@@ -31,6 +31,7 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
         ->and($document['operations']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast.send']['action'])->toBe('send')
         ->and($document['operations']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast.send']['messages'][0]['$ref'])->toBe('#/channels/private-users.{userId}/messages/Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast')
         ->and($notificationMessage['name'])->toBe('user.notification.created')
+        ->and($notificationMessage['title'])->toBe('User Notification')
         ->and($notificationMessage['summary'])->toBe('User notification was created')
         ->and($notificationMessage['description'])->toBe('Sent when a user receives a notification.')
         ->and($notificationMessage['tags'])->toBe([['name' => 'notifications']])

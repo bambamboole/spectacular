@@ -150,6 +150,7 @@ From an event, Spectacular derives:
 ```php
 #[Message(
     channels: [],          // explicit channel names; inferred from broadcastOn() when empty
+    title: null,           // human-friendly message title
     summary: null,         // short message summary
     description: null,     // longer description
     tags: [],              // AsyncAPI message tags

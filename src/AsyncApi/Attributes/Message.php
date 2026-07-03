@@ -14,6 +14,7 @@ final readonly class Message
      */
     public function __construct(
         public array $channels = [],
+        public ?string $title = null,
         public ?string $summary = null,
         public ?string $description = null,
         public array $tags = [],

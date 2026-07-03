@@ -10,6 +10,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 
 #[Message(
     channels: ['private-users.{userId}'],
+    title: 'User Notification',
     summary: 'User notification was created',
     description: 'Sent when a user receives a notification.',
     tags: ['notifications'],

@@ -73,6 +73,7 @@ final readonly class AsyncApiGenerator
 
             $messages[$messageKey] = array_filter([
                 'name' => $this->broadcastName($event),
+                'title' => $attribute->title,
                 'summary' => $attribute->summary,
                 'description' => $attribute->description,
                 'tags' => array_map(fn (string $tag): array => ['name' => $tag], $attribute->tags),
