@@ -6,10 +6,10 @@ use Bambamboole\Spectacular\Doc\Lattice\SchemaTree;
 
 it('serializes to the spectacular.schema-tree node', function (): void {
     $node = SchemaTree::make()
-        ->for(['components' => ['schemas' => []]], '#/components/schemas/Node')
+        ->forSchema(['type' => 'object'], ['schemas' => []])
         ->jsonSerialize();
 
     expect($node['type'])->toBe('spectacular.schema-tree')
-        ->and($node['props']['pointer'])->toBe('#/components/schemas/Node')
-        ->and($node['props']['document'])->toBe(['components' => ['schemas' => []]]);
+        ->and($node['props']['schema'])->toBe(['type' => 'object'])
+        ->and($node['props']['components'])->toBe(['schemas' => []]);
 });

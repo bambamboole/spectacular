@@ -19,17 +19,6 @@ function isRegularLike(node: SchemaNode): node is RegularLikeNode {
     return isRegularNode(node) || (isMirroredNode(node) && "types" in node);
 }
 
-function resolvePointer(doc: unknown, pointer: string): unknown {
-    const path = pointer.replace(/^#\//, "").split("/");
-
-    return path.reduce<unknown>((acc, key) => {
-        if (acc && typeof acc === "object") {
-            return (acc as Record<string, unknown>)[decodeURIComponent(key)];
-        }
-        return undefined;
-    }, doc);
-}
-
 function typeLabel(node: SchemaNode): string {
     if (isReferenceNode(node)) {
         return node.value ?? "ref";
@@ -67,13 +56,13 @@ function childRows(node: SchemaNode): SchemaRow[] {
     });
 }
 
-export async function buildSchemaRows(rootDocument: unknown, pointer: string): Promise<SchemaRow[]> {
-    const dereferenced = await $RefParser.dereference(structuredClone(rootDocument) as object, {
+export async function buildSchemaRows(schema: unknown, components: unknown): Promise<SchemaRow[]> {
+    const wrapper = { __schema: schema, components };
+    const dereferenced = (await $RefParser.dereference(structuredClone(wrapper) as object, {
         dereference: { circular: true },
-    });
-    const target = resolvePointer(dereferenced, pointer);
+    })) as { __schema: object };
 
-    const tree = new SchemaTree(target as object, { mergeAllOf: true, refResolver: null });
+    const tree = new SchemaTree(dereferenced.__schema, { mergeAllOf: true });
     tree.populate();
 
     const [schemaNode] = tree.root.children as unknown as SchemaNode[];

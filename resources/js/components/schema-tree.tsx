@@ -28,19 +28,19 @@ function Row({ row }: { row: SchemaRow }): React.ReactNode {
 }
 
 const SchemaTreeComponent: RendererComponent<"spectacular.schema-tree"> = ({ node }) => {
-    const { document, pointer } = node.props as { document: unknown; pointer: string };
+    const { schema, components } = node.props as { schema: unknown; components: unknown };
     const [rows, setRows] = useState<SchemaRow[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let active = true;
-        buildSchemaRows(document, pointer)
+        buildSchemaRows(schema, components)
             .then((result) => active && setRows(result))
             .catch((e: unknown) => active && setError(String(e)));
         return () => {
             active = false;
         };
-    }, [document, pointer]);
+    }, [schema, components]);
 
     if (error) {
         return <div className="text-lt-danger">{error}</div>;

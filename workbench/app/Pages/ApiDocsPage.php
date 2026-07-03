@@ -23,9 +23,12 @@ final class ApiDocsPage extends Page
             flags: JSON_THROW_ON_ERROR,
         );
 
+        $components = $document['components'] ?? [];
+        $categorySchema = $components['schemas']['CategoryResource'] ?? [];
+
         return $schema->schema([
             Section::make('CategoryResource')->schema([
-                SchemaTree::make()->for($document, '#/components/schemas/CategoryResource'),
+                SchemaTree::make()->forSchema($categorySchema, $components),
             ]),
         ]);
     }

@@ -11,9 +11,10 @@ use Lattice\Lattice\Core\Components\Component;
 final class SchemaTree extends Component
 {
     /** @var array<string, mixed> */
-    public array $document = [];
+    public array $schema = [];
 
-    public string $pointer = '#/';
+    /** @var array<string, mixed> */
+    public array $components = [];
 
     public static function make(?string $key = null): static
     {
@@ -21,12 +22,13 @@ final class SchemaTree extends Component
     }
 
     /**
-     * @param  array<string, mixed>  $document
+     * @param  array<string, mixed>  $schema
+     * @param  array<string, mixed>  $components
      */
-    public function for(array $document, string $pointer): static
+    public function forSchema(array $schema, array $components): static
     {
-        $this->document = $document;
-        $this->pointer = $pointer;
+        $this->schema = $schema;
+        $this->components = $components;
 
         return $this;
     }
