@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoiceRefundedWebhook;
+use Bambamboole\Spectacular\Tests\Fixtures\WebhookRegistry\NestedRoot\Nested\InvoiceVoidedWebhook;
 use Bambamboole\Spectacular\Webhooks\WebhookEventRegistry;
 
 it('discovers webhook event definitions sorted by event name', function (): void {
@@ -38,11 +39,44 @@ it('discovers webhook event definitions sorted by event name', function (): void
 
 it('rejects duplicate webhook event names', function (): void {
     config()->set('spectacular.asyncapi.webhooks.scan_paths', [
-        dirname(__DIR__).'/Fixtures/AsyncApi/DuplicateWebhooks',
+        dirname(__DIR__).'/Fixtures/WebhookRegistry/DuplicateWebhooks',
     ]);
 
     expect(fn () => app(WebhookEventRegistry::class)->all())
         ->toThrow(LogicException::class, 'Duplicate webhook event name [invoice.paid]');
+});
+
+it('discovers nested webhook event definitions recursively', function (): void {
+    config()->set('spectacular.asyncapi.webhooks.scan_paths', [
+        dirname(__DIR__).'/Fixtures/WebhookRegistry/NestedRoot',
+    ]);
+
+    $definitions = app(WebhookEventRegistry::class)->all();
+
+    expect($definitions)->toHaveCount(1)
+        ->and($definitions[0]->name)->toBe('invoice.voided')
+        ->and($definitions[0]->class)->toBe(InvoiceVoidedWebhook::class);
+});
+
+it('inherits base asyncapi scan paths when webhook scan paths are null', function (): void {
+    config()->set('spectacular.asyncapi.scan_paths', [
+        dirname(__DIR__).'/Fixtures/WebhookRegistry/NestedRoot',
+    ]);
+    config()->set('spectacular.asyncapi.webhooks.scan_paths', null);
+
+    $definitions = app(WebhookEventRegistry::class)->all();
+
+    expect($definitions)->toHaveCount(1)
+        ->and($definitions[0]->name)->toBe('invoice.voided');
+});
+
+it('returns no events when webhook scan paths are explicitly empty', function (): void {
+    config()->set('spectacular.asyncapi.scan_paths', [
+        dirname(__DIR__).'/Fixtures/WebhookRegistry/NestedRoot',
+    ]);
+    config()->set('spectacular.asyncapi.webhooks.scan_paths', []);
+
+    expect(app(WebhookEventRegistry::class)->all())->toBe([]);
 });
 
 it('is registered as a singleton', function (): void {

@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\DuplicateWebhooks;
+namespace Bambamboole\Spectacular\Tests\Fixtures\WebhookRegistry\DuplicateWebhooks;
 
 use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
 
-#[WebhookEvent(name: 'invoice.paid', title: 'Second Invoice Paid')]
-final class SecondInvoicePaidWebhook
+#[WebhookEvent(name: 'invoice.paid', title: 'First Invoice Paid')]
+final class FirstInvoicePaidWebhook
 {
     /**
      * @return array{invoiceId:int}
@@ -14,7 +14,7 @@ final class SecondInvoicePaidWebhook
     public function webhookPayload(): array
     {
         return [
-            'invoiceId' => 456,
+            'invoiceId' => 123,
         ];
     }
 }

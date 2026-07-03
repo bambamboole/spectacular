@@ -21,12 +21,11 @@ final readonly class WebhookEventRegistry
     {
         $definitions = [];
         $scanPaths = $this->scanPaths();
-        $realScanPaths = $this->realScanPaths($scanPaths);
 
         foreach ($this->classes->classesIn($scanPaths) as $class) {
             $reflection = new ReflectionClass($class);
 
-            if (! $reflection->isInstantiable() || ! $this->isDirectlyInScanPaths($reflection, $realScanPaths)) {
+            if (! $reflection->isInstantiable()) {
                 continue;
             }
 
@@ -74,38 +73,5 @@ final readonly class WebhookEventRegistry
         }
 
         return array_values(array_filter($scanPaths, is_string(...)));
-    }
-
-    /**
-     * @param  list<string>  $scanPaths
-     * @return list<string>
-     */
-    private function realScanPaths(array $scanPaths): array
-    {
-        return array_values(array_filter(
-            array_map(fn (string $path): string|false => realpath($path), $scanPaths),
-            is_string(...),
-        ));
-    }
-
-    /**
-     * @param  ReflectionClass<object>  $reflection
-     * @param  list<string>  $scanPaths
-     */
-    private function isDirectlyInScanPaths(ReflectionClass $reflection, array $scanPaths): bool
-    {
-        $file = $reflection->getFileName();
-
-        if (! is_string($file)) {
-            return false;
-        }
-
-        $directory = realpath(dirname($file));
-
-        if ($directory === false) {
-            return false;
-        }
-
-        return in_array($directory, $scanPaths, true);
     }
 }
