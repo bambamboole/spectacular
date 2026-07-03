@@ -74,7 +74,7 @@ final readonly class MessageDefinitionFactory
     {
         $channels = $attribute->channels !== []
             ? $attribute->channels
-            : $this->inferNotificationChannels($attribute->notifiables);
+            : $this->inferNotificationChannels($attribute->notifiables, $notification);
 
         if ($channels === []) {
             return null;
@@ -111,9 +111,11 @@ final readonly class MessageDefinitionFactory
         );
     }
 
-    public function fromWebhook(WebhookEventDefinition $definition): AsyncMessageDefinition
+    /**
+     * @param  array<string, mixed>  $channel
+     */
+    public function fromWebhook(WebhookEventDefinition $definition, array $channel = []): AsyncMessageDefinition
     {
-        $channel = config('spectacular.asyncapi.webhooks.channel', []);
         $channelKey = is_string($channel['key'] ?? null) ? $channel['key'] : 'webhooks';
         $channelAddress = is_string($channel['address'] ?? null) ? $channel['address'] : '{webhookUrl}';
         $data = $definition->attribute->payload !== null
@@ -188,16 +190,17 @@ final readonly class MessageDefinitionFactory
 
     /**
      * @param  list<class-string>  $notifiables
+     * @param  ReflectionClass<object>  $notification
      * @return list<string>
      */
-    private function inferNotificationChannels(array $notifiables): array
+    private function inferNotificationChannels(array $notifiables, ReflectionClass $notification): array
     {
         return collect($notifiables)
-            ->flatMap(function (string $notifiable): array {
+            ->flatMap(function (string $notifiable) use ($notification): array {
                 $reflection = new ReflectionClass($notifiable);
 
                 return $this->normalizeChannels(
-                    $this->receivesBroadcastNotificationsOn($reflection) ?? $this->defaultNotifiableChannel($reflection),
+                    $this->receivesBroadcastNotificationsOn($reflection, $notification) ?? $this->defaultNotifiableChannel($reflection),
                 );
             })
             ->values()
@@ -206,8 +209,9 @@ final readonly class MessageDefinitionFactory
 
     /**
      * @param  ReflectionClass<object>  $notifiable
+     * @param  ReflectionClass<object>  $notification
      */
-    private function receivesBroadcastNotificationsOn(ReflectionClass $notifiable): mixed
+    private function receivesBroadcastNotificationsOn(ReflectionClass $notifiable, ReflectionClass $notification): mixed
     {
         if (! $notifiable->hasMethod('receivesBroadcastNotificationsOn')) {
             return null;
@@ -215,12 +219,18 @@ final readonly class MessageDefinitionFactory
 
         $method = $notifiable->getMethod('receivesBroadcastNotificationsOn');
 
-        if (! $method->isPublic() || $method->getNumberOfRequiredParameters() > 0) {
+        if (! $method->isPublic() || $method->getNumberOfRequiredParameters() > 1) {
             return null;
         }
 
         try {
-            return $method->invoke($notifiable->newInstanceWithoutConstructor());
+            $notifiableInstance = $notifiable->newInstanceWithoutConstructor();
+
+            if ($method->getNumberOfParameters() === 0) {
+                return $method->invoke($notifiableInstance);
+            }
+
+            return $method->invoke($notifiableInstance, $notification->newInstanceWithoutConstructor());
         } catch (Throwable) {
             return null;
         }

@@ -15,12 +15,13 @@ final readonly class WebhookEventRegistry
     ) {}
 
     /**
+     * @param  list<string>|null  $scanPaths
      * @return list<WebhookEventDefinition>
      */
-    public function all(): array
+    public function all(?array $scanPaths = null): array
     {
         $definitions = [];
-        $scanPaths = $this->scanPaths();
+        $scanPaths ??= $this->scanPaths();
 
         foreach ($this->classes->classesIn($scanPaths) as $class) {
             $reflection = new ReflectionClass($class);
