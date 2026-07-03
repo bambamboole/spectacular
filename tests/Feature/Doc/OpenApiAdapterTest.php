@@ -39,3 +39,29 @@ it('adapts the workbench openapi document into operations grouped by tag', funct
 
     expect($doc->components['schemas'])->toHaveKeys(['UserResource', 'RoleResource', 'CategoryResource']);
 });
+
+it('adds a multi-tagged operation to every one of its tags groups', function (): void {
+    $doc = (new OpenApiAdapter)->adapt([
+        'openapi' => '3.1.0',
+        'info' => ['title' => 'Test', 'version' => '1.0.0'],
+        'paths' => [
+            '/users/{user}/promote' => [
+                'post' => [
+                    'operationId' => 'promoteUser',
+                    'tags' => ['Users', 'Admin'],
+                    'responses' => [
+                        '200' => ['description' => 'OK'],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    $usersGroup = collect($doc->groups)->firstWhere('title', 'Users');
+    $adminGroup = collect($doc->groups)->firstWhere('title', 'Admin');
+
+    expect($usersGroup)->not->toBeNull()
+        ->and($adminGroup)->not->toBeNull()
+        ->and($usersGroup->operationIds)->toContain('post-users-user-promote')
+        ->and($adminGroup->operationIds)->toContain('post-users-user-promote');
+});

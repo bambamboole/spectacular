@@ -192,8 +192,9 @@ final class OpenApiAdapter
         $operationIdsByTag = [];
 
         foreach ($operations as $operation) {
-            $tag = $this->primaryTag($operation);
-            $operationIdsByTag[$tag][] = $operation->id;
+            foreach ($this->groupTags($operation) as $tag) {
+                $operationIdsByTag[$tag][] = $operation->id;
+            }
         }
 
         $groups = [];
@@ -207,6 +208,14 @@ final class OpenApiAdapter
     private function primaryTag(Operation $operation): string
     {
         return $operation->tags[0] ?? self::DEFAULT_GROUP_TITLE;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function groupTags(Operation $operation): array
+    {
+        return $operation->tags === [] ? [self::DEFAULT_GROUP_TITLE] : $operation->tags;
     }
 
     private function sortKey(Operation $operation): string
