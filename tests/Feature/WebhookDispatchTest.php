@@ -5,13 +5,16 @@ use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
 use Bambamboole\Spectacular\SpectacularServiceProvider;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
+use Bambamboole\Spectacular\Webhooks\DispatchWebhookEvent;
 use Bambamboole\Spectacular\Webhooks\WebhookEventDefinition;
 use Bambamboole\Spectacular\Webhooks\WebhookPayloadFactory;
 use Bambamboole\Spectacular\Webhooks\WebhookSubscription;
 use Bambamboole\Spectacular\Webhooks\WebhookSubscriptionRepository;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
+use Spatie\WebhookServer\CallWebhookJob;
 
 afterEach(function (): void {
     Carbon::setTestNow();
@@ -58,6 +61,60 @@ it('preserves an existing subscription repository binding', function (): void {
 
     expect($subscriptions)->toHaveCount(1)
         ->and($subscriptions[0]->url)->toBe('https://example.com/webhooks');
+});
+
+it('dispatches documented webhook events through spatie', function (): void {
+    Bus::fake();
+    Carbon::setTestNow('2026-07-03 12:34:56');
+    config()->set('spectacular.asyncapi.webhooks.scan_paths', [
+        __DIR__.'/../Fixtures/AsyncApi',
+    ]);
+    config()->set('webhook-server', require __DIR__.'/../../vendor/spatie/laravel-webhook-server/config/webhook-server.php');
+
+    app()->bind(WebhookSubscriptionRepository::class, DispatchingWebhookSubscriptionRepository::class);
+
+    $event = new InvoicePaidWebhook(invoiceId: 987, amount: 6500);
+
+    app(DispatchWebhookEvent::class)->handle($event);
+
+    Bus::assertDispatched(CallWebhookJob::class, function (CallWebhookJob $job) use ($event): bool {
+        expect($job->webhookUrl)->toBe('https://example.com/webhooks')
+            ->and($job->payload)->toMatchArray([
+                'event' => 'invoice.paid',
+                'data' => [
+                    'invoiceId' => 987,
+                    'amount' => 6500,
+                    'paidAt' => CarbonImmutable::parse('2026-07-03 12:00:00'),
+                    'status' => BroadcastStatus::Sent,
+                ],
+            ])
+            ->and($job->headers)->toMatchArray([
+                'X-Webhook-Source' => 'spectacular',
+            ])
+            ->and($job->headers)->not->toHaveKey('Signature')
+            ->and($job->meta)->toMatchArray([
+                'event' => 'invoice.paid',
+                'subscription_id' => 'subscription-123',
+                'payload_id' => $job->payload['id'],
+            ])
+            ->and($job->useTimestamp)->toBeTrue();
+
+        expect(DispatchingWebhookSubscriptionRepository::$eventName)->toBe('invoice.paid')
+            ->and(DispatchingWebhookSubscriptionRepository::$event)->toBe($event);
+
+        return true;
+    });
+});
+
+it('ignores events that are not documented webhooks', function (): void {
+    Bus::fake();
+    config()->set('spectacular.asyncapi.webhooks.scan_paths', [
+        __DIR__.'/../Fixtures/AsyncApi',
+    ]);
+
+    app(DispatchWebhookEvent::class)->handle(new UndocumentedWebhookEvent);
+
+    Bus::assertNothingDispatched();
 });
 
 it('throws a useful runtime exception when the payload method is missing', function (): void {
@@ -209,3 +266,27 @@ final class CustomWebhookSubscriptionRepository implements WebhookSubscriptionRe
         ];
     }
 }
+
+final class DispatchingWebhookSubscriptionRepository implements WebhookSubscriptionRepository
+{
+    public static ?string $eventName = null;
+
+    public static ?object $event = null;
+
+    public function forEvent(string $eventName, object $event): iterable
+    {
+        self::$eventName = $eventName;
+        self::$event = $event;
+
+        return [
+            new WebhookSubscription(
+                url: 'https://example.com/webhooks',
+                secret: null,
+                headers: ['X-Webhook-Source' => 'spectacular'],
+                id: 'subscription-123',
+            ),
+        ];
+    }
+}
+
+final class UndocumentedWebhookEvent {}
