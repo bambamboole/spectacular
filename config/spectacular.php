@@ -17,9 +17,7 @@ return [
             app_path('Events'),
         ],
         'webhooks' => [
-            'scan_paths' => [
-                app_path('Events'),
-            ],
+            'scan_paths' => null,
             'channel' => [
                 'key' => 'webhooks',
                 'address' => '{webhookUrl}',

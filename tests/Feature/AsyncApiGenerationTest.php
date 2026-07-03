@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use Bambamboole\Spectacular\AsyncApi\AsyncApiGenerator;
+use Bambamboole\Spectacular\SpectacularServiceProvider;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\ImmediateBroadcast;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
@@ -19,7 +20,7 @@ it('defaults webhook AsyncAPI settings without enabling runtime delivery', funct
     $config = require dirname(__DIR__, 2).'/config/spectacular.php';
 
     expect($config['asyncapi']['webhooks'])->toBe([
-        'scan_paths' => [app_path('Events')],
+        'scan_paths' => null,
         'channel' => [
             'key' => 'webhooks',
             'address' => '{webhookUrl}',
@@ -34,6 +35,27 @@ it('defaults webhook AsyncAPI settings without enabling runtime delivery', funct
             'use_timestamp' => true,
         ],
     ]);
+});
+
+it('fills webhook AsyncAPI defaults for older published configs', function (): void {
+    $publishedScanPaths = [dirname(__DIR__).'/Fixtures/AsyncApi'];
+
+    config()->set('spectacular.asyncapi', [
+        'version' => '3.0.0',
+        'default_content_type' => 'application/json',
+        'info' => [
+            'title' => 'Published AsyncAPI',
+            'version' => '9.9.9',
+        ],
+        'laravel_extensions' => false,
+        'scan_paths' => $publishedScanPaths,
+    ]);
+
+    (new SpectacularServiceProvider(app()))->register();
+
+    expect(config('spectacular.asyncapi.webhooks.channel.key'))->toBe('webhooks')
+        ->and(config('spectacular.asyncapi.webhooks.scan_paths'))->toBeNull()
+        ->and(config('spectacular.asyncapi.scan_paths'))->toBe($publishedScanPaths);
 });
 
 it('generates an AsyncAPI document for tagged Laravel broadcast events', function (): void {
