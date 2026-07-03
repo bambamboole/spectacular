@@ -209,11 +209,15 @@ final class DocumentCompiler
      */
     private function responseBody(Contract $contract, array $components): Component
     {
-        if ($contract->schema === []) {
-            return Text::make('No body.');
+        $body = $contract->schema === []
+            ? Text::make('No body.')
+            : SchemaTree::make()->forSchema($contract->schema, $components);
+
+        if ($contract->title === null || $contract->title === '') {
+            return $body;
         }
 
-        return SchemaTree::make()->forSchema($contract->schema, $components);
+        return Stack::make()->schema([Text::make($contract->title), $body]);
     }
 
     /**

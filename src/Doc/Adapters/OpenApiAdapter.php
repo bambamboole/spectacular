@@ -27,7 +27,8 @@ final class OpenApiAdapter
      */
     public function adapt(array $document): ApiDocument
     {
-        $operations = $this->buildOperations($document['paths'] ?? []);
+        $componentsResponses = $document['components']['responses'] ?? [];
+        $operations = $this->buildOperations($document['paths'] ?? [], $componentsResponses);
 
         return new ApiDocument(
             format: 'openapi',
@@ -42,9 +43,10 @@ final class OpenApiAdapter
 
     /**
      * @param  array<string, mixed>  $paths
+     * @param  array<string, array<string, mixed>>  $componentsResponses
      * @return list<Operation>
      */
-    private function buildOperations(array $paths): array
+    private function buildOperations(array $paths, array $componentsResponses): array
     {
         $operations = [];
 
@@ -56,7 +58,7 @@ final class OpenApiAdapter
                     continue;
                 }
 
-                $operations[] = $this->buildOperation($path, $method, $pathItem[$method], $sharedParameters);
+                $operations[] = $this->buildOperation($path, $method, $pathItem[$method], $sharedParameters, $componentsResponses);
             }
         }
 
@@ -68,8 +70,9 @@ final class OpenApiAdapter
     /**
      * @param  array<string, mixed>  $operation
      * @param  list<array<string, mixed>>  $sharedParameters
+     * @param  array<string, array<string, mixed>>  $componentsResponses
      */
-    private function buildOperation(string $path, string $method, array $operation, array $sharedParameters): Operation
+    private function buildOperation(string $path, string $method, array $operation, array $sharedParameters, array $componentsResponses): Operation
     {
         $operationParameters = $operation['parameters'] ?? [];
 
@@ -82,7 +85,7 @@ final class OpenApiAdapter
             tags: array_values($operation['tags'] ?? []),
             deprecated: (bool) ($operation['deprecated'] ?? false),
             paramGroups: $this->buildParamGroups($sharedParameters, $operationParameters),
-            responses: $this->buildResponses($operation['responses'] ?? []),
+            responses: $this->buildResponses($operation['responses'] ?? [], $componentsResponses),
             facet: new HttpFacet(strtoupper($method), $path, $operation['operationId'] ?? null),
         );
     }
@@ -158,13 +161,15 @@ final class OpenApiAdapter
 
     /**
      * @param  array<string, mixed>  $responses
+     * @param  array<string, array<string, mixed>>  $componentsResponses
      * @return list<Contract>
      */
-    private function buildResponses(array $responses): array
+    private function buildResponses(array $responses, array $componentsResponses): array
     {
         $contracts = [];
 
         foreach ($responses as $status => $response) {
+            $response = $this->resolveResponse($response, $componentsResponses);
             $description = $response['description'] ?? null;
             $content = $response['content'] ?? [];
 
@@ -180,6 +185,24 @@ final class OpenApiAdapter
         }
 
         return $contracts;
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     * @param  array<string, array<string, mixed>>  $componentsResponses
+     * @return array<string, mixed>
+     */
+    private function resolveResponse(array $response, array $componentsResponses): array
+    {
+        $ref = $response['$ref'] ?? null;
+
+        if (! is_string($ref)) {
+            return $response;
+        }
+
+        $name = Str::afterLast($ref, '/');
+
+        return $componentsResponses[$name] ?? ['description' => $name, 'content' => []];
     }
 
     /**

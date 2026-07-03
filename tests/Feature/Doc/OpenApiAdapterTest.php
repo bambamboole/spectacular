@@ -40,6 +40,22 @@ it('adapts the workbench openapi document into operations grouped by tag', funct
     expect($doc->components['schemas'])->toHaveKeys(['UserResource', 'RoleResource', 'CategoryResource']);
 });
 
+it('resolves a response-level $ref against components.responses', function (): void {
+    $doc = (new OpenApiAdapter)->adapt(workbenchOpenApi());
+
+    $show = collect($doc->operations)->firstWhere('id', 'get-users-user');
+    expect($show)->not->toBeNull();
+
+    $ok = collect($show->responses)->firstWhere('status', '200');
+    expect($ok)->not->toBeNull();
+
+    $notFound = collect($show->responses)->firstWhere('status', '404');
+    expect($notFound)->not->toBeNull()
+        ->and($notFound->title)->toBe('Not found')
+        ->and($notFound->schema)->not->toBe([])
+        ->and($notFound->schema['properties'])->toHaveKey('message');
+});
+
 it('adds a multi-tagged operation to every one of its tags groups', function (): void {
     $doc = (new OpenApiAdapter)->adapt([
         'openapi' => '3.1.0',
