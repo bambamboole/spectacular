@@ -15,6 +15,27 @@ it('defaults to scanning the application events path', function (): void {
     expect($config['asyncapi']['scan_paths'])->toBe([app_path('Events')]);
 });
 
+it('defaults webhook AsyncAPI settings without enabling runtime delivery', function (): void {
+    $config = require dirname(__DIR__, 2).'/config/spectacular.php';
+
+    expect($config['asyncapi']['webhooks'])->toBe([
+        'scan_paths' => [app_path('Events')],
+        'channel' => [
+            'key' => 'webhooks',
+            'address' => '{webhookUrl}',
+        ],
+        'headers' => [
+            'Content-Type' => ['type' => 'string', 'enum' => ['application/json']],
+            'Signature' => ['type' => 'string'],
+            'Timestamp' => ['type' => 'integer'],
+        ],
+        'dispatcher' => [
+            'enabled' => false,
+            'use_timestamp' => true,
+        ],
+    ]);
+});
+
 it('generates an AsyncAPI document for tagged Laravel broadcast events', function (): void {
     configureFixtureAsyncApi();
 
