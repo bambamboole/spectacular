@@ -8,11 +8,6 @@ use Spatie\WebhookServer\WebhookCall;
 
 final class DispatchWebhookEvent
 {
-    /**
-     * @var array<class-string, WebhookEventDefinition>|null
-     */
-    private ?array $definitionsByClass = null;
-
     public function __construct(
         private readonly WebhookEventRegistry $events,
         private readonly WebhookPayloadFactory $payloads,
@@ -69,25 +64,7 @@ final class DispatchWebhookEvent
 
     private function definitionFor(object $event): ?WebhookEventDefinition
     {
-        return $this->definitionsByClass()[$event::class] ?? null;
-    }
-
-    /**
-     * @return array<class-string, WebhookEventDefinition>
-     */
-    private function definitionsByClass(): array
-    {
-        if ($this->definitionsByClass !== null) {
-            return $this->definitionsByClass;
-        }
-
-        $definitions = [];
-
-        foreach ($this->events->all() as $definition) {
-            $definitions[$definition->class] = $definition;
-        }
-
-        return $this->definitionsByClass = $definitions;
+        return $this->events->forClass($event::class);
     }
 
     /**

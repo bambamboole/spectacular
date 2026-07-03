@@ -70,6 +70,22 @@ it('inherits base asyncapi scan paths when webhook scan paths are null', functio
         ->and($definitions[0]->name)->toBe('invoice.voided');
 });
 
+it('caches default webhook definitions by class for singleton lookups', function (): void {
+    config()->set('spectacular.asyncapi.webhooks.scan_paths', [
+        dirname(__DIR__).'/Fixtures/AsyncApi',
+    ]);
+
+    $registry = app(WebhookEventRegistry::class);
+
+    expect($registry->forClass(InvoicePaidWebhook::class)?->name)->toBe('invoice.paid')
+        ->and($registry->forClass(stdClass::class))->toBeNull();
+
+    config()->set('spectacular.asyncapi.webhooks.scan_paths', []);
+
+    expect(app(WebhookEventRegistry::class)->forClass(InvoicePaidWebhook::class)?->name)->toBe('invoice.paid')
+        ->and(app(WebhookEventRegistry::class)->all())->toBe([]);
+});
+
 it('returns no events when webhook scan paths are explicitly empty', function (): void {
     config()->set('spectacular.asyncapi.scan_paths', [
         dirname(__DIR__).'/Fixtures/WebhookRegistry/NestedRoot',
