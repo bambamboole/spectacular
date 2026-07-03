@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\DuplicateWebhooks;
+namespace Bambamboole\Spectacular\Tests\Fixtures\WebhookRegistry\NestedRoot\Nested;
 
 use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
 
-#[WebhookEvent(name: 'invoice.paid', title: 'First Invoice Paid')]
-final class FirstInvoicePaidWebhook
+#[WebhookEvent(name: 'invoice.voided', title: 'Invoice Voided')]
+final class InvoiceVoidedWebhook
 {
     /**
      * @return array{invoiceId:int}
@@ -14,7 +14,7 @@ final class FirstInvoicePaidWebhook
     public function webhookPayload(): array
     {
         return [
-            'invoiceId' => 123,
+            'invoiceId' => 789,
         ];
     }
 }
