@@ -1,0 +1,67 @@
+{
+    "asyncapi": "3.0.0",
+    "info": {
+        "title": "Workbench AsyncAPI",
+        "version": "1.0.0"
+    },
+    "defaultContentType": "application/json",
+    "channels": {
+        "private-users.{userId}": {
+            "address": "private-users.{userId}",
+            "messages": {
+                "Workbench.App.Events.UserNotificationReceived": {
+                    "$ref": "#/components/messages/Workbench.App.Events.UserNotificationReceived"
+                }
+            },
+            "x-laravel-channel-type": "private"
+        }
+    },
+    "operations": {
+        "Workbench.App.Events.UserNotificationReceived.send": {
+            "action": "send",
+            "channel": {
+                "$ref": "#/channels/private-users.{userId}"
+            },
+            "messages": [
+                {
+                    "$ref": "#/channels/private-users.{userId}/messages/Workbench.App.Events.UserNotificationReceived"
+                }
+            ]
+        }
+    },
+    "components": {
+        "messages": {
+            "Workbench.App.Events.UserNotificationReceived": {
+                "name": "user.notification.received",
+                "summary": "User notification received",
+                "description": "Sent when a user receives a notification in the workbench app.",
+                "tags": [
+                    {
+                        "name": "notifications"
+                    }
+                ],
+                "payload": {
+                    "type": "object",
+                    "properties": {
+                        "userId": {
+                            "type": "integer"
+                        },
+                        "team": {
+                            "type": "string"
+                        },
+                        "unreadCount": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "userId",
+                        "team",
+                        "unreadCount"
+                    ]
+                },
+                "x-laravel-event": "Workbench\\App\\Events\\UserNotificationReceived",
+                "x-laravel-broadcast-now": false
+            }
+        }
+    }
+}

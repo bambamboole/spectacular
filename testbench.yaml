@@ -1,0 +1,20 @@
+laravel: '@testbench'
+
+providers:
+  - Dedoc\Scramble\ScrambleServiceProvider
+  - Spatie\QueryBuilder\QueryBuilderServiceProvider
+  - Bambamboole\Spectacular\SpectacularServiceProvider
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+workbench:
+  start: '/'
+  welcome: false
+  discovers:
+    web: true
+    api: true
+    commands: false
+    components: false
+    views: false
+  build:
+    - migrate:fresh:
+        --force: true

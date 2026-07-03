@@ -1,0 +1,16 @@
+.idea
+/vendor
+/composer.lock
+/.phpunit.cache
+/.phpunit.result.cache
+/vendor/orchestra/testbench-core/laravel
+/workbench/database/*.sqlite
+
+.phpstorm.meta.php
+_ide_helper.php
+
+.agents
+.claude
+.codex
+AGENTS.md
+CLAUDE.md
