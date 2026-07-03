@@ -2,12 +2,18 @@
 declare(strict_types=1);
 
 use Bambamboole\Spectacular\AsyncApi\AsyncApiGenerator;
+use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
+use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
+use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
 use Bambamboole\Spectacular\SpectacularServiceProvider;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\ImmediateBroadcast;
+use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
+use ReflectionAttribute;
+use ReflectionClass;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
 it('defaults to scanning the application events path', function (): void {
@@ -56,6 +62,43 @@ it('fills webhook AsyncAPI defaults for older published configs', function (): v
     expect(config('spectacular.asyncapi.webhooks.channel.key'))->toBe('webhooks')
         ->and(config('spectacular.asyncapi.webhooks.scan_paths'))->toBeNull()
         ->and(config('spectacular.asyncapi.scan_paths'))->toBe($publishedScanPaths);
+});
+
+it('treats specialized async attributes as message metadata', function (): void {
+    $notification = new ReflectionClass(BroadcastNotification::class);
+    $webhook = new ReflectionClass(WebhookEvent::class);
+
+    expect($notification->isSubclassOf(Message::class))->toBeTrue()
+        ->and($webhook->isSubclassOf(Message::class))->toBeTrue();
+
+    $attribute = new BroadcastNotification(
+        notifiables: ['App\\Models\\User'],
+        title: 'Invoice paid',
+        summary: 'Sent after an invoice is paid',
+        tags: ['billing'],
+    );
+
+    expect($attribute->notifiables)->toBe(['App\\Models\\User'])
+        ->and($attribute->title)->toBe('Invoice paid')
+        ->and($attribute->summary)->toBe('Sent after an invoice is paid')
+        ->and($attribute->tags)->toBe(['billing']);
+
+    $webhookAttribute = new WebhookEvent(
+        name: 'invoice.paid',
+        payloadMethod: 'webhookPayload',
+        title: 'Invoice paid',
+        tags: ['billing'],
+    );
+
+    expect($webhookAttribute->name)->toBe('invoice.paid')
+        ->and($webhookAttribute->payloadMethod)->toBe('webhookPayload')
+        ->and($webhookAttribute->title)->toBe('Invoice paid')
+        ->and($webhookAttribute->tags)->toBe(['billing']);
+
+    $reflectedAttributes = (new ReflectionClass(InvoicePaidWebhook::class))
+        ->getAttributes(Message::class, ReflectionAttribute::IS_INSTANCEOF);
+
+    expect($reflectedAttributes)->toHaveCount(1);
 });
 
 it('generates an AsyncAPI document for tagged Laravel broadcast events', function (): void {

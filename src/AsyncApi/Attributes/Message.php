@@ -6,7 +6,7 @@ namespace Bambamboole\Spectacular\AsyncApi\Attributes;
 use Attribute;
 
 #[Attribute(Attribute::TARGET_CLASS)]
-final readonly class Message
+readonly class Message
 {
     /**
      * @param  list<string>  $channels
