@@ -28,7 +28,6 @@ return [
                 'Timestamp' => ['type' => 'integer'],
             ],
             'dispatcher' => [
-                'enabled' => false,
                 'use_timestamp' => true,
             ],
         ],

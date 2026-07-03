@@ -36,7 +36,6 @@ it('defaults webhook AsyncAPI settings without enabling runtime delivery', funct
             'Timestamp' => ['type' => 'integer'],
         ],
         'dispatcher' => [
-            'enabled' => false,
             'use_timestamp' => true,
         ],
     ]);
@@ -85,12 +84,14 @@ it('treats specialized async attributes as message metadata', function (): void 
     $webhookAttribute = new WebhookEvent(
         name: 'invoice.paid',
         payloadMethod: 'webhookPayload',
+        headers: ['X-Tenant' => ['type' => 'string']],
         title: 'Invoice paid',
         tags: ['billing'],
     );
 
     expect($webhookAttribute->name)->toBe('invoice.paid')
         ->and($webhookAttribute->payloadMethod)->toBe('webhookPayload')
+        ->and($webhookAttribute->headers)->toBe(['X-Tenant' => ['type' => 'string']])
         ->and($webhookAttribute->title)->toBe('Invoice paid')
         ->and($webhookAttribute->tags)->toBe(['billing']);
 
@@ -186,6 +187,9 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
         ->and($document['operations']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast.send']['messages'][0]['$ref'])->toBe('#/channels/private-users.{userId}/messages/Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast')
         ->and($webhookMessage['name'])->toBe('invoice.paid')
         ->and($webhookMessage['title'])->toBe('Invoice Paid')
+        ->and($webhookMessage['headers']['properties']['Content-Type'])->toBe(['type' => 'string', 'enum' => ['application/json']])
+        ->and($webhookMessage['headers']['properties']['Signature'])->toBe(['type' => 'string'])
+        ->and($webhookMessage['headers']['properties']['Timestamp'])->toBe(['type' => 'integer'])
         ->and($webhookMessage['payload']['properties']['data']['properties']['invoiceId'])->toBe(['type' => 'integer'])
         ->and($webhookMessage['payload']['required'])->toBe(['id', 'event', 'createdAt', 'data'])
         ->and($webhookMessage['x-spectacular-webhook-event'])->toBe('invoice.paid')
@@ -436,7 +440,6 @@ function configureFixtureAsyncApi(): void
                 'Timestamp' => ['type' => 'integer'],
             ],
             'dispatcher' => [
-                'enabled' => false,
                 'use_timestamp' => true,
             ],
         ],

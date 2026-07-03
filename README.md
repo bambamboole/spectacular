@@ -313,7 +313,6 @@ broadcasts now). Disable them with `laravel_extensions => false` in the config.
             'Timestamp' => ['type' => 'integer'],
         ],
         'dispatcher' => [
-            'enabled' => false,
             'use_timestamp' => true,
         ],
     ],
