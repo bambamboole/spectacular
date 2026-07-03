@@ -14,7 +14,7 @@ workbench:
     api: true
     commands: false
     components: false
-    views: false
+    views: true
   build:
     - migrate:fresh:
         --force: true

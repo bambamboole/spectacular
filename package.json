@@ -9,6 +9,7 @@
     },
     "devDependencies": {
         "@inertiajs/react": "^3.0.0",
+        "@laravel/echo-react": "^2.0.0",
         "@lattice-php/lattice": "^0.15.0",
         "@tailwindcss/vite": "^4.1.11",
         "@types/react": "^19.0.0",
