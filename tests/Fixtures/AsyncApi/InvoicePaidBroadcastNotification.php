@@ -25,7 +25,7 @@ final class InvoicePaidBroadcastNotification extends Notification
     }
 
     /**
-     * @return BroadcastMessage&object{data:array{invoiceId:int, amount:int, paidAt:CarbonImmutable}}
+     * @return BroadcastMessage&object{data: array{invoiceId:int, amount:int, paidAt:CarbonImmutable}}
      */
     public function toBroadcast(object $notifiable): BroadcastMessage
     {
