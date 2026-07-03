@@ -30,7 +30,11 @@
         "laravel/pint": "^1.29",
         "orchestra/testbench": "^11.0",
         "pestphp/pest": "^4.0",
-        "pestphp/pest-plugin-laravel": "^4.0"
+        "pestphp/pest-plugin-laravel": "^4.0",
+        "spatie/laravel-webhook-server": "^3.10"
+    },
+    "suggest": {
+        "spatie/laravel-webhook-server": "Required only when using Spectacular's optional webhook delivery dispatcher."
     },
     "autoload": {
         "psr-4": {
