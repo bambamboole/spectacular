@@ -58,6 +58,11 @@ final class PayloadSchemaFactory
     public function forNotification(string $notificationClass, ?string $notifiableClass = null): array
     {
         $notification = new ReflectionClass($notificationClass);
+
+        if ($notification->hasMethod('broadcastWith')) {
+            return $this->schemaFromArrayReturn($notification, $notification->getMethod('broadcastWith')) ?? ['type' => 'object'];
+        }
+
         $schema = ['type' => 'object'];
 
         foreach (['toBroadcast', 'toArray'] as $methodName) {
@@ -101,7 +106,7 @@ final class PayloadSchemaFactory
         $returnType = trim(str_replace('*/', '', $matches[1]));
 
         if (str_starts_with($returnType, 'array{') && str_ends_with($returnType, '}')) {
-            return $this->schemaFromArrayShape($class, substr($returnType, 6, -1));
+            return $this->schemaFromArrayShape($class, substr($returnType, 6, -1)) ?? ['type' => 'object'];
         }
 
         if (preg_match('/^array<string,\s*(.+)>$/', $returnType, $matches)) {
@@ -111,8 +116,8 @@ final class PayloadSchemaFactory
             ];
         }
 
-        if (preg_match('/object\{data:array\{(.+)\}\}/', $returnType, $matches)) {
-            return $this->schemaFromArrayShape($class, $matches[1]);
+        if (preg_match('/object\s*\{\s*data\s*:\s*array\s*\{(.+)\}\s*\}/', $returnType, $matches)) {
+            return $this->schemaFromArrayShape($class, $matches[1]) ?? ['type' => 'object'];
         }
 
         return ['type' => 'object'];
@@ -145,12 +150,20 @@ final class PayloadSchemaFactory
 
         $schema['type'] ??= 'object';
         $schema['properties'] ??= [];
+        $schema['properties']['id'] ??= [
+            'type' => 'string',
+            'format' => 'uuid',
+        ];
         $schema['properties']['type'] = [
             'type' => 'string',
             'enum' => [$type],
         ];
 
         $schema['required'] ??= [];
+
+        if (! in_array('id', $schema['required'], true)) {
+            $schema['required'][] = 'id';
+        }
 
         if (! in_array('type', $schema['required'], true)) {
             $schema['required'][] = 'type';
@@ -161,15 +174,21 @@ final class PayloadSchemaFactory
 
     /**
      * @param  ReflectionClass<object>  $event
-     * @return array<string, mixed>
+     * @return array<string, mixed>|null
      */
-    private function schemaFromArrayShape(ReflectionClass $event, string $shape): array
+    private function schemaFromArrayShape(ReflectionClass $event, string $shape): ?array
     {
         $properties = [];
         $required = [];
 
         foreach ($this->splitTopLevel($shape) as $entry) {
-            [$key, $type] = array_map(trim(...), explode(':', $entry, 2));
+            $parts = array_map(trim(...), explode(':', $entry, 2));
+
+            if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
+                return null;
+            }
+
+            [$key, $type] = $parts;
             $isOptional = str_ends_with($key, '?');
             $key = rtrim($key, '?');
             $properties[$key] = $this->schemaFromDocType($type, $event);
