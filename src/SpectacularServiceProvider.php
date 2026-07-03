@@ -5,6 +5,7 @@ namespace Bambamboole\Spectacular;
 
 use Bambamboole\Spectacular\AsyncApi\AsyncApiGenerator;
 use Bambamboole\Spectacular\AsyncApi\Console\GenerateAsyncApiCommand;
+use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\AsyncApi\Support\ClassDiscoverer;
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
@@ -34,6 +35,7 @@ final class SpectacularServiceProvider extends PackageServiceProvider
 
         $this->app->singleton(ClassDiscoverer::class);
         $this->app->singleton(PayloadSchemaFactory::class);
+        $this->app->singleton(MessageDefinitionFactory::class);
         $this->app->singleton(AsyncApiGenerator::class);
         $this->app->singleton(WebhookEventRegistry::class);
 
