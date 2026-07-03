@@ -6,12 +6,17 @@ namespace Bambamboole\Spectacular\Webhooks;
 use RuntimeException;
 use Spatie\WebhookServer\WebhookCall;
 
-final readonly class DispatchWebhookEvent
+final class DispatchWebhookEvent
 {
+    /**
+     * @var array<class-string, WebhookEventDefinition>|null
+     */
+    private ?array $definitionsByClass = null;
+
     public function __construct(
-        private WebhookEventRegistry $events,
-        private WebhookPayloadFactory $payloads,
-        private WebhookSubscriptionRepository $subscriptions,
+        private readonly WebhookEventRegistry $events,
+        private readonly WebhookPayloadFactory $payloads,
+        private readonly WebhookSubscriptionRepository $subscriptions,
     ) {}
 
     public function handle(object $event): void
@@ -30,7 +35,13 @@ final readonly class DispatchWebhookEvent
 
         $payload = $this->payloads->make($definition, $event);
 
-        foreach ($this->subscriptions->forEvent($definition->name, $event) as $subscription) {
+        foreach ($this->subscriptionsFor($definition->name, $event) as $subscription) {
+            if (! $subscription instanceof WebhookSubscription) {
+                throw new RuntimeException(
+                    'Webhook subscription repositories must yield [Bambamboole\Spectacular\Webhooks\WebhookSubscription] instances.',
+                );
+            }
+
             $call = WebhookCall::create()
                 ->url($subscription->url)
                 ->payload($payload->body)
@@ -58,13 +69,33 @@ final readonly class DispatchWebhookEvent
 
     private function definitionFor(object $event): ?WebhookEventDefinition
     {
-        foreach ($this->events->all() as $definition) {
-            if ($definition->class === $event::class) {
-                return $definition;
-            }
+        return $this->definitionsByClass()[$event::class] ?? null;
+    }
+
+    /**
+     * @return array<class-string, WebhookEventDefinition>
+     */
+    private function definitionsByClass(): array
+    {
+        if ($this->definitionsByClass !== null) {
+            return $this->definitionsByClass;
         }
 
-        return null;
+        $definitions = [];
+
+        foreach ($this->events->all() as $definition) {
+            $definitions[$definition->class] = $definition;
+        }
+
+        return $this->definitionsByClass = $definitions;
+    }
+
+    /**
+     * @return iterable<mixed>
+     */
+    private function subscriptionsFor(string $eventName, object $event): iterable
+    {
+        return $this->subscriptions->forEvent($eventName, $event);
     }
 
     private function supports(object $target, string $method): bool

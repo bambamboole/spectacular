@@ -117,6 +117,24 @@ it('ignores events that are not documented webhooks', function (): void {
     Bus::assertNothingDispatched();
 });
 
+it('throws a useful runtime exception when a repository yields invalid subscriptions', function (): void {
+    Bus::fake();
+    config()->set('spectacular.asyncapi.webhooks.scan_paths', [
+        __DIR__.'/../Fixtures/AsyncApi',
+    ]);
+    config()->set('webhook-server', require __DIR__.'/../../vendor/spatie/laravel-webhook-server/config/webhook-server.php');
+
+    app()->bind(WebhookSubscriptionRepository::class, InvalidWebhookSubscriptionRepository::class);
+
+    expect(fn () => app(DispatchWebhookEvent::class)->handle(new InvoicePaidWebhook))
+        ->toThrow(
+            RuntimeException::class,
+            'Webhook subscription repositories must yield [Bambamboole\Spectacular\Webhooks\WebhookSubscription] instances.',
+        );
+
+    Bus::assertNothingDispatched();
+});
+
 it('throws a useful runtime exception when the payload method is missing', function (): void {
     $definition = new WebhookEventDefinition(
         name: 'invoice.missing',
@@ -287,6 +305,19 @@ final class DispatchingWebhookSubscriptionRepository implements WebhookSubscript
             ),
         ];
     }
+}
+
+final class InvalidWebhookSubscriptionRepository implements WebhookSubscriptionRepository
+{
+    public function forEvent(string $eventName, object $event): iterable
+    {
+        return [invalidWebhookSubscription()];
+    }
+}
+
+function invalidWebhookSubscription(): mixed
+{
+    return 'invalid';
 }
 
 final class UndocumentedWebhookEvent {}
