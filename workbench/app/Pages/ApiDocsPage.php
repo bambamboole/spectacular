@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Workbench\App\Pages;
 
-use Bambamboole\Spectacular\Doc\Lattice\SchemaTree;
+use Bambamboole\Spectacular\Doc\Adapters\OpenApiAdapter;
+use Bambamboole\Spectacular\Doc\Lattice\DocumentCompiler;
 use Illuminate\Http\Request;
 use Lattice\Lattice\Attributes\AsPage;
-use Lattice\Lattice\Core\Components\Section;
 use Lattice\Lattice\Core\PageSchema;
 use Lattice\Lattice\Http\Page;
 
@@ -23,13 +23,8 @@ final class ApiDocsPage extends Page
             flags: JSON_THROW_ON_ERROR,
         );
 
-        $components = $document['components'] ?? [];
-        $categorySchema = $components['schemas']['CategoryResource'] ?? [];
+        $api = (new OpenApiAdapter)->adapt($document);
 
-        return $schema->schema([
-            Section::make('CategoryResource')->schema([
-                SchemaTree::make()->forSchema($categorySchema, $components),
-            ]),
-        ]);
+        return $schema->schema((new DocumentCompiler)->compile($api));
     }
 }
