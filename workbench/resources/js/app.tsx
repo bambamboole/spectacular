@@ -3,10 +3,14 @@ import { createInertiaApp } from "@inertiajs/react";
 import {
     createLayoutResolver,
     createPageResolver,
+    extendRegistry,
     Provider,
     registry,
 } from "@lattice-php/lattice";
 import { createRoot } from "react-dom/client";
+import { spectacularComponents } from "../../../resources/js/plugin";
+
+const appRegistry = extendRegistry(registry, spectacularComponents);
 
 createInertiaApp({
     resolve: createPageResolver({}),
@@ -16,7 +20,7 @@ createInertiaApp({
             return;
         }
         createRoot(el).render(
-            <Provider registry={registry}>
+            <Provider registry={appRegistry}>
                 <App {...props} />
             </Provider>,
         );
