@@ -8,6 +8,7 @@ use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
 use Bambamboole\Spectacular\SpectacularServiceProvider;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\ImmediateBroadcast;
+use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidBroadcastNotification;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
 use Carbon\CarbonImmutable;
@@ -166,6 +167,9 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
     $document = app(AsyncApiGenerator::class)->generate();
     $notificationMessage = $document['components']['messages']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast'];
     $immediateMessage = $document['components']['messages']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.ImmediateBroadcast'];
+    $webhookMessage = $document['components']['messages']['invoice.paid'];
+    $broadcastNotificationMessage = $document['components']['messages']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.InvoicePaidBroadcastNotification'];
+    $broadcastNotificationChannel = 'private-Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotifiable.{userNotifiableId}';
 
     expect($document['asyncapi'])->toBe('3.0.0')
         ->and($document['info'])->toBe(['title' => 'Test AsyncAPI', 'version' => '1.2.3'])
@@ -173,8 +177,24 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
         ->and($document['channels']['private-users.{userId}']['address'])->toBe('private-users.{userId}')
         ->and($document['channels']['private-users.{userId}']['x-laravel-channel-type'])->toBe('private')
         ->and($document['channels']['orders']['x-laravel-channel-type'])->toBe('public')
+        ->and($document['channels']['webhooks']['address'])->toBe('{webhookUrl}')
+        ->and($document['channels']['webhooks']['x-spectacular-channel-kind'])->toBe('webhook')
+        ->and($document['channels']['webhooks']['messages'])->toHaveKey('invoice.paid')
+        ->and($document['operations']['invoice.paid.send']['channel']['$ref'])->toBe('#/channels/webhooks')
+        ->and($document['operations']['invoice.paid.send']['messages'][0]['$ref'])->toBe('#/channels/webhooks/messages/invoice.paid')
         ->and($document['operations']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast.send']['action'])->toBe('send')
         ->and($document['operations']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast.send']['messages'][0]['$ref'])->toBe('#/channels/private-users.{userId}/messages/Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast')
+        ->and($webhookMessage['name'])->toBe('invoice.paid')
+        ->and($webhookMessage['title'])->toBe('Invoice Paid')
+        ->and($webhookMessage['payload']['properties']['data']['properties']['invoiceId'])->toBe(['type' => 'integer'])
+        ->and($webhookMessage['payload']['required'])->toBe(['id', 'event', 'createdAt', 'data'])
+        ->and($webhookMessage['x-spectacular-webhook-event'])->toBe('invoice.paid')
+        ->and($webhookMessage['x-spectacular-source-class'])->toBe(InvoicePaidWebhook::class)
+        ->and($document['channels'])->toHaveKey($broadcastNotificationChannel)
+        ->and($document['channels'][$broadcastNotificationChannel]['messages'])->toHaveKey('Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.InvoicePaidBroadcastNotification')
+        ->and($broadcastNotificationMessage['name'])->toBe('Illuminate\Notifications\Events\BroadcastNotificationCreated')
+        ->and($broadcastNotificationMessage['payload']['properties']['type']['enum'])->toBe(['invoice.paid'])
+        ->and($broadcastNotificationMessage['x-laravel-notification'])->toBe(InvoicePaidBroadcastNotification::class)
         ->and($notificationMessage['name'])->toBe('user.notification.created')
         ->and($notificationMessage['title'])->toBe('User Notification')
         ->and($notificationMessage['summary'])->toBe('User notification was created')
@@ -273,6 +293,24 @@ function configureFixtureAsyncApi(): void
         ],
         'scan_paths' => [
             dirname(__DIR__).'/Fixtures/AsyncApi',
+        ],
+        'webhooks' => [
+            'scan_paths' => [
+                dirname(__DIR__).'/Fixtures/AsyncApi',
+            ],
+            'channel' => [
+                'key' => 'webhooks',
+                'address' => '{webhookUrl}',
+            ],
+            'headers' => [
+                'Content-Type' => ['type' => 'string', 'enum' => ['application/json']],
+                'Signature' => ['type' => 'string'],
+                'Timestamp' => ['type' => 'integer'],
+            ],
+            'dispatcher' => [
+                'enabled' => false,
+                'use_timestamp' => true,
+            ],
         ],
     ]);
 }
