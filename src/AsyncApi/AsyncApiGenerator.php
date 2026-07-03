@@ -115,7 +115,7 @@ final readonly class AsyncApiGenerator
             ->all();
 
         foreach ($this->webhooks->all($this->webhookScanPaths($settings)) as $webhook) {
-            $messageDefinitions[] = $this->messages->fromWebhook($webhook, $this->webhookChannel($settings));
+            $messageDefinitions[] = $this->messages->fromWebhook($webhook, $this->webhookSettings($settings));
         }
 
         return $messageDefinitions;
@@ -161,11 +161,11 @@ final readonly class AsyncApiGenerator
      * @param  array<string, mixed>  $settings
      * @return array<string, mixed>
      */
-    private function webhookChannel(array $settings): array
+    private function webhookSettings(array $settings): array
     {
-        $channel = $settings['webhooks']['channel'] ?? [];
+        $webhooks = $settings['webhooks'] ?? [];
 
-        return is_array($channel) ? $channel : [];
+        return is_array($webhooks) ? $webhooks : [];
     }
 
     /**

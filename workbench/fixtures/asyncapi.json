@@ -91,6 +91,23 @@
                         "name": "billing"
                     }
                 ],
+                "headers": {
+                    "type": "object",
+                    "properties": {
+                        "Content-Type": {
+                            "type": "string",
+                            "enum": [
+                                "application/json"
+                            ]
+                        },
+                        "Signature": {
+                            "type": "string"
+                        },
+                        "Timestamp": {
+                            "type": "integer"
+                        }
+                    }
+                },
                 "payload": {
                     "type": "object",
                     "properties": {

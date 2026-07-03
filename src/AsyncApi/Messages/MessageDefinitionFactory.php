@@ -112,10 +112,12 @@ final readonly class MessageDefinitionFactory
     }
 
     /**
-     * @param  array<string, mixed>  $channel
+     * @param  array<string, mixed>  $webhooks
      */
-    public function fromWebhook(WebhookEventDefinition $definition, array $channel = []): AsyncMessageDefinition
+    public function fromWebhook(WebhookEventDefinition $definition, array $webhooks = []): AsyncMessageDefinition
     {
+        $channel = $webhooks['channel'] ?? [];
+        $channel = is_array($channel) ? $channel : [];
         $channelKey = is_string($channel['key'] ?? null) ? $channel['key'] : 'webhooks';
         $channelAddress = is_string($channel['address'] ?? null) ? $channel['address'] : '{webhookUrl}';
         $data = $definition->attribute->payload !== null
@@ -128,6 +130,7 @@ final readonly class MessageDefinitionFactory
             'summary' => $definition->summary,
             'description' => $definition->description,
             'tags' => array_map(fn (string $tag): array => ['name' => $tag], $definition->tags),
+            'headers' => $this->webhookHeaders($definition, $webhooks),
             'payload' => [
                 'type' => 'object',
                 'properties' => [
@@ -163,6 +166,44 @@ final readonly class MessageDefinitionFactory
             ],
             message: $message,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $webhooks
+     * @return array<string, mixed>
+     */
+    private function webhookHeaders(WebhookEventDefinition $definition, array $webhooks): array
+    {
+        $headers = $this->normalizeHeaders(is_array($webhooks['headers'] ?? null) ? $webhooks['headers'] : []);
+        $headers = array_replace($headers, $this->normalizeHeaders($definition->attribute->headers));
+
+        return array_filter([
+            'type' => 'object',
+            'properties' => $headers,
+        ], fn (mixed $value): bool => $value !== []);
+    }
+
+    /**
+     * @param  array<mixed>  $headers
+     * @return array<string, mixed>
+     */
+    private function normalizeHeaders(array $headers): array
+    {
+        $normalized = [];
+
+        foreach ($headers as $name => $schema) {
+            if (is_int($name) && is_string($schema)) {
+                $normalized[$schema] = ['type' => 'string'];
+
+                continue;
+            }
+
+            if (is_string($name) && is_array($schema)) {
+                $normalized[$name] = $schema;
+            }
+        }
+
+        return $normalized;
     }
 
     /**

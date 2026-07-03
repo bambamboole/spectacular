@@ -9,7 +9,7 @@ use Attribute;
 readonly class WebhookEvent extends Message
 {
     /**
-     * @param  list<string>  $headers
+     * @param  array<string, mixed>  $headers
      * @param  list<string>  $tags
      */
     public function __construct(
