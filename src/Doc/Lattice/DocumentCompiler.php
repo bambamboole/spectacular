@@ -17,6 +17,7 @@ use Lattice\Lattice\Core\Components\Component;
 use Lattice\Lattice\Core\Components\Grid;
 use Lattice\Lattice\Core\Components\Heading;
 use Lattice\Lattice\Core\Components\Link;
+use Lattice\Lattice\Core\Components\RawBlock;
 use Lattice\Lattice\Core\Components\Section;
 use Lattice\Lattice\Core\Components\Stack;
 use Lattice\Lattice\Core\Components\Tab;
@@ -98,10 +99,19 @@ final class DocumentCompiler
      */
     private function contentColumn(array $operations, array $components): Component
     {
-        return Stack::make()->schema(array_map(
-            fn (Operation $operation): Component => $this->operationSection($operation, $components),
-            $operations,
-        ));
+        $children = [];
+
+        foreach ($operations as $operation) {
+            $children[] = $this->scrollAnchor($operation);
+            $children[] = $this->operationSection($operation, $components);
+        }
+
+        return Stack::make()->schema($children);
+    }
+
+    private function scrollAnchor(Operation $operation): Component
+    {
+        return RawBlock::make()->html('<div id="'.htmlspecialchars($operation->id, ENT_QUOTES).'"></div>');
     }
 
     /**

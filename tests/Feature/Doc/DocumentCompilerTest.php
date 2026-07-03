@@ -16,5 +16,6 @@ it('compiles the document into a lattice node tree with nav and operation shells
     expect($flat)->toContain('spectacular.schema-tree')
         ->and($flat)->toContain('GET')
         ->and($flat)->toContain('/users')
-        ->and($flat)->toContain('UserResource');
+        ->and($flat)->toContain('UserResource')
+        ->and($flat)->toContain('id=\"get-users\"');
 });
