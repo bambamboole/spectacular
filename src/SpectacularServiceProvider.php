@@ -42,7 +42,7 @@ final class SpectacularServiceProvider extends PackageServiceProvider
         $this->app->singleton(AsyncApiGenerator::class);
         $this->app->singleton(WebhookEventRegistry::class);
         $this->app->singleton(WebhookPayloadFactory::class);
-        $this->app->bind(WebhookSubscriptionRepository::class, NullWebhookSubscriptionRepository::class);
+        $this->app->bindIf(WebhookSubscriptionRepository::class, NullWebhookSubscriptionRepository::class);
 
         foreach (config('spectacular.scramble.extensions', []) as $extension) {
             if (is_string($extension)) {

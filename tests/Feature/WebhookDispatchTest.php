@@ -2,10 +2,12 @@
 declare(strict_types=1);
 
 use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
+use Bambamboole\Spectacular\SpectacularServiceProvider;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Webhooks\WebhookEventDefinition;
 use Bambamboole\Spectacular\Webhooks\WebhookPayloadFactory;
+use Bambamboole\Spectacular\Webhooks\WebhookSubscription;
 use Bambamboole\Spectacular\Webhooks\WebhookSubscriptionRepository;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -47,6 +49,17 @@ it('uses a safe empty subscription repository by default', function (): void {
         ->and(iterator_to_array($repository->forEvent('invoice.paid', new InvoicePaidWebhook)))->toBe([]);
 });
 
+it('preserves an existing subscription repository binding', function (): void {
+    app()->bind(WebhookSubscriptionRepository::class, CustomWebhookSubscriptionRepository::class);
+
+    (new SpectacularServiceProvider(app()))->register();
+
+    $subscriptions = iterator_to_array(app(WebhookSubscriptionRepository::class)->forEvent('invoice.paid', new InvoicePaidWebhook));
+
+    expect($subscriptions)->toHaveCount(1)
+        ->and($subscriptions[0]->url)->toBe('https://example.com/webhooks');
+});
+
 it('throws a useful runtime exception when the payload method is missing', function (): void {
     $definition = new WebhookEventDefinition(
         name: 'invoice.missing',
@@ -60,6 +73,51 @@ it('throws a useful runtime exception when the payload method is missing', funct
 
     expect(fn () => app(WebhookPayloadFactory::class)->make($definition, new MissingPayloadMethodWebhook))
         ->toThrow(RuntimeException::class, 'Webhook payload method [missingPayload] is missing on [MissingPayloadMethodWebhook]');
+});
+
+it('throws a useful runtime exception when the payload method is handled by magic call', function (): void {
+    $definition = new WebhookEventDefinition(
+        name: 'invoice.magic',
+        class: MagicPayloadMethodWebhook::class,
+        title: null,
+        summary: null,
+        description: null,
+        tags: [],
+        attribute: new WebhookEvent(name: 'invoice.magic', payloadMethod: 'webhookPayload'),
+    );
+
+    expect(fn () => app(WebhookPayloadFactory::class)->make($definition, new MagicPayloadMethodWebhook))
+        ->toThrow(RuntimeException::class, 'Webhook payload method [webhookPayload] is missing on [MagicPayloadMethodWebhook]');
+});
+
+it('throws a useful runtime exception when the payload method is not public', function (): void {
+    $definition = new WebhookEventDefinition(
+        name: 'invoice.private',
+        class: PrivatePayloadMethodWebhook::class,
+        title: null,
+        summary: null,
+        description: null,
+        tags: [],
+        attribute: new WebhookEvent(name: 'invoice.private', payloadMethod: 'webhookPayload'),
+    );
+
+    expect(fn () => app(WebhookPayloadFactory::class)->make($definition, new PrivatePayloadMethodWebhook))
+        ->toThrow(RuntimeException::class, 'Webhook payload method [webhookPayload] on [PrivatePayloadMethodWebhook] must be public');
+});
+
+it('throws a useful runtime exception when the payload method requires parameters', function (): void {
+    $definition = new WebhookEventDefinition(
+        name: 'invoice.parameters',
+        class: RequiredParameterPayloadWebhook::class,
+        title: null,
+        summary: null,
+        description: null,
+        tags: [],
+        attribute: new WebhookEvent(name: 'invoice.parameters', payloadMethod: 'webhookPayload'),
+    );
+
+    expect(fn () => app(WebhookPayloadFactory::class)->make($definition, new RequiredParameterPayloadWebhook))
+        ->toThrow(RuntimeException::class, 'Webhook payload method [webhookPayload] on [RequiredParameterPayloadWebhook] must have zero required parameters');
 });
 
 it('throws a useful runtime exception when the payload method does not return an array', function (): void {
@@ -92,10 +150,62 @@ function invoicePaidWebhookDefinition(): WebhookEventDefinition
 
 final class MissingPayloadMethodWebhook {}
 
+final class MagicPayloadMethodWebhook
+{
+    /**
+     * @param  array<int, mixed>  $arguments
+     * @return array<string, mixed>
+     */
+    public function __call(string $method, array $arguments): array
+    {
+        return ['magic' => $method];
+    }
+}
+
+final class PrivatePayloadMethodWebhook
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function payload(): array
+    {
+        return $this->webhookPayload();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function webhookPayload(): array
+    {
+        return [];
+    }
+}
+
+final class RequiredParameterPayloadWebhook
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function webhookPayload(string $scope): array
+    {
+        return ['scope' => $scope];
+    }
+}
+
 final class NonArrayPayloadWebhook
 {
     public function webhookPayload(): string
     {
         return 'invalid';
+    }
+}
+
+final class CustomWebhookSubscriptionRepository implements WebhookSubscriptionRepository
+{
+    public function forEvent(string $eventName, object $event): iterable
+    {
+        return [
+            new WebhookSubscription(url: 'https://example.com/webhooks'),
+        ];
     }
 }
