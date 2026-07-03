@@ -158,6 +158,129 @@ From an event, Spectacular derives:
 )]
 ```
 
+### Broadcast notifications
+
+Use `#[BroadcastNotification]` on Laravel notification classes that are delivered through the `broadcast` channel:
+
+```php
+use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
+use Illuminate\Notifications\Messages\BroadcastMessage;
+use Illuminate\Notifications\Notification;
+
+#[BroadcastNotification(
+    notifiables: [User::class],
+    title: 'Invoice paid',
+    summary: 'Sent to users when an invoice is paid.',
+    tags: ['billing'],
+)]
+final class InvoicePaidNotification extends Notification
+{
+    public function via(object $notifiable): array
+    {
+        return ['broadcast'];
+    }
+
+    /**
+     * @return BroadcastMessage&object{data: array{invoiceId:int, amount:int}}
+     */
+    public function toBroadcast(object $notifiable): BroadcastMessage
+    {
+        return new BroadcastMessage([
+            'invoiceId' => 123,
+            'amount' => 4999,
+        ]);
+    }
+}
+```
+
+Spectacular infers notification channels from the `notifiables` classes. If a notifiable exposes
+`receivesBroadcastNotificationsOn()`, that value is used; otherwise the channel defaults to a private placeholder such
+as `private-App.Models.User.{userId}`. Pass explicit `channels` when notifications use custom or dynamic broadcast
+channels that cannot be inferred.
+
+### Webhook events
+
+Use `#[WebhookEvent]` on outbound webhook event classes you want listed in the AsyncAPI document and runtime webhook
+registry:
+
+```php
+use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
+
+#[WebhookEvent(
+    name: 'invoice.paid',
+    title: 'Invoice paid',
+    summary: 'Sent when an invoice is paid.',
+    tags: ['billing'],
+)]
+final class InvoicePaidWebhook
+{
+    public function __construct(public int $invoiceId, public int $amount) {}
+
+    /**
+     * @return array{invoiceId:int, amount:int}
+     */
+    public function webhookPayload(): array
+    {
+        return [
+            'invoiceId' => $this->invoiceId,
+            'amount' => $this->amount,
+        ];
+    }
+}
+```
+
+`WebhookEventRegistry::all()` returns the discovered definitions, which an app can use to power its own webhook setup
+UI:
+
+```php
+use Bambamboole\Spectacular\Webhooks\WebhookEventRegistry;
+
+$events = collect(app(WebhookEventRegistry::class)->all())
+    ->map(fn ($event) => [
+        'name' => $event->name,
+        'title' => $event->title,
+        'summary' => $event->summary,
+    ]);
+```
+
+Spectacular documents and discovers webhook events, but your application owns webhook endpoint persistence and any
+subscription UI.
+
+### Optional webhook delivery
+
+Runtime delivery is optional and uses `spatie/laravel-webhook-server`:
+
+```bash
+composer require spatie/laravel-webhook-server
+```
+
+Bind `Bambamboole\Spectacular\Webhooks\WebhookSubscriptionRepository` to an application repository that returns active
+`Bambamboole\Spectacular\Webhooks\WebhookSubscription` objects for an event:
+
+```php
+use Bambamboole\Spectacular\Webhooks\WebhookSubscription;
+use Bambamboole\Spectacular\Webhooks\WebhookSubscriptionRepository;
+
+final class DatabaseWebhookSubscriptionRepository implements WebhookSubscriptionRepository
+{
+    public function forEvent(string $eventName, object $event): iterable
+    {
+        return [
+            new WebhookSubscription(
+                url: 'https://example.com/webhooks',
+                secret: 'signing-secret',
+                headers: ['X-Webhook-Source' => 'app'],
+                id: 'subscription-123',
+            ),
+        ];
+    }
+}
+```
+
+Then register `Bambamboole\Spectacular\Webhooks\DispatchWebhookEvent` as a listener for the webhook event classes your
+app wants delivered. If `spectacular.asyncapi.webhooks.scan_paths` is `null`, webhook discovery uses the base AsyncAPI
+`scan_paths`; set it to an explicit empty array to disable webhook event discovery.
+
 ### Laravel extensions
 
 By default the document includes `x-laravel-*` extension fields (channel type, source event class, whether it
@@ -177,6 +300,22 @@ broadcasts now). Disable them with `laravel_extensions => false` in the config.
     'laravel_extensions' => true,
     'scan_paths' => [
         app_path('Events'),
+    ],
+    'webhooks' => [
+        'scan_paths' => null,
+        'channel' => [
+            'key' => 'webhooks',
+            'address' => '{webhookUrl}',
+        ],
+        'headers' => [
+            'Content-Type' => ['type' => 'string', 'enum' => ['application/json']],
+            'Signature' => ['type' => 'string'],
+            'Timestamp' => ['type' => 'integer'],
+        ],
+        'dispatcher' => [
+            'enabled' => false,
+            'use_timestamp' => true,
+        ],
     ],
 ],
 ```
