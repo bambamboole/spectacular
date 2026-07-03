@@ -8,11 +8,24 @@ use Bambamboole\Spectacular\AsyncApi\Support\ClassDiscoverer;
 use LogicException;
 use ReflectionClass;
 
-final readonly class WebhookEventRegistry
+final class WebhookEventRegistry
 {
+    /**
+     * @var array<class-string, WebhookEventDefinition>|null
+     */
+    private ?array $defaultDefinitionsByClass = null;
+
     public function __construct(
-        private ClassDiscoverer $classes,
+        private readonly ClassDiscoverer $classes,
     ) {}
+
+    /**
+     * @param  class-string  $class
+     */
+    public function forClass(string $class): ?WebhookEventDefinition
+    {
+        return $this->defaultDefinitionsByClass()[$class] ?? null;
+    }
 
     /**
      * @param  list<string>|null  $scanPaths
@@ -56,6 +69,24 @@ final readonly class WebhookEventRegistry
         ksort($definitions);
 
         return array_values($definitions);
+    }
+
+    /**
+     * @return array<class-string, WebhookEventDefinition>
+     */
+    private function defaultDefinitionsByClass(): array
+    {
+        if ($this->defaultDefinitionsByClass !== null) {
+            return $this->defaultDefinitionsByClass;
+        }
+
+        $definitions = [];
+
+        foreach ($this->all() as $definition) {
+            $definitions[$definition->class] = $definition;
+        }
+
+        return $this->defaultDefinitionsByClass = $definitions;
     }
 
     /**
