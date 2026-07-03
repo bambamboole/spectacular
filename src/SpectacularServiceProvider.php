@@ -29,6 +29,8 @@ final class SpectacularServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
+        $this->mergeAsyncApiWebhookConfigDefaults();
+
         $this->app->singleton(ClassDiscoverer::class);
         $this->app->singleton(PayloadSchemaFactory::class);
         $this->app->singleton(AsyncApiGenerator::class);
@@ -38,5 +40,16 @@ final class SpectacularServiceProvider extends PackageServiceProvider
                 Scramble::registerExtension($extension);
             }
         }
+    }
+
+    private function mergeAsyncApiWebhookConfigDefaults(): void
+    {
+        if (config()->has('spectacular.asyncapi.webhooks')) {
+            return;
+        }
+
+        $config = require __DIR__.'/../config/spectacular.php';
+
+        config()->set('spectacular.asyncapi.webhooks', $config['asyncapi']['webhooks']);
     }
 }
