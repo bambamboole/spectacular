@@ -8,6 +8,7 @@ use Bambamboole\Spectacular\AsyncApi\Support\ClassDiscoverer;
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use ReflectionAttribute;
 use ReflectionClass;
 use Stringable;
 use Throwable;
@@ -34,7 +35,7 @@ final readonly class AsyncApiGenerator
         $includeLaravelExtensions = (bool) ($settings['laravel_extensions'] ?? true);
 
         foreach ($events as $event) {
-            $attribute = $event->getAttributes(Message::class)[0]->newInstance();
+            $attribute = $event->getAttributes(Message::class, ReflectionAttribute::IS_INSTANCEOF)[0]->newInstance();
             $eventChannels = $attribute->channels !== []
                 ? $attribute->channels
                 : $this->inferChannels($event);
@@ -118,7 +119,7 @@ final readonly class AsyncApiGenerator
             ->filter(fn (ReflectionClass $event): bool => $event->implementsInterface(ShouldBroadcast::class)
                 || $event->implementsInterface(ShouldBroadcastNow::class))
             ->filter(function (ReflectionClass $event): bool {
-                return $event->getAttributes(Message::class) !== [];
+                return $event->getAttributes(Message::class, ReflectionAttribute::IS_INSTANCEOF) !== [];
             })
             ->sortBy(fn (ReflectionClass $event): string => $event->getName())
             ->values()

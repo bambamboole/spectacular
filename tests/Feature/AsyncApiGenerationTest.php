@@ -12,8 +12,6 @@ use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
-use ReflectionAttribute;
-use ReflectionClass;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
 it('defaults to scanning the application events path', function (): void {
@@ -72,13 +70,13 @@ it('treats specialized async attributes as message metadata', function (): void 
         ->and($webhook->isSubclassOf(Message::class))->toBeTrue();
 
     $attribute = new BroadcastNotification(
-        notifiables: ['App\\Models\\User'],
+        notifiables: [UserNotificationBroadcast::class],
         title: 'Invoice paid',
         summary: 'Sent after an invoice is paid',
         tags: ['billing'],
     );
 
-    expect($attribute->notifiables)->toBe(['App\\Models\\User'])
+    expect($attribute->notifiables)->toBe([UserNotificationBroadcast::class])
         ->and($attribute->title)->toBe('Invoice paid')
         ->and($attribute->summary)->toBe('Sent after an invoice is paid')
         ->and($attribute->tags)->toBe(['billing']);
@@ -99,6 +97,67 @@ it('treats specialized async attributes as message metadata', function (): void 
         ->getAttributes(Message::class, ReflectionAttribute::IS_INSTANCEOF);
 
     expect($reflectedAttributes)->toHaveCount(1);
+
+    $fixtureDirectory = sys_get_temp_dir().'/spectacular-specialized-asyncapi-'.str_replace('.', '', uniqid('', true));
+    $className = 'SpecializedInvoicePaidBroadcast'.str_replace('.', '', uniqid('', true));
+    $eventClass = 'Bambamboole\\Spectacular\\Tests\\Generated\\'.$className;
+    $fixturePath = $fixtureDirectory.'/'.$className.'.php';
+
+    mkdir($fixtureDirectory);
+
+    file_put_contents($fixturePath, <<<PHP
+<?php
+declare(strict_types=1);
+
+namespace Bambamboole\Spectacular\Tests\Generated;
+
+use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
+use Illuminate\Broadcasting\Channel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+
+#[WebhookEvent(name: 'invoice.paid', title: 'Invoice paid', tags: ['billing'])]
+final class {$className} implements ShouldBroadcast
+{
+    public int \$invoiceId = 123;
+
+    public function broadcastOn(): Channel
+    {
+        return new Channel('webhooks.invoices');
+    }
+}
+PHP);
+
+    config()->set('spectacular.asyncapi', [
+        'version' => '3.0.0',
+        'default_content_type' => 'application/json',
+        'laravel_extensions' => true,
+        'info' => [
+            'title' => 'Test AsyncAPI',
+            'version' => '1.2.3',
+        ],
+        'scan_paths' => [
+            $fixtureDirectory,
+        ],
+    ]);
+
+    try {
+        $document = app(AsyncApiGenerator::class)->generate();
+    } finally {
+        if (file_exists($fixturePath)) {
+            unlink($fixturePath);
+        }
+
+        if (is_dir($fixtureDirectory)) {
+            rmdir($fixtureDirectory);
+        }
+    }
+
+    $messageKey = str_replace('\\', '.', $eventClass);
+
+    expect($document['channels'])->toHaveKey('webhooks.invoices')
+        ->and($document['channels']['webhooks.invoices']['messages'])->toHaveKey($messageKey)
+        ->and($document['components']['messages'][$messageKey]['title'])->toBe('Invoice paid')
+        ->and($document['components']['messages'][$messageKey]['tags'])->toBe([['name' => 'billing']]);
 });
 
 it('generates an AsyncAPI document for tagged Laravel broadcast events', function (): void {
