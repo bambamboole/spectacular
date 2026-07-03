@@ -14,6 +14,15 @@
                 }
             },
             "x-laravel-channel-type": "private"
+        },
+        "webhooks": {
+            "address": "{webhookUrl}",
+            "messages": {
+                "invoice.paid": {
+                    "$ref": "#/components/messages/invoice.paid"
+                }
+            },
+            "x-spectacular-channel-kind": "webhook"
         }
     },
     "operations": {
@@ -25,6 +34,17 @@
             "messages": [
                 {
                     "$ref": "#/channels/private-users.{userId}/messages/Workbench.App.Events.UserNotificationReceived"
+                }
+            ]
+        },
+        "invoice.paid.send": {
+            "action": "send",
+            "channel": {
+                "$ref": "#/channels/webhooks"
+            },
+            "messages": [
+                {
+                    "$ref": "#/channels/webhooks/messages/invoice.paid"
                 }
             ]
         }
@@ -61,6 +81,58 @@
                 },
                 "x-laravel-event": "Workbench\\App\\Events\\UserNotificationReceived",
                 "x-laravel-broadcast-now": false
+            },
+            "invoice.paid": {
+                "name": "invoice.paid",
+                "title": "Invoice Paid",
+                "summary": "Sent when a workbench invoice is paid.",
+                "tags": [
+                    {
+                        "name": "billing"
+                    }
+                ],
+                "payload": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "event": {
+                            "type": "string",
+                            "enum": [
+                                "invoice.paid"
+                            ]
+                        },
+                        "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "invoiceId": {
+                                    "type": "integer"
+                                },
+                                "amount": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "invoiceId",
+                                "amount"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "id",
+                        "event",
+                        "createdAt",
+                        "data"
+                    ]
+                },
+                "x-spectacular-webhook-event": "invoice.paid",
+                "x-spectacular-source-class": "Workbench\\App\\Events\\InvoicePaid"
             }
         }
     }

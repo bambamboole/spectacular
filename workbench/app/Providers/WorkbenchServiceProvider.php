@@ -36,6 +36,10 @@ final class WorkbenchServiceProvider extends ServiceProvider
 
         config(['scramble.security_strategy' => MiddlewareAuthSecurityStrategy::class]);
 
+        config()->set('spectacular.asyncapi.webhooks.scan_paths', [
+            dirname(__DIR__, 2).'/app/Events',
+        ]);
+
         $this->readBoostConfigFromPackageRoot();
     }
 
