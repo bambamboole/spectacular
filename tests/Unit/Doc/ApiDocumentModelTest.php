@@ -24,6 +24,7 @@ it('composes a document from value objects', function (): void {
             new Param('page', 'query', false, false, null, ['type' => 'integer']),
         ])],
         responses: [new Contract('response', '200', 'application/json', ['type' => 'object'], null)],
+        requests: [new Contract('request', null, 'application/json', ['type' => 'object'], null)],
         facet: new HttpFacet('GET', '/users', 'users.index'),
     );
     $doc = new ApiDocument('openapi', '3.1.0', ['title' => 'X'], [], [new ApiGroup('users', 'Users', null, ['get-users'])], [$op], ['schemas' => []]);
@@ -33,5 +34,6 @@ it('composes a document from value objects', function (): void {
     if ($facet instanceof HttpFacet) {
         expect($facet->method)->toBe('GET');
     }
-    expect($doc->groups[0]->operationIds)->toBe(['get-users']);
+    expect($doc->groups[0]->operationIds)->toBe(['get-users'])
+        ->and($doc->operations[0]->requests[0]->role)->toBe('request');
 });

@@ -10,6 +10,7 @@ final readonly class Operation
      * @param  list<string>  $tags
      * @param  list<ParamGroup>  $paramGroups
      * @param  list<Contract>  $responses
+     * @param  list<Contract>  $requests
      * @param  array<string, mixed>  $extensions
      */
     public function __construct(
@@ -22,6 +23,7 @@ final readonly class Operation
         public bool $deprecated,
         public array $paramGroups,
         public array $responses,
+        public array $requests,
         public ?Facet $facet,
         public array $extensions = [],
     ) {}
