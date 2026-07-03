@@ -28,6 +28,10 @@ final class WorkbenchServiceProvider extends ServiceProvider
             dirname(__DIR__, 2).'/app/Events',
         ]);
 
+        config()->set('spectacular.asyncapi.webhooks.scan_paths', [
+            dirname(__DIR__, 2).'/app/Events',
+        ]);
+
         $this->readBoostConfigFromPackageRoot();
     }
 
