@@ -38,6 +38,7 @@ final class DocumentCompiler
         }
 
         return [
+            $this->infoHeader($document->info),
             Grid::make()
                 ->columns(2)
                 ->schema([
@@ -45,6 +46,32 @@ final class DocumentCompiler
                     $this->contentColumn($document->operations, $document->components),
                 ]),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $info
+     */
+    private function infoHeader(array $info): Component
+    {
+        $title = (string) ($info['title'] ?? '');
+        $version = (string) ($info['version'] ?? '');
+        $description = $info['description'] ?? null;
+
+        $children = [];
+
+        if ($title !== '') {
+            $children[] = Heading::make($title, 1);
+        }
+
+        if ($version !== '') {
+            $children[] = Badge::make('v'.$version);
+        }
+
+        if (is_string($description) && $description !== '') {
+            $children[] = Text::make($description);
+        }
+
+        return Stack::make()->schema($children);
     }
 
     /**
