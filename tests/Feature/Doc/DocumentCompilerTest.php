@@ -79,6 +79,23 @@ it('renders an info header with the API title, version, and description', functi
         ->and($flat)->toContain('The widget service.');
 });
 
+it('renders a Request body section delegating the body to schema-tree', function (): void {
+    $doc = (new OpenApiAdapter)->adapt(json_decode((string) file_get_contents(dirname(__DIR__, 3).'/workbench/fixtures/openapi.json'), true, flags: JSON_THROW_ON_ERROR));
+
+    $nodes = (new DocumentCompiler)->compile($doc);
+    $json = json_decode(json_encode($nodes, JSON_THROW_ON_ERROR), true);
+
+    $root = ['schema' => $json];
+    $sections = findNodesByType($root, 'section');
+    $requestSection = collect($sections)->first(fn (array $s): bool => ($s['props']['title'] ?? null) === 'Request body');
+
+    expect($requestSection)->not->toBeNull();
+
+    $trees = findNodesByType($requestSection, 'spectacular.schema-tree');
+    expect($trees)->not->toBeEmpty()
+        ->and(json_encode($requestSection))->toContain('email');
+});
+
 it('omits the description node when the info block has none', function (): void {
     $doc = new ApiDocument(
         format: 'openapi',
