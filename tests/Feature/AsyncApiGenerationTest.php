@@ -206,6 +206,134 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
         ->and($immediateMessage['x-laravel-broadcast-now'])->toBeTrue();
 });
 
+it('applies per-call webhook scan path and channel overrides', function (): void {
+    configureFixtureAsyncApi();
+
+    config()->set('spectacular.asyncapi.webhooks.scan_paths', []);
+
+    $document = app(AsyncApiGenerator::class)->generate([
+        'webhooks' => [
+            'scan_paths' => [
+                asyncApiFixturePath(),
+            ],
+            'channel' => [
+                'key' => 'tenant-webhooks',
+                'address' => '{tenantWebhookUrl}',
+            ],
+        ],
+    ]);
+
+    expect($document['channels'])->toHaveKey('tenant-webhooks')
+        ->and($document['channels']['tenant-webhooks']['address'])->toBe('{tenantWebhookUrl}')
+        ->and($document['channels']['tenant-webhooks']['messages'])->toHaveKey('invoice.paid')
+        ->and($document['operations']['invoice.paid.send']['channel']['$ref'])->toBe('#/channels/tenant-webhooks')
+        ->and($document['operations']['invoice.paid.send']['messages'][0]['$ref'])->toBe('#/channels/tenant-webhooks/messages/invoice.paid');
+});
+
+it('honors an explicit empty per-call webhook scan path override', function (): void {
+    configureFixtureAsyncApi();
+
+    $document = app(AsyncApiGenerator::class)->generate([
+        'webhooks' => [
+            'scan_paths' => [],
+        ],
+    ]);
+
+    expect($document['channels'])->not->toHaveKey('webhooks')
+        ->and($document['components']['messages'])->not->toHaveKey('invoice.paid')
+        ->and($document['components']['messages'])->not->toHaveKey('invoice.refunded');
+});
+
+it('honors custom notifiable broadcast channels that accept the notification', function (): void {
+    $fixtureDirectory = sys_get_temp_dir().'/spectacular-notifiable-channel-'.str_replace('.', '', uniqid('', true));
+    $suffix = str_replace('.', '', uniqid('', true));
+    $notifiableClassName = 'CustomChannelNotifiable'.$suffix;
+    $notificationClassName = 'CustomChannelBroadcastNotification'.$suffix;
+    $notifiableClass = 'Bambamboole\\Spectacular\\Tests\\Generated\\'.$notifiableClassName;
+    $notificationClass = 'Bambamboole\\Spectacular\\Tests\\Generated\\'.$notificationClassName;
+    $notifiablePath = $fixtureDirectory.'/'.$notifiableClassName.'.php';
+    $notificationPath = $fixtureDirectory.'/'.$notificationClassName.'.php';
+
+    mkdir($fixtureDirectory);
+
+    file_put_contents($notifiablePath, <<<PHP
+<?php
+declare(strict_types=1);
+
+namespace Bambamboole\Spectacular\Tests\Generated;
+
+use Illuminate\Notifications\Notification;
+
+final class {$notifiableClassName}
+{
+    public function receivesBroadcastNotificationsOn(Notification \$notification): string
+    {
+        return 'private-review-channel.{notificationId}';
+    }
+}
+PHP);
+
+    file_put_contents($notificationPath, <<<PHP
+<?php
+declare(strict_types=1);
+
+namespace Bambamboole\Spectacular\Tests\Generated;
+
+use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
+use Illuminate\Notifications\Notification;
+
+#[BroadcastNotification(notifiables: [{$notifiableClassName}::class])]
+final class {$notificationClassName} extends Notification
+{
+    /**
+     * @return array<string, string>
+     */
+    public function toArray(object \$notifiable): array
+    {
+        return [
+            'status' => 'ready',
+        ];
+    }
+}
+PHP);
+
+    config()->set('spectacular.asyncapi', [
+        'version' => '3.0.0',
+        'default_content_type' => 'application/json',
+        'laravel_extensions' => true,
+        'info' => [
+            'title' => 'Test AsyncAPI',
+            'version' => '1.2.3',
+        ],
+        'scan_paths' => [
+            $fixtureDirectory,
+        ],
+        'webhooks' => [
+            'scan_paths' => [],
+        ],
+    ]);
+
+    try {
+        $document = app(AsyncApiGenerator::class)->generate();
+    } finally {
+        if (file_exists($notifiablePath)) {
+            unlink($notifiablePath);
+        }
+
+        if (file_exists($notificationPath)) {
+            unlink($notificationPath);
+        }
+
+        if (is_dir($fixtureDirectory)) {
+            rmdir($fixtureDirectory);
+        }
+    }
+
+    expect($document['channels'])->toHaveKey('private-review-channel.{notificationId}')
+        ->and($document['channels']['private-review-channel.{notificationId}']['messages'])
+        ->toHaveKey(str_replace('\\', '.', $notificationClass));
+});
+
 it('infers literal broadcastOn channels when the Message attribute omits channels', function (): void {
     configureFixtureAsyncApi();
 
@@ -292,11 +420,11 @@ function configureFixtureAsyncApi(): void
             'version' => '1.2.3',
         ],
         'scan_paths' => [
-            dirname(__DIR__).'/Fixtures/AsyncApi',
+            asyncApiFixturePath(),
         ],
         'webhooks' => [
             'scan_paths' => [
-                dirname(__DIR__).'/Fixtures/AsyncApi',
+                asyncApiFixturePath(),
             ],
             'channel' => [
                 'key' => 'webhooks',
@@ -313,6 +441,11 @@ function configureFixtureAsyncApi(): void
             ],
         ],
     ]);
+}
+
+function asyncApiFixturePath(): string
+{
+    return dirname(__DIR__).'/Fixtures/AsyncApi';
 }
 
 function generatedWorkbenchAsyncApiJson(): string

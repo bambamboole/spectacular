@@ -26,7 +26,8 @@ final readonly class AsyncApiGenerator
      */
     public function generate(?array $settings = null): array
     {
-        $settings = array_replace_recursive(config('spectacular.asyncapi', []), $settings ?? []);
+        $overrides = $settings ?? [];
+        $settings = $this->resolveSettings($overrides);
         $definitions = $this->messageDefinitions($settings);
 
         $channels = [];
@@ -113,11 +114,58 @@ final readonly class AsyncApiGenerator
             ->values()
             ->all();
 
-        foreach ($this->webhooks->all() as $webhook) {
-            $messageDefinitions[] = $this->messages->fromWebhook($webhook);
+        foreach ($this->webhooks->all($this->webhookScanPaths($settings)) as $webhook) {
+            $messageDefinitions[] = $this->messages->fromWebhook($webhook, $this->webhookChannel($settings));
         }
 
         return $messageDefinitions;
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function resolveSettings(array $overrides): array
+    {
+        $settings = array_replace_recursive(config('spectacular.asyncapi', []), $overrides);
+
+        if (isset($overrides['webhooks'])
+            && is_array($overrides['webhooks'])
+            && array_key_exists('scan_paths', $overrides['webhooks'])) {
+            $settings['webhooks']['scan_paths'] = $overrides['webhooks']['scan_paths'];
+        }
+
+        return $settings;
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return list<string>
+     */
+    private function webhookScanPaths(array $settings): array
+    {
+        $scanPaths = $settings['webhooks']['scan_paths'] ?? null;
+
+        if ($scanPaths === null) {
+            $scanPaths = $settings['scan_paths'] ?? [];
+        }
+
+        if (! is_array($scanPaths)) {
+            return [];
+        }
+
+        return array_values(array_filter($scanPaths, is_string(...)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return array<string, mixed>
+     */
+    private function webhookChannel(array $settings): array
+    {
+        $channel = $settings['webhooks']['channel'] ?? [];
+
+        return is_array($channel) ? $channel : [];
     }
 
     /**
