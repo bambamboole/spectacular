@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Workbench\App\Providers;
 
+use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Support\ServiceProvider;
+use Inertia\Middleware as InertiaMiddleware;
 use Laravel\Boost\Install\GuidelineComposer;
 use Laravel\Boost\Install\SkillComposer;
 use Laravel\Boost\Support\Config;
@@ -28,11 +31,17 @@ final class WorkbenchServiceProvider extends ServiceProvider
             dirname(__DIR__, 2).'/app/Events',
         ]);
 
+        config(['lattice.discover' => [dirname(__DIR__)]]);
+
         $this->readBoostConfigFromPackageRoot();
     }
 
-    public function boot(): void
+    public function boot(Kernel $kernel): void
     {
+        if ($kernel instanceof HttpKernel) {
+            $kernel->appendMiddlewareToGroup('web', InertiaMiddleware::class);
+        }
+
         $this->pointBoostAtPackageRoot();
         $this->redirectBoostSkillsToPackageRoot();
     }

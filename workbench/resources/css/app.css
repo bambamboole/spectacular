@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "@lattice-php/lattice/css";
+
+@source "../js";
+@source "../../../resources/js";

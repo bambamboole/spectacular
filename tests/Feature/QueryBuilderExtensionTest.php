@@ -104,12 +104,12 @@ it('writes the generated OpenAPI document to stdout or to a file path', function
         unlink($path);
     }
 
-    Scramble::routes(fn (Route $route): bool => in_array($route->uri(), ['api/users', 'api/roles'], true));
+    Scramble::routes(fn (Route $route): bool => in_array($route->uri(), ['api/users', 'api/users/{user}', 'api/roles', 'api/categories'], true));
 
     expect(Artisan::call('spectacular:openapi'))->toBe(0)
         ->and(Artisan::output())->toContain('"openapi": "3.1.0"');
 
-    Scramble::routes(fn (Route $route): bool => in_array($route->uri(), ['api/users', 'api/roles'], true));
+    Scramble::routes(fn (Route $route): bool => in_array($route->uri(), ['api/users', 'api/users/{user}', 'api/roles', 'api/categories'], true));
 
     expect(Artisan::call('spectacular:openapi', ['--path' => $path]))->toBe(0)
         ->and(json_decode((string) file_get_contents($path), true))
@@ -390,7 +390,7 @@ function generatedUsersOpenApiDocument(): array
  */
 function generatedWorkbenchOpenApiDocument(): array
 {
-    Scramble::routes(fn (Route $route): bool => in_array($route->uri(), ['api/users', 'api/roles'], true));
+    Scramble::routes(fn (Route $route): bool => in_array($route->uri(), ['api/users', 'api/users/{user}', 'api/roles', 'api/categories'], true));
 
     $document = app(Generator::class)();
 

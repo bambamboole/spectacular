@@ -1,6 +1,5 @@
 .idea
 /vendor
-/composer.lock
 /.phpunit.cache
 /.phpunit.result.cache
 /vendor/orchestra/testbench-core/laravel
@@ -14,3 +13,8 @@ _ide_helper.php
 .codex
 AGENTS.md
 CLAUDE.md
+
+/node_modules
+/package-lock.json
+/workbench/public/build
+/composer.lock
