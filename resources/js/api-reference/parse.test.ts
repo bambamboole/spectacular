@@ -43,8 +43,60 @@ const spec = {
                 responses: { "201": { description: "Created" } },
             },
         },
+        "/posts": {
+            get: {
+                operationId: "listPosts",
+                summary: "List posts",
+                tags: ["Posts"],
+                parameters: [{ $ref: "#/components/parameters/PageParam" }],
+                responses: {
+                    "200": {
+                        description: "OK",
+                        content: { "application/json": { schema: { type: "array" } } },
+                    },
+                },
+            },
+        },
+        "/articles": {
+            post: {
+                operationId: "createArticle",
+                summary: "Create article",
+                tags: ["Articles"],
+                requestBody: { $ref: "#/components/requestBodies/UserBody" },
+                responses: {
+                    "201": {
+                        description: "Created",
+                        content: { "application/json": { schema: { type: "object" } } },
+                    },
+                },
+            },
+        },
     },
     components: {
+        parameters: {
+            PageParam: {
+                name: "page",
+                in: "query",
+                required: false,
+                schema: { type: "integer" },
+                description: "Page number",
+            },
+        },
+        requestBodies: {
+            UserBody: {
+                description: "User creation payload",
+                content: {
+                    "application/json": {
+                        schema: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
         responses: {
             NotFound: {
                 description: "Not found",
@@ -66,7 +118,7 @@ describe("buildNavigation", () => {
 
     it("groups operations by tag, in first-appearance order, with a Default fallback", () => {
         const nav = buildNavigation(spec);
-        expect(nav.groups.map((g) => g.title)).toEqual(["Users", "Admin", "Pets", "Default"]);
+        expect(nav.groups.map((g) => g.title)).toEqual(["Users", "Admin", "Pets", "Default", "Posts", "Articles"]);
     });
 
     it("puts a multi-tag operation's id into every one of its tag groups", () => {
@@ -212,4 +264,39 @@ describe("parseOperation", () => {
             },
         ]);
     });
+
+    it("resolves a $ref parameter and merges it into paramGroups", () => {
+        const op = parseOperation(spec, "get-posts")!;
+
+        expect(op.paramGroups).toEqual([
+            {
+                location: "query",
+                params: [
+                    {
+                        name: "page",
+                        location: "query",
+                        required: false,
+                        deprecated: false,
+                        description: "Page number",
+                        schema: { type: "integer" },
+                    },
+                ],
+            },
+        ]);
+    });
+
+    it("resolves a $ref requestBody and builds the request Contract", () => {
+        const op = parseOperation(spec, "post-articles")!;
+
+        expect(op.requests).toEqual([
+            {
+                role: "request",
+                status: null,
+                mediaType: "application/json",
+                schema: { type: "object", properties: { name: { type: "string" } } },
+                title: "User creation payload",
+            },
+        ]);
+    });
+
 });
