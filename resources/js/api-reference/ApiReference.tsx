@@ -101,7 +101,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     return (
         <div className="flex w-full">
             <ApiReferenceNav navigation={navigation} selectedId={selectedId} onSelect={selectOperation} />
-            <OperationView spec={spec} operationId={selectedId} />
+            <OperationView key={selectedId} spec={spec} operationId={selectedId} />
         </div>
     );
 };
