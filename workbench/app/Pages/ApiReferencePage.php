@@ -10,7 +10,7 @@ use Lattice\Lattice\Attributes\AsPage;
 use Lattice\Lattice\Core\PageSchema;
 use Lattice\Lattice\Http\Page;
 
-#[AsPage(route: 'reference', name: 'reference')]
+#[AsPage(route: 'docs', name: 'docs')]
 final class ApiReferencePage extends Page
 {
     public function render(PageSchema $schema, Request $request): PageSchema

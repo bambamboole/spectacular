@@ -41,7 +41,7 @@ type RawPathItem = Record<string, unknown> & {
 };
 
 /**
- * Mirrors OpenApiAdapter::operationId() so client-derived ids stay stable for deep-linking.
+ * Derives a stable slug from a path so client-derived operation ids stay stable for deep-linking.
  */
 function slug(path: string): string {
     const stripped = path.replaceAll("/", "-").replaceAll("{", "").replaceAll("}", "");
