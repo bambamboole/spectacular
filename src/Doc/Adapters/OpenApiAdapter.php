@@ -28,7 +28,8 @@ final class OpenApiAdapter
     public function adapt(array $document): ApiDocument
     {
         $componentsResponses = $document['components']['responses'] ?? [];
-        $operations = $this->buildOperations($document['paths'] ?? [], $componentsResponses);
+        $componentsRequestBodies = $document['components']['requestBodies'] ?? [];
+        $operations = $this->buildOperations($document['paths'] ?? [], $componentsResponses, $componentsRequestBodies);
 
         return new ApiDocument(
             format: 'openapi',
@@ -44,9 +45,10 @@ final class OpenApiAdapter
     /**
      * @param  array<string, mixed>  $paths
      * @param  array<string, array<string, mixed>>  $componentsResponses
+     * @param  array<string, array<string, mixed>>  $componentsRequestBodies
      * @return list<Operation>
      */
-    private function buildOperations(array $paths, array $componentsResponses): array
+    private function buildOperations(array $paths, array $componentsResponses, array $componentsRequestBodies): array
     {
         $operations = [];
 
@@ -58,7 +60,7 @@ final class OpenApiAdapter
                     continue;
                 }
 
-                $operations[] = $this->buildOperation($path, $method, $pathItem[$method], $sharedParameters, $componentsResponses);
+                $operations[] = $this->buildOperation($path, $method, $pathItem[$method], $sharedParameters, $componentsResponses, $componentsRequestBodies);
             }
         }
 
@@ -71,8 +73,9 @@ final class OpenApiAdapter
      * @param  array<string, mixed>  $operation
      * @param  list<array<string, mixed>>  $sharedParameters
      * @param  array<string, array<string, mixed>>  $componentsResponses
+     * @param  array<string, array<string, mixed>>  $componentsRequestBodies
      */
-    private function buildOperation(string $path, string $method, array $operation, array $sharedParameters, array $componentsResponses): Operation
+    private function buildOperation(string $path, string $method, array $operation, array $sharedParameters, array $componentsResponses, array $componentsRequestBodies): Operation
     {
         $operationParameters = $operation['parameters'] ?? [];
 
@@ -86,6 +89,7 @@ final class OpenApiAdapter
             deprecated: (bool) ($operation['deprecated'] ?? false),
             paramGroups: $this->buildParamGroups($sharedParameters, $operationParameters),
             responses: $this->buildResponses($operation['responses'] ?? [], $componentsResponses),
+            requests: $this->buildRequests($operation, $componentsRequestBodies),
             facet: new HttpFacet(strtoupper($method), $path, $operation['operationId'] ?? null),
         );
     }
@@ -203,6 +207,49 @@ final class OpenApiAdapter
         $name = Str::afterLast($ref, '/');
 
         return $componentsResponses[$name] ?? ['description' => $name, 'content' => []];
+    }
+
+    /**
+     * @param  array<string, mixed>  $operation
+     * @param  array<string, array<string, mixed>>  $componentsRequestBodies
+     * @return list<Contract>
+     */
+    private function buildRequests(array $operation, array $componentsRequestBodies): array
+    {
+        $requestBody = $operation['requestBody'] ?? null;
+
+        if (! is_array($requestBody) || $requestBody === []) {
+            return [];
+        }
+
+        $requestBody = $this->resolveRequestBody($requestBody, $componentsRequestBodies);
+        $description = $requestBody['description'] ?? null;
+        $content = $requestBody['content'] ?? [];
+
+        $contracts = [];
+        foreach ($content as $mediaType => $mediaTypeObject) {
+            $contracts[] = new Contract('request', null, $mediaType, $mediaTypeObject['schema'] ?? [], $description);
+        }
+
+        return $contracts;
+    }
+
+    /**
+     * @param  array<string, mixed>  $requestBody
+     * @param  array<string, array<string, mixed>>  $componentsRequestBodies
+     * @return array<string, mixed>
+     */
+    private function resolveRequestBody(array $requestBody, array $componentsRequestBodies): array
+    {
+        $ref = $requestBody['$ref'] ?? null;
+
+        if (! is_string($ref)) {
+            return $requestBody;
+        }
+
+        $name = Str::afterLast($ref, '/');
+
+        return $componentsRequestBodies[$name] ?? ['content' => []];
     }
 
     /**

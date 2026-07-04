@@ -38,6 +38,7 @@ final class DocumentCompiler
         }
 
         return [
+            $this->infoHeader($document->info),
             Grid::make()
                 ->columns(2)
                 ->schema([
@@ -45,6 +46,32 @@ final class DocumentCompiler
                     $this->contentColumn($document->operations, $document->components),
                 ]),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $info
+     */
+    private function infoHeader(array $info): Component
+    {
+        $title = (string) ($info['title'] ?? '');
+        $version = (string) ($info['version'] ?? '');
+        $description = $info['description'] ?? null;
+
+        $children = [];
+
+        if ($title !== '') {
+            $children[] = Heading::make($title, 1);
+        }
+
+        if ($version !== '') {
+            $children[] = Badge::make('v'.$version);
+        }
+
+        if (is_string($description) && $description !== '') {
+            $children[] = Text::make($description);
+        }
+
+        return Stack::make()->schema($children);
     }
 
     /**
@@ -133,6 +160,10 @@ final class DocumentCompiler
             $children[] = $this->paramGroupSection($paramGroup);
         }
 
+        if ($operation->requests !== []) {
+            $children[] = $this->requestBodySection($operation->requests, $components);
+        }
+
         $children[] = $this->responsesTabs($operation->responses, $components);
 
         return Section::make(title: $operation->title, key: $operation->id)
@@ -205,9 +236,29 @@ final class DocumentCompiler
     }
 
     /**
+     * @param  list<Contract>  $requests
+     * @param  array<string, mixed>  $components
+     */
+    private function requestBodySection(array $requests, array $components): Component
+    {
+        return Section::make('Request body')->schema(array_map(
+            fn (Contract $contract): Component => $this->contractBody($contract, $components),
+            $requests,
+        ));
+    }
+
+    /**
      * @param  array<string, mixed>  $components
      */
     private function responseBody(Contract $contract, array $components): Component
+    {
+        return $this->contractBody($contract, $components);
+    }
+
+    /**
+     * @param  array<string, mixed>  $components
+     */
+    private function contractBody(Contract $contract, array $components): Component
     {
         $body = $contract->schema === []
             ? Text::make('No body.')

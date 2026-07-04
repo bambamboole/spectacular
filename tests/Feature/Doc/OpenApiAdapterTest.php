@@ -56,6 +56,62 @@ it('resolves a response-level $ref against components.responses', function (): v
         ->and($notFound->schema['properties'])->toHaveKey('message');
 });
 
+it('adapts an inline request body into a request contract', function (): void {
+    $doc = (new OpenApiAdapter)->adapt(workbenchOpenApi());
+
+    $createUser = collect($doc->operations)->firstWhere('id', 'post-users');
+    expect($createUser)->not->toBeNull()
+        ->and($createUser->requests)->toHaveCount(1);
+
+    $request = $createUser->requests[0];
+    expect($request->role)->toBe('request')
+        ->and($request->status)->toBeNull()
+        ->and($request->mediaType)->toBe('application/json')
+        ->and($request->schema['properties'])->toHaveKeys(['name', 'email', 'roles'])
+        ->and($request->schema['required'])->toContain('name', 'email');
+});
+
+it('resolves a request-body $ref against components.requestBodies', function (): void {
+    $doc = (new OpenApiAdapter)->adapt([
+        'openapi' => '3.1.0',
+        'info' => ['title' => 'Test', 'version' => '1.0.0'],
+        'paths' => [
+            '/users' => [
+                'post' => [
+                    'operationId' => 'storeUser',
+                    'requestBody' => ['$ref' => '#/components/requestBodies/StoreUser'],
+                    'responses' => [
+                        '201' => ['description' => 'Created'],
+                    ],
+                ],
+            ],
+        ],
+        'components' => [
+            'requestBodies' => [
+                'StoreUser' => [
+                    'content' => [
+                        'application/json' => [
+                            'schema' => [
+                                'type' => 'object',
+                                'properties' => ['x' => ['type' => 'string']],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    $store = collect($doc->operations)->firstWhere('id', 'post-users');
+    expect($store)->not->toBeNull()
+        ->and($store->requests)->toHaveCount(1);
+
+    expect($store->requests[0]->schema)->toBe([
+        'type' => 'object',
+        'properties' => ['x' => ['type' => 'string']],
+    ]);
+});
+
 it('adds a multi-tagged operation to every one of its tags groups', function (): void {
     $doc = (new OpenApiAdapter)->adapt([
         'openapi' => '3.1.0',
