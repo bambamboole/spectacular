@@ -7,6 +7,7 @@ type OperationViewProps = {
     spec: unknown;
     operationId: string | null;
     baseUrl?: string | null;
+    expandDepth?: number;
 };
 
 type SecuritySchemeDefinition = {
@@ -87,17 +88,19 @@ function SchemaExampleView({
     examples,
     components,
     noSchemaMessage,
+    expandDepth,
 }: {
     schema: unknown;
     examples: ContractExample[];
     components: unknown;
     noSchemaMessage: string;
+    expandDepth: number;
 }): React.ReactNode {
     const [tab, setTab] = useState<SchemaTab>("schema");
     const [selected, setSelected] = useState(0);
 
     if (examples.length === 0) {
-        return <SchemaView schema={schema} components={components} />;
+        return <SchemaView schema={schema} components={components} expandDepth={expandDepth} />;
     }
 
     const current = examples[selected] ?? examples[0];
@@ -123,7 +126,7 @@ function SchemaExampleView({
             </div>
             {tab === "schema" ? (
                 schema ? (
-                    <SchemaView schema={schema} components={components} />
+                    <SchemaView schema={schema} components={components} expandDepth={expandDepth} />
                 ) : (
                     <p className="text-sm text-lt-muted-fg">{noSchemaMessage}</p>
                 )
@@ -154,7 +157,15 @@ function SchemaExampleView({
     );
 }
 
-function RequestBodySection({ requests, components }: { requests: Contract[]; components: unknown }): React.ReactNode {
+function RequestBodySection({
+    requests,
+    components,
+    expandDepth,
+}: {
+    requests: Contract[];
+    components: unknown;
+    expandDepth: number;
+}): React.ReactNode {
     if (requests.length === 0) return null;
 
     return (
@@ -172,6 +183,7 @@ function RequestBodySection({ requests, components }: { requests: Contract[]; co
                             examples={request.examples}
                             components={components}
                             noSchemaMessage="No request body schema."
+                            expandDepth={expandDepth}
                         />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No request body schema.</p>
@@ -182,7 +194,15 @@ function RequestBodySection({ requests, components }: { requests: Contract[]; co
     );
 }
 
-function ResponsesSection({ responses, components }: { responses: Contract[]; components: unknown }): React.ReactNode {
+function ResponsesSection({
+    responses,
+    components,
+    expandDepth,
+}: {
+    responses: Contract[];
+    components: unknown;
+    expandDepth: number;
+}): React.ReactNode {
     const [active, setActive] = useState(0);
 
     if (responses.length === 0) return null;
@@ -219,6 +239,7 @@ function ResponsesSection({ responses, components }: { responses: Contract[]; co
                             examples={current.examples}
                             components={components}
                             noSchemaMessage="No response body."
+                            expandDepth={expandDepth}
                         />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No response body.</p>
@@ -304,7 +325,7 @@ function SecuritySection({ security, components }: { security: SecurityRequireme
     );
 }
 
-export function OperationView({ spec, operationId, baseUrl }: OperationViewProps): React.ReactNode {
+export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: OperationViewProps): React.ReactNode {
     const operation = useMemo(
         () => (operationId ? parseOperation(spec, operationId) : null),
         [spec, operationId],
@@ -357,8 +378,8 @@ export function OperationView({ spec, operationId, baseUrl }: OperationViewProps
                 </section>
             ) : null}
 
-            <RequestBodySection requests={operation.requests} components={components} />
-            <ResponsesSection responses={operation.responses} components={components} />
+            <RequestBodySection requests={operation.requests} components={components} expandDepth={expandDepth} />
+            <ResponsesSection responses={operation.responses} components={components} expandDepth={expandDepth} />
         </div>
     );
 }

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { buildSchemaRows, type SchemaRow } from "./build-rows";
 
-function Row({ row }: { row: SchemaRow }): React.ReactNode {
-    const [open, setOpen] = useState(false);
+function Row({ row, depth, expandDepth }: { row: SchemaRow; depth: number; expandDepth: number }): React.ReactNode {
+    const [open, setOpen] = useState(depth < expandDepth);
     const hasChildren = row.children.length > 0 || row.isRecursive;
 
     return (
@@ -21,12 +21,22 @@ function Row({ row }: { row: SchemaRow }): React.ReactNode {
                 {row.isRecursive ? <span className="text-xs text-lt-muted-fg">↩ recursive</span> : null}
             </div>
             {open && row.description ? <p className="pl-5 text-xs text-lt-muted-fg">{row.description}</p> : null}
-            {open && !row.isRecursive ? row.children.map((c) => <Row key={c.id} row={c} />) : null}
+            {open && !row.isRecursive
+                ? row.children.map((c) => <Row key={c.id} row={c} depth={depth + 1} expandDepth={expandDepth} />)
+                : null}
         </div>
     );
 }
 
-export function SchemaView({ schema, components }: { schema: unknown; components: unknown }): React.ReactNode {
+export function SchemaView({
+    schema,
+    components,
+    expandDepth = 0,
+}: {
+    schema: unknown;
+    components: unknown;
+    expandDepth?: number;
+}): React.ReactNode {
     const [rows, setRows] = useState<SchemaRow[]>([]);
     const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +57,7 @@ export function SchemaView({ schema, components }: { schema: unknown; components
     return (
         <div className="text-sm">
             {rows.map((row) => (
-                <Row key={row.id} row={row} />
+                <Row key={row.id} row={row} depth={0} expandDepth={expandDepth} />
             ))}
         </div>
     );

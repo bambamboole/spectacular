@@ -288,6 +288,15 @@ function buildSecurity(spec: any, operation: RawOperation): SecurityRequirement[
     }));
 }
 
+export function filterNavigationByTags(nav: Navigation, tags: string[]): Navigation {
+    const set = new Set(tags);
+    const groups = nav.groups.filter((g) => set.has(g.title));
+    const keep = new Set(groups.flatMap((g) => g.operationIds));
+    const summaries = Object.fromEntries(Object.entries(nav.summaries).filter(([id]) => keep.has(id)));
+
+    return { ...nav, groups, summaries };
+}
+
 export function parseOperation(spec: any, opId: string): Operation | null {
     const found = findOperation(spec, opId);
     if (!found) return null;

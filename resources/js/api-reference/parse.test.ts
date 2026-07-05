@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildNavigation, parseOperation } from "./parse";
+import { buildNavigation, filterNavigationByTags, parseOperation } from "./parse";
 
 const spec = {
     openapi: "3.0.0",
@@ -487,6 +487,41 @@ describe("buildNavigation servers", () => {
         const nav = buildNavigation(spec);
 
         expect(nav.servers).toEqual([]);
+    });
+});
+
+describe("filterNavigationByTags", () => {
+    it("keeps only groups whose title is in the tag set, pruning summaries to the kept operation ids", () => {
+        const nav = buildNavigation(spec);
+        const filtered = filterNavigationByTags(nav, ["Users", "Pets"]);
+
+        expect(filtered.groups.map((g) => g.title)).toEqual(["Users", "Pets"]);
+        expect(Object.keys(filtered.summaries).sort()).toEqual(["get-pets", "get-users-id"]);
+    });
+
+    it("leaves info and servers intact", () => {
+        const withServers = { ...spec, servers: [{ url: "https://api.example.com" }] };
+        const nav = buildNavigation(withServers);
+        const filtered = filterNavigationByTags(nav, ["Users"]);
+
+        expect(filtered.info).toEqual(nav.info);
+        expect(filtered.servers).toEqual(nav.servers);
+    });
+
+    it("returns no groups and no summaries when no tag matches", () => {
+        const nav = buildNavigation(spec);
+        const filtered = filterNavigationByTags(nav, ["DoesNotExist"]);
+
+        expect(filtered.groups).toEqual([]);
+        expect(filtered.summaries).toEqual({});
+    });
+
+    it("returns no groups when the tag list is empty", () => {
+        const nav = buildNavigation(spec);
+        const filtered = filterNavigationByTags(nav, []);
+
+        expect(filtered.groups).toEqual([]);
+        expect(filtered.summaries).toEqual({});
     });
 });
 
