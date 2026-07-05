@@ -31,6 +31,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     const [loading, setLoading] = useState<boolean>(Boolean(url));
     const [error, setError] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(() => currentHashId());
+    const [selectedServerUrl, setSelectedServerUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (!url) return;
@@ -72,6 +73,13 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     }, [navigation, selectedId]);
 
     useEffect(() => {
+        if (selectedServerUrl !== null || !navigation) return;
+
+        const initial = navigation.servers[0]?.url ?? null;
+        if (initial) setSelectedServerUrl(initial);
+    }, [navigation, selectedServerUrl]);
+
+    useEffect(() => {
         function onHashChange(): void {
             setSelectedId(currentHashId());
         }
@@ -100,8 +108,15 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
 
     return (
         <div className="flex w-full">
-            <ApiReferenceNav navigation={navigation} selectedId={selectedId} onSelect={selectOperation} />
-            <OperationView key={selectedId} spec={spec} operationId={selectedId} />
+            <ApiReferenceNav
+                navigation={navigation}
+                selectedId={selectedId}
+                onSelect={selectOperation}
+                servers={navigation.servers}
+                selectedServerUrl={selectedServerUrl}
+                onServerChange={setSelectedServerUrl}
+            />
+            <OperationView key={selectedId} spec={spec} operationId={selectedId} baseUrl={selectedServerUrl} />
         </div>
     );
 };

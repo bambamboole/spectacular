@@ -1,11 +1,49 @@
 import { useMemo, useState } from "react";
-import type { Navigation, NavGroup } from "./types";
+import type { Navigation, NavGroup, Server } from "./types";
 
 type ApiReferenceNavProps = {
     navigation: Navigation;
     selectedId: string | null;
     onSelect: (id: string) => void;
+    servers: Server[];
+    selectedServerUrl: string | null;
+    onServerChange: (url: string) => void;
 };
+
+function serverLabel(server: Server): string {
+    return server.description ? `${server.description} — ${server.url}` : server.url;
+}
+
+function ServerPicker({ servers, selectedServerUrl, onServerChange }: {
+    servers: Server[];
+    selectedServerUrl: string | null;
+    onServerChange: (url: string) => void;
+}): React.ReactNode {
+    if (servers.length === 0) return null;
+
+    if (servers.length === 1) {
+        return (
+            <p className="truncate px-2 py-1 text-xs text-lt-muted-fg" title={servers[0].url}>
+                {serverLabel(servers[0])}
+            </p>
+        );
+    }
+
+    return (
+        <select
+            value={selectedServerUrl ?? ""}
+            onChange={(event) => onServerChange(event.target.value)}
+            aria-label="Select server"
+            className="w-full rounded-lt-sm border border-lt-input bg-lt-bg px-2 py-1 text-sm text-lt-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-lt-ring"
+        >
+            {servers.map((server) => (
+                <option key={server.url} value={server.url}>
+                    {serverLabel(server)}
+                </option>
+            ))}
+        </select>
+    );
+}
 
 function filterGroups(navigation: Navigation, needle: string): NavGroup[] {
     if (needle === "") return navigation.groups;
@@ -23,7 +61,14 @@ function filterGroups(navigation: Navigation, needle: string): NavGroup[] {
         .filter((group) => group.operationIds.length > 0);
 }
 
-export function ApiReferenceNav({ navigation, selectedId, onSelect }: ApiReferenceNavProps): React.ReactNode {
+export function ApiReferenceNav({
+    navigation,
+    selectedId,
+    onSelect,
+    servers,
+    selectedServerUrl,
+    onServerChange,
+}: ApiReferenceNavProps): React.ReactNode {
     const [filter, setFilter] = useState("");
 
     const groups = useMemo(
@@ -33,6 +78,11 @@ export function ApiReferenceNav({ navigation, selectedId, onSelect }: ApiReferen
 
     return (
         <nav className="sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r border-lt-border bg-lt-surface text-lt-surface-fg">
+            {servers.length > 0 ? (
+                <div className="border-b border-lt-border p-3">
+                    <ServerPicker servers={servers} selectedServerUrl={selectedServerUrl} onServerChange={onServerChange} />
+                </div>
+            ) : null}
             <div className="border-b border-lt-border p-3">
                 <input
                     type="text"

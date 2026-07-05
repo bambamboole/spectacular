@@ -299,4 +299,95 @@ describe("parseOperation", () => {
         ]);
     });
 
+    it("resolves to no security requirements when neither the operation nor the spec declares any", () => {
+        const op = parseOperation(spec, "get-users-id")!;
+
+        expect(op.security).toEqual([]);
+    });
+});
+
+describe("buildNavigation servers", () => {
+    it("extracts servers with url and description", () => {
+        const withServers = {
+            ...spec,
+            servers: [
+                { url: "https://api.example.com", description: "Production" },
+                { url: "https://staging.example.com" },
+            ],
+        };
+
+        const nav = buildNavigation(withServers);
+
+        expect(nav.servers).toEqual([
+            { url: "https://api.example.com", description: "Production" },
+            { url: "https://staging.example.com", description: null },
+        ]);
+    });
+
+    it("returns an empty array when servers is absent", () => {
+        const nav = buildNavigation(spec);
+
+        expect(nav.servers).toEqual([]);
+    });
+});
+
+describe("effective security resolution", () => {
+    const securitySpec = {
+        openapi: "3.0.0",
+        info: { title: "Security API", version: "1.0.0", description: null },
+        security: [{ http: [] }],
+        paths: {
+            "/inherited": {
+                get: {
+                    operationId: "getInherited",
+                    responses: { "200": { description: "OK" } },
+                },
+            },
+            "/public": {
+                get: {
+                    operationId: "getPublic",
+                    security: [],
+                    responses: { "200": { description: "OK" } },
+                },
+            },
+            "/override": {
+                get: {
+                    operationId: "getOverride",
+                    security: [{ oauth2: ["read", "write"] }],
+                    responses: { "200": { description: "OK" } },
+                },
+            },
+            "/optional": {
+                get: {
+                    operationId: "getOptional",
+                    security: [{}],
+                    responses: { "200": { description: "OK" } },
+                },
+            },
+        },
+    };
+
+    it("inherits the top-level security when the operation omits it", () => {
+        const op = parseOperation(securitySpec, "get-inherited")!;
+
+        expect(op.security).toEqual([{ schemes: [{ name: "http", scopes: [] }] }]);
+    });
+
+    it("treats an explicit empty security array as public, overriding the top-level default", () => {
+        const op = parseOperation(securitySpec, "get-public")!;
+
+        expect(op.security).toEqual([]);
+    });
+
+    it("uses the operation's own security requirements when present, with scopes carried through", () => {
+        const op = parseOperation(securitySpec, "get-override")!;
+
+        expect(op.security).toEqual([{ schemes: [{ name: "oauth2", scopes: ["read", "write"] }] }]);
+    });
+
+    it("resolves an empty requirement object to a requirement with no schemes", () => {
+        const op = parseOperation(securitySpec, "get-optional")!;
+
+        expect(op.security).toEqual([{ schemes: [] }]);
+    });
 });

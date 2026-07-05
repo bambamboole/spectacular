@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Route as RouteFacade;
 use Spatie\QueryBuilder\QueryBuilder;
 use Workbench\App\Http\Resources\UserResource;
 use Workbench\App\Models\User;
+use Workbench\App\Providers\WorkbenchServiceProvider;
 
 it('documents spatie query builder parameters from the route action', function (): void {
     $parameters = generatedUsersOperationParameters();
@@ -91,6 +92,9 @@ it('documents spatie query builder parameters from the route action', function (
 });
 
 it('matches the workbench OpenAPI fixture', function (): void {
+    app()->register(WorkbenchServiceProvider::class);
+    Scramble::configure()->useConfig(config('scramble'));
+
     $fixture = workbenchOpenApiFixturePath();
 
     expect($fixture)->toBeFile()

@@ -7,6 +7,8 @@ import type {
     OperationSummary,
     Param,
     ParamGroup,
+    SecurityRequirement,
+    Server,
 } from "./types";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "options", "head", "trace"];
@@ -34,6 +36,7 @@ type RawOperation = {
     parameters?: RawParameter[];
     requestBody?: { $ref?: string; description?: string | null; content?: Record<string, { schema?: unknown }> };
     responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, { schema?: unknown }> }>;
+    security?: Array<Record<string, string[]>>;
 };
 
 type RawPathItem = Record<string, unknown> & {
@@ -93,6 +96,15 @@ function findOperation(spec: any, opId: string): { path: string; method: string;
     return null;
 }
 
+function buildServers(spec: any): Server[] {
+    const servers = spec?.servers ?? [];
+    if (!Array.isArray(servers)) return [];
+
+    return servers
+        .filter((server): server is { url: string; description?: string | null } => typeof server?.url === "string")
+        .map((server) => ({ url: server.url, description: server.description ?? null }));
+}
+
 export function buildNavigation(spec: any): Navigation {
     const info: ApiInfo = {
         title: spec?.info?.title ?? "",
@@ -135,7 +147,7 @@ export function buildNavigation(spec: any): Navigation {
         operationIds,
     }));
 
-    return { info, groups, summaries };
+    return { info, groups, summaries, servers: buildServers(spec) };
 }
 
 function slugifyTag(tag: string): string {
@@ -239,6 +251,14 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
     return contracts;
 }
 
+function buildSecurity(spec: any, operation: RawOperation): SecurityRequirement[] {
+    const raw: Array<Record<string, string[]>> = operation.security !== undefined ? operation.security : (spec?.security ?? []);
+
+    return raw.map((requirement) => ({
+        schemes: Object.entries(requirement).map(([name, scopes]) => ({ name, scopes: scopes ?? [] })),
+    }));
+}
+
 export function parseOperation(spec: any, opId: string): Operation | null {
     const found = findOperation(spec, opId);
     if (!found) return null;
@@ -260,5 +280,6 @@ export function parseOperation(spec: any, opId: string): Operation | null {
         paramGroups: buildParamGroups(spec, pathItem.parameters ?? [], operation.parameters ?? []),
         requests: buildRequests(spec, operation.requestBody),
         responses: buildResponses(spec, operation.responses),
+        security: buildSecurity(spec, operation),
     };
 }

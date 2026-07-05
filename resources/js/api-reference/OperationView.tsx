@@ -1,11 +1,21 @@
 import { useMemo, useState } from "react";
 import { SchemaView } from "../schema/SchemaView";
 import { parseOperation } from "./parse";
-import type { Contract, Param, ParamGroup } from "./types";
+import type { Contract, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
 
 type OperationViewProps = {
     spec: unknown;
     operationId: string | null;
+    baseUrl?: string | null;
+};
+
+type SecuritySchemeDefinition = {
+    type?: string;
+    scheme?: string;
+    bearerFormat?: string;
+    in?: string;
+    name?: string;
+    description?: string | null;
 };
 
 function paramTypeLabel(schema: unknown): string {
@@ -129,7 +139,82 @@ function ResponsesSection({ responses, components }: { responses: Contract[]; co
     );
 }
 
-export function OperationView({ spec, operationId }: OperationViewProps): React.ReactNode {
+function securitySchemeLabel(name: string, definition: SecuritySchemeDefinition | null): string {
+    if (!definition) return name;
+
+    if (definition.type === "http" && definition.scheme === "bearer") {
+        return definition.bearerFormat ? `HTTP Bearer (${definition.bearerFormat})` : "HTTP Bearer";
+    }
+    if (definition.type === "http" && definition.scheme === "basic") {
+        return "HTTP Basic";
+    }
+    if (definition.type === "apiKey") {
+        return `API key (${definition.in}: ${definition.name})`;
+    }
+    if (definition.type === "oauth2") {
+        return "OAuth 2.0";
+    }
+    if (definition.type === "openIdConnect") {
+        return "OpenID Connect";
+    }
+
+    return name;
+}
+
+function SecuritySchemeRow({ scheme, components }: { scheme: SecuritySchemeRef; components: unknown }): React.ReactNode {
+    const definitions = (components as { securitySchemes?: Record<string, SecuritySchemeDefinition> } | null)?.securitySchemes ?? {};
+    const definition = definitions[scheme.name] ?? null;
+
+    return (
+        <li className="border-b border-lt-border py-2 last:border-b-0">
+            <span className="text-sm text-lt-fg">{securitySchemeLabel(scheme.name, definition)}</span>
+            {definition?.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{definition.description}</p> : null}
+            {scheme.scopes.length > 0 ? (
+                <div className="mt-1 flex flex-wrap gap-1">
+                    {scheme.scopes.map((scope) => (
+                        <code key={scope} className="rounded-lt-xs bg-lt-muted px-1.5 py-0.5 text-xs text-lt-muted-fg">
+                            {scope}
+                        </code>
+                    ))}
+                </div>
+            ) : null}
+        </li>
+    );
+}
+
+function SecurityRequirementRow({ requirement, components }: { requirement: SecurityRequirement; components: unknown }): React.ReactNode {
+    if (requirement.schemes.length === 0) {
+        return <p className="text-sm text-lt-muted-fg">Optional authentication</p>;
+    }
+
+    return (
+        <ul>
+            {requirement.schemes.map((scheme) => (
+                <SecuritySchemeRow key={scheme.name} scheme={scheme} components={components} />
+            ))}
+        </ul>
+    );
+}
+
+function SecuritySection({ security, components }: { security: SecurityRequirement[]; components: unknown }): React.ReactNode {
+    if (security.length === 0) return null;
+
+    return (
+        <section className="mb-6">
+            <h2 className="mb-2 text-sm font-semibold text-lt-fg">Authorization</h2>
+            {security.map((requirement, index) => (
+                <div key={index}>
+                    {index > 0 ? (
+                        <p className="my-2 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">OR</p>
+                    ) : null}
+                    <SecurityRequirementRow requirement={requirement} components={components} />
+                </div>
+            ))}
+        </section>
+    );
+}
+
+export function OperationView({ spec, operationId, baseUrl }: OperationViewProps): React.ReactNode {
     const operation = useMemo(
         () => (operationId ? parseOperation(spec, operationId) : null),
         [spec, operationId],
@@ -155,7 +240,10 @@ export function OperationView({ spec, operationId }: OperationViewProps): React.
                     <span className="rounded-lt-xs bg-lt-primary px-2 py-0.5 text-xs font-semibold uppercase text-lt-primary-fg">
                         {operation.summary.method}
                     </span>
-                    <span className="font-mono text-sm text-lt-muted-fg">{operation.summary.path}</span>
+                    <span className="font-mono text-sm">
+                        {baseUrl ? <span className="text-lt-muted-fg">{baseUrl}</span> : null}
+                        <span className="text-lt-muted-fg">{operation.summary.path}</span>
+                    </span>
                     {operation.summary.deprecated ? (
                         <span className="rounded-lt-xs bg-lt-danger px-2 py-0.5 text-xs text-lt-danger-fg">
                             deprecated
@@ -167,6 +255,8 @@ export function OperationView({ spec, operationId }: OperationViewProps): React.
                     <p className="mt-1 text-sm text-lt-muted-fg">{operation.description}</p>
                 ) : null}
             </header>
+
+            <SecuritySection security={operation.security} components={components} />
 
             {operation.paramGroups.length > 0 ? (
                 <section className="mb-6">
