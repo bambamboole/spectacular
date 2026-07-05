@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { SchemaView } from "../schema/SchemaView";
 import { parseOperation } from "./parse";
-import type { Contract, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
+import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
 
 type OperationViewProps = {
     spec: unknown;
@@ -75,6 +75,85 @@ function ParamGroupSection({ group }: { group: ParamGroup }): React.ReactNode {
     );
 }
 
+type SchemaTab = "schema" | "example";
+
+const SCHEMA_TABS: Array<{ key: SchemaTab; label: string }> = [
+    { key: "schema", label: "Schema" },
+    { key: "example", label: "Example" },
+];
+
+function SchemaExampleView({
+    schema,
+    examples,
+    components,
+    noSchemaMessage,
+}: {
+    schema: unknown;
+    examples: ContractExample[];
+    components: unknown;
+    noSchemaMessage: string;
+}): React.ReactNode {
+    const [tab, setTab] = useState<SchemaTab>("schema");
+    const [selected, setSelected] = useState(0);
+
+    if (examples.length === 0) {
+        return <SchemaView schema={schema} components={components} />;
+    }
+
+    const current = examples[selected] ?? examples[0];
+
+    return (
+        <div>
+            <div className="mb-2 flex flex-wrap gap-1 border-b border-lt-border pb-2">
+                {SCHEMA_TABS.map(({ key, label }) => (
+                    <button
+                        key={key}
+                        type="button"
+                        onClick={() => setTab(key)}
+                        aria-pressed={tab === key}
+                        className={`rounded-lt-sm px-2 py-1 text-xs transition-colors ${
+                            tab === key
+                                ? "bg-lt-primary text-lt-primary-fg"
+                                : "bg-lt-muted text-lt-muted-fg hover:bg-lt-accent hover:text-lt-accent-fg"
+                        }`}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+            {tab === "schema" ? (
+                schema ? (
+                    <SchemaView schema={schema} components={components} />
+                ) : (
+                    <p className="text-sm text-lt-muted-fg">{noSchemaMessage}</p>
+                )
+            ) : (
+                <div>
+                    {examples.length > 1 ? (
+                        <select
+                            value={selected}
+                            onChange={(event) => setSelected(Number(event.target.value))}
+                            className="mb-2 rounded-lt-sm border border-lt-border bg-lt-muted px-2 py-1 text-xs text-lt-fg"
+                        >
+                            {examples.map((example, index) => (
+                                <option key={example.name ?? index} value={index}>
+                                    {example.name ?? `Example ${index + 1}`}
+                                    {example.summary ? ` — ${example.summary}` : ""}
+                                </option>
+                            ))}
+                        </select>
+                    ) : current?.summary ? (
+                        <p className="mb-1 text-xs text-lt-muted-fg">{current.summary}</p>
+                    ) : null}
+                    <pre className="overflow-x-auto rounded-lt-sm bg-lt-muted p-3 text-xs text-lt-fg">
+                        {JSON.stringify(current?.value, null, 2)}
+                    </pre>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function RequestBodySection({ requests, components }: { requests: Contract[]; components: unknown }): React.ReactNode {
     if (requests.length === 0) return null;
 
@@ -87,8 +166,13 @@ function RequestBodySection({ requests, components }: { requests: Contract[]; co
                         {request.mediaType ?? "unspecified media type"}
                         {request.title ? ` — ${request.title}` : ""}
                     </p>
-                    {request.schema ? (
-                        <SchemaView schema={request.schema} components={components} />
+                    {request.schema || request.examples.length > 0 ? (
+                        <SchemaExampleView
+                            schema={request.schema}
+                            examples={request.examples}
+                            components={components}
+                            noSchemaMessage="No request body schema."
+                        />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No request body schema.</p>
                     )}
@@ -128,8 +212,14 @@ function ResponsesSection({ responses, components }: { responses: Contract[]; co
             {current ? (
                 <div>
                     {current.title ? <p className="mb-2 text-sm text-lt-muted-fg">{current.title}</p> : null}
-                    {current.schema ? (
-                        <SchemaView schema={current.schema} components={components} />
+                    {current.schema || current.examples.length > 0 ? (
+                        <SchemaExampleView
+                            key={contractLabel(current)}
+                            schema={current.schema}
+                            examples={current.examples}
+                            components={components}
+                            noSchemaMessage="No response body."
+                        />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No response body.</p>
                     )}

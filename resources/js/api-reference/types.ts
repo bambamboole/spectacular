@@ -19,12 +19,14 @@ export type Param = {
     description: string | null;
     schema: unknown;
 };
+export type ContractExample = { name: string | null; summary: string | null; value: unknown };
 export type Contract = {
     role: "request" | "response";
     status: string | null;
     mediaType: string | null;
     schema: unknown;
     title: string | null;
+    examples: ContractExample[];
 };
 export type Operation = {
     summary: OperationSummary;

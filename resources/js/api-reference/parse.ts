@@ -1,6 +1,7 @@
 import type {
     ApiInfo,
     Contract,
+    ContractExample,
     Navigation,
     NavGroup,
     Operation,
@@ -27,6 +28,12 @@ type RawParameter = {
     $ref?: string;
 };
 
+type RawMediaTypeObject = {
+    schema?: unknown;
+    example?: unknown;
+    examples?: Record<string, { summary?: string; description?: string; value?: unknown; $ref?: string }>;
+};
+
 type RawOperation = {
     operationId?: string;
     summary?: string;
@@ -34,8 +41,8 @@ type RawOperation = {
     tags?: string[];
     deprecated?: boolean;
     parameters?: RawParameter[];
-    requestBody?: { $ref?: string; description?: string | null; content?: Record<string, { schema?: unknown }> };
-    responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, { schema?: unknown }> }>;
+    requestBody?: { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject> };
+    responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject> }>;
     security?: Array<Record<string, string[]>>;
 };
 
@@ -70,7 +77,7 @@ function operationTitle(operation: RawOperation, method: string, path: string): 
     return `${method.toUpperCase()} ${path}`;
 }
 
-function resolveRef<T>(spec: any, ref: string | undefined, kind: "parameters" | "requestBodies" | "responses"): T | null {
+function resolveRef<T>(spec: any, ref: string | undefined, kind: "parameters" | "requestBodies" | "responses" | "examples"): T | null {
     if (typeof ref !== "string") return null;
     const name = ref.split("/").pop();
     if (!name) return null;
@@ -199,6 +206,26 @@ function buildParamGroups(spec: any, sharedParameters: RawParameter[], operation
     return groups;
 }
 
+function buildExamples(spec: any, mediaTypeObject: RawMediaTypeObject | undefined): ContractExample[] {
+    if (!mediaTypeObject) return [];
+
+    const named = mediaTypeObject.examples;
+    if (named && Object.keys(named).length > 0) {
+        return Object.entries(named).map(([name, ex]) => {
+            const resolved =
+                ex && typeof ex === "object" && "$ref" in ex ? (resolveRef<any>(spec, ex.$ref, "examples") ?? ex) : ex;
+
+            return { name, summary: resolved?.summary ?? null, value: resolved?.value };
+        });
+    }
+
+    if (mediaTypeObject.example !== undefined) {
+        return [{ name: null, summary: null, value: mediaTypeObject.example }];
+    }
+
+    return [];
+}
+
 function buildRequests(spec: any, requestBody: RawOperation["requestBody"]): Contract[] {
     if (!requestBody) return [];
 
@@ -215,6 +242,7 @@ function buildRequests(spec: any, requestBody: RawOperation["requestBody"]): Con
         mediaType,
         schema: mediaTypeObject?.schema ?? null,
         title,
+        examples: buildExamples(spec, mediaTypeObject),
     }));
 }
 
@@ -233,7 +261,7 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
         const mediaTypes = Object.entries(content);
 
         if (mediaTypes.length === 0) {
-            contracts.push({ role: "response", status, mediaType: null, schema: null, title });
+            contracts.push({ role: "response", status, mediaType: null, schema: null, title, examples: [] });
             continue;
         }
 
@@ -244,6 +272,7 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
                 mediaType,
                 schema: mediaTypeObject?.schema ?? null,
                 title,
+                examples: buildExamples(spec, mediaTypeObject),
             });
         }
     }
