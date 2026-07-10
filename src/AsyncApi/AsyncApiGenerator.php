@@ -129,6 +129,8 @@ final readonly class AsyncApiGenerator
     {
         $settings = array_replace_recursive(config('spectacular.asyncapi', []), $overrides);
 
+        // array_replace_recursive merges lists per index, so an explicit (possibly
+        // empty) scan path override would still inherit configured default entries.
         if (isset($overrides['webhooks'])
             && is_array($overrides['webhooks'])
             && array_key_exists('scan_paths', $overrides['webhooks'])) {
@@ -144,17 +146,10 @@ final readonly class AsyncApiGenerator
      */
     private function webhookScanPaths(array $settings): array
     {
-        $scanPaths = $settings['webhooks']['scan_paths'] ?? null;
-
-        if ($scanPaths === null) {
-            $scanPaths = $settings['scan_paths'] ?? [];
-        }
-
-        if (! is_array($scanPaths)) {
-            return [];
-        }
-
-        return array_values(array_filter($scanPaths, is_string(...)));
+        return WebhookEventRegistry::resolveScanPaths(
+            $settings['webhooks']['scan_paths'] ?? null,
+            $settings['scan_paths'] ?? null,
+        );
     }
 
     /**
