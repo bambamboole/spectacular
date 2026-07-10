@@ -16,7 +16,7 @@ final class DispatchWebhookEvent
 
     public function handle(object $event): void
     {
-        $definition = $this->definitionFor($event);
+        $definition = $this->events->forClass($event::class);
 
         if ($definition === null) {
             return;
@@ -62,12 +62,10 @@ final class DispatchWebhookEvent
         }
     }
 
-    private function definitionFor(object $event): ?WebhookEventDefinition
-    {
-        return $this->events->forClass($event::class);
-    }
-
     /**
+     * App repositories may yield anything at runtime despite the interface
+     * generics, so widen to mixed to keep the instanceof guard meaningful.
+     *
      * @return iterable<mixed>
      */
     private function subscriptionsFor(string $eventName, object $event): iterable
@@ -75,6 +73,10 @@ final class DispatchWebhookEvent
         return $this->subscriptions->forEvent($eventName, $event);
     }
 
+    /**
+     * Widening to object keeps the runtime guard for hosts running older
+     * spatie/laravel-webhook-server releases without these methods.
+     */
     private function supports(object $target, string $method): bool
     {
         return method_exists($target, $method);
