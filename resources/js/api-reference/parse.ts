@@ -1,12 +1,15 @@
 import type {
     ApiInfo,
     Contract,
+    ContractExample,
     Navigation,
     NavGroup,
     Operation,
     OperationSummary,
     Param,
     ParamGroup,
+    SecurityRequirement,
+    Server,
 } from "./types";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "options", "head", "trace"];
@@ -25,6 +28,12 @@ type RawParameter = {
     $ref?: string;
 };
 
+type RawMediaTypeObject = {
+    schema?: unknown;
+    example?: unknown;
+    examples?: Record<string, { summary?: string; description?: string; value?: unknown; $ref?: string }>;
+};
+
 type RawOperation = {
     operationId?: string;
     summary?: string;
@@ -32,8 +41,9 @@ type RawOperation = {
     tags?: string[];
     deprecated?: boolean;
     parameters?: RawParameter[];
-    requestBody?: { $ref?: string; description?: string | null; content?: Record<string, { schema?: unknown }> };
-    responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, { schema?: unknown }> }>;
+    requestBody?: { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject> };
+    responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject> }>;
+    security?: Array<Record<string, string[]>>;
 };
 
 type RawPathItem = Record<string, unknown> & {
@@ -41,7 +51,7 @@ type RawPathItem = Record<string, unknown> & {
 };
 
 /**
- * Mirrors OpenApiAdapter::operationId() so client-derived ids stay stable for deep-linking.
+ * Derives a stable slug from a path so client-derived operation ids stay stable for deep-linking.
  */
 function slug(path: string): string {
     const stripped = path.replaceAll("/", "-").replaceAll("{", "").replaceAll("}", "");
@@ -67,7 +77,7 @@ function operationTitle(operation: RawOperation, method: string, path: string): 
     return `${method.toUpperCase()} ${path}`;
 }
 
-function resolveRef<T>(spec: any, ref: string | undefined, kind: "parameters" | "requestBodies" | "responses"): T | null {
+function resolveRef<T>(spec: any, ref: string | undefined, kind: "parameters" | "requestBodies" | "responses" | "examples"): T | null {
     if (typeof ref !== "string") return null;
     const name = ref.split("/").pop();
     if (!name) return null;
@@ -91,6 +101,15 @@ function findOperation(spec: any, opId: string): { path: string; method: string;
     }
 
     return null;
+}
+
+function buildServers(spec: any): Server[] {
+    const servers = spec?.servers ?? [];
+    if (!Array.isArray(servers)) return [];
+
+    return servers
+        .filter((server): server is { url: string; description?: string | null } => typeof server?.url === "string")
+        .map((server) => ({ url: server.url, description: server.description ?? null }));
 }
 
 export function buildNavigation(spec: any): Navigation {
@@ -135,7 +154,7 @@ export function buildNavigation(spec: any): Navigation {
         operationIds,
     }));
 
-    return { info, groups, summaries };
+    return { info, groups, summaries, servers: buildServers(spec) };
 }
 
 function slugifyTag(tag: string): string {
@@ -187,6 +206,26 @@ function buildParamGroups(spec: any, sharedParameters: RawParameter[], operation
     return groups;
 }
 
+function buildExamples(spec: any, mediaTypeObject: RawMediaTypeObject | undefined): ContractExample[] {
+    if (!mediaTypeObject) return [];
+
+    const named = mediaTypeObject.examples;
+    if (named && Object.keys(named).length > 0) {
+        return Object.entries(named).map(([name, ex]) => {
+            const resolved =
+                ex && typeof ex === "object" && "$ref" in ex ? (resolveRef<any>(spec, ex.$ref, "examples") ?? ex) : ex;
+
+            return { name, summary: resolved?.summary ?? null, value: resolved?.value };
+        });
+    }
+
+    if (mediaTypeObject.example !== undefined) {
+        return [{ name: null, summary: null, value: mediaTypeObject.example }];
+    }
+
+    return [];
+}
+
 function buildRequests(spec: any, requestBody: RawOperation["requestBody"]): Contract[] {
     if (!requestBody) return [];
 
@@ -203,6 +242,7 @@ function buildRequests(spec: any, requestBody: RawOperation["requestBody"]): Con
         mediaType,
         schema: mediaTypeObject?.schema ?? null,
         title,
+        examples: buildExamples(spec, mediaTypeObject),
     }));
 }
 
@@ -221,7 +261,7 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
         const mediaTypes = Object.entries(content);
 
         if (mediaTypes.length === 0) {
-            contracts.push({ role: "response", status, mediaType: null, schema: null, title });
+            contracts.push({ role: "response", status, mediaType: null, schema: null, title, examples: [] });
             continue;
         }
 
@@ -232,11 +272,29 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
                 mediaType,
                 schema: mediaTypeObject?.schema ?? null,
                 title,
+                examples: buildExamples(spec, mediaTypeObject),
             });
         }
     }
 
     return contracts;
+}
+
+function buildSecurity(spec: any, operation: RawOperation): SecurityRequirement[] {
+    const raw: Array<Record<string, string[]>> = operation.security !== undefined ? operation.security : (spec?.security ?? []);
+
+    return raw.map((requirement) => ({
+        schemes: Object.entries(requirement).map(([name, scopes]) => ({ name, scopes: scopes ?? [] })),
+    }));
+}
+
+export function filterNavigationByTags(nav: Navigation, tags: string[]): Navigation {
+    const set = new Set(tags);
+    const groups = nav.groups.filter((g) => set.has(g.title));
+    const keep = new Set(groups.flatMap((g) => g.operationIds));
+    const summaries = Object.fromEntries(Object.entries(nav.summaries).filter(([id]) => keep.has(id)));
+
+    return { ...nav, groups, summaries };
 }
 
 export function parseOperation(spec: any, opId: string): Operation | null {
@@ -260,5 +318,6 @@ export function parseOperation(spec: any, opId: string): Operation | null {
         paramGroups: buildParamGroups(spec, pathItem.parameters ?? [], operation.parameters ?? []),
         requests: buildRequests(spec, operation.requestBody),
         responses: buildResponses(spec, operation.responses),
+        security: buildSecurity(spec, operation),
     };
 }

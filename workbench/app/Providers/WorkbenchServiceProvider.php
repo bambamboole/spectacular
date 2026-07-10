@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Workbench\App\Providers;
 
+use Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Support\ServiceProvider;
@@ -32,6 +33,8 @@ final class WorkbenchServiceProvider extends ServiceProvider
         ]);
 
         config(['lattice.discover' => [dirname(__DIR__)]]);
+
+        config(['scramble.security_strategy' => MiddlewareAuthSecurityStrategy::class]);
 
         $this->readBoostConfigFromPackageRoot();
     }

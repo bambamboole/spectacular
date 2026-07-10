@@ -1,7 +1,15 @@
 export type ApiInfo = { title: string; version: string | null; description: string | null };
 export type OperationSummary = { id: string; method: string; path: string; title: string; deprecated: boolean };
 export type NavGroup = { id: string; title: string; operationIds: string[] };
-export type Navigation = { info: ApiInfo; groups: NavGroup[]; summaries: Record<string, OperationSummary> };
+export type Server = { url: string; description: string | null };
+export type SecuritySchemeRef = { name: string; scopes: string[] };
+export type SecurityRequirement = { schemes: SecuritySchemeRef[] };
+export type Navigation = {
+    info: ApiInfo;
+    groups: NavGroup[];
+    summaries: Record<string, OperationSummary>;
+    servers: Server[];
+};
 export type ParamGroup = { location: string; params: Param[] };
 export type Param = {
     name: string;
@@ -11,12 +19,14 @@ export type Param = {
     description: string | null;
     schema: unknown;
 };
+export type ContractExample = { name: string | null; summary: string | null; value: unknown };
 export type Contract = {
     role: "request" | "response";
     status: string | null;
     mediaType: string | null;
     schema: unknown;
     title: string | null;
+    examples: ContractExample[];
 };
 export type Operation = {
     summary: OperationSummary;
@@ -25,4 +35,5 @@ export type Operation = {
     paramGroups: ParamGroup[];
     requests: Contract[];
     responses: Contract[];
+    security: SecurityRequirement[];
 };

@@ -1,11 +1,22 @@
 import { useMemo, useState } from "react";
 import { SchemaView } from "../schema/SchemaView";
 import { parseOperation } from "./parse";
-import type { Contract, Param, ParamGroup } from "./types";
+import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
 
 type OperationViewProps = {
     spec: unknown;
     operationId: string | null;
+    baseUrl?: string | null;
+    expandDepth?: number;
+};
+
+type SecuritySchemeDefinition = {
+    type?: string;
+    scheme?: string;
+    bearerFormat?: string;
+    in?: string;
+    name?: string;
+    description?: string | null;
 };
 
 function paramTypeLabel(schema: unknown): string {
@@ -65,7 +76,96 @@ function ParamGroupSection({ group }: { group: ParamGroup }): React.ReactNode {
     );
 }
 
-function RequestBodySection({ requests, components }: { requests: Contract[]; components: unknown }): React.ReactNode {
+type SchemaTab = "schema" | "example";
+
+const SCHEMA_TABS: Array<{ key: SchemaTab; label: string }> = [
+    { key: "schema", label: "Schema" },
+    { key: "example", label: "Example" },
+];
+
+function SchemaExampleView({
+    schema,
+    examples,
+    components,
+    noSchemaMessage,
+    expandDepth,
+}: {
+    schema: unknown;
+    examples: ContractExample[];
+    components: unknown;
+    noSchemaMessage: string;
+    expandDepth: number;
+}): React.ReactNode {
+    const [tab, setTab] = useState<SchemaTab>("schema");
+    const [selected, setSelected] = useState(0);
+
+    if (examples.length === 0) {
+        return <SchemaView schema={schema} components={components} expandDepth={expandDepth} />;
+    }
+
+    const current = examples[selected] ?? examples[0];
+
+    return (
+        <div>
+            <div className="mb-2 flex flex-wrap gap-1 border-b border-lt-border pb-2">
+                {SCHEMA_TABS.map(({ key, label }) => (
+                    <button
+                        key={key}
+                        type="button"
+                        onClick={() => setTab(key)}
+                        aria-pressed={tab === key}
+                        className={`rounded-lt-sm px-2 py-1 text-xs transition-colors ${
+                            tab === key
+                                ? "bg-lt-primary text-lt-primary-fg"
+                                : "bg-lt-muted text-lt-muted-fg hover:bg-lt-accent hover:text-lt-accent-fg"
+                        }`}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+            {tab === "schema" ? (
+                schema ? (
+                    <SchemaView schema={schema} components={components} expandDepth={expandDepth} />
+                ) : (
+                    <p className="text-sm text-lt-muted-fg">{noSchemaMessage}</p>
+                )
+            ) : (
+                <div>
+                    {examples.length > 1 ? (
+                        <select
+                            value={selected}
+                            onChange={(event) => setSelected(Number(event.target.value))}
+                            className="mb-2 rounded-lt-sm border border-lt-border bg-lt-muted px-2 py-1 text-xs text-lt-fg"
+                        >
+                            {examples.map((example, index) => (
+                                <option key={example.name ?? index} value={index}>
+                                    {example.name ?? `Example ${index + 1}`}
+                                    {example.summary ? ` — ${example.summary}` : ""}
+                                </option>
+                            ))}
+                        </select>
+                    ) : current?.summary ? (
+                        <p className="mb-1 text-xs text-lt-muted-fg">{current.summary}</p>
+                    ) : null}
+                    <pre className="overflow-x-auto rounded-lt-sm bg-lt-muted p-3 text-xs text-lt-fg">
+                        {JSON.stringify(current?.value, null, 2)}
+                    </pre>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function RequestBodySection({
+    requests,
+    components,
+    expandDepth,
+}: {
+    requests: Contract[];
+    components: unknown;
+    expandDepth: number;
+}): React.ReactNode {
     if (requests.length === 0) return null;
 
     return (
@@ -77,8 +177,14 @@ function RequestBodySection({ requests, components }: { requests: Contract[]; co
                         {request.mediaType ?? "unspecified media type"}
                         {request.title ? ` — ${request.title}` : ""}
                     </p>
-                    {request.schema ? (
-                        <SchemaView schema={request.schema} components={components} />
+                    {request.schema || request.examples.length > 0 ? (
+                        <SchemaExampleView
+                            schema={request.schema}
+                            examples={request.examples}
+                            components={components}
+                            noSchemaMessage="No request body schema."
+                            expandDepth={expandDepth}
+                        />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No request body schema.</p>
                     )}
@@ -88,7 +194,15 @@ function RequestBodySection({ requests, components }: { requests: Contract[]; co
     );
 }
 
-function ResponsesSection({ responses, components }: { responses: Contract[]; components: unknown }): React.ReactNode {
+function ResponsesSection({
+    responses,
+    components,
+    expandDepth,
+}: {
+    responses: Contract[];
+    components: unknown;
+    expandDepth: number;
+}): React.ReactNode {
     const [active, setActive] = useState(0);
 
     if (responses.length === 0) return null;
@@ -118,8 +232,15 @@ function ResponsesSection({ responses, components }: { responses: Contract[]; co
             {current ? (
                 <div>
                     {current.title ? <p className="mb-2 text-sm text-lt-muted-fg">{current.title}</p> : null}
-                    {current.schema ? (
-                        <SchemaView schema={current.schema} components={components} />
+                    {current.schema || current.examples.length > 0 ? (
+                        <SchemaExampleView
+                            key={contractLabel(current)}
+                            schema={current.schema}
+                            examples={current.examples}
+                            components={components}
+                            noSchemaMessage="No response body."
+                            expandDepth={expandDepth}
+                        />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No response body.</p>
                     )}
@@ -129,7 +250,82 @@ function ResponsesSection({ responses, components }: { responses: Contract[]; co
     );
 }
 
-export function OperationView({ spec, operationId }: OperationViewProps): React.ReactNode {
+function securitySchemeLabel(name: string, definition: SecuritySchemeDefinition | null): string {
+    if (!definition) return name;
+
+    if (definition.type === "http" && definition.scheme === "bearer") {
+        return definition.bearerFormat ? `HTTP Bearer (${definition.bearerFormat})` : "HTTP Bearer";
+    }
+    if (definition.type === "http" && definition.scheme === "basic") {
+        return "HTTP Basic";
+    }
+    if (definition.type === "apiKey") {
+        return `API key (${definition.in}: ${definition.name})`;
+    }
+    if (definition.type === "oauth2") {
+        return "OAuth 2.0";
+    }
+    if (definition.type === "openIdConnect") {
+        return "OpenID Connect";
+    }
+
+    return name;
+}
+
+function SecuritySchemeRow({ scheme, components }: { scheme: SecuritySchemeRef; components: unknown }): React.ReactNode {
+    const definitions = (components as { securitySchemes?: Record<string, SecuritySchemeDefinition> } | null)?.securitySchemes ?? {};
+    const definition = definitions[scheme.name] ?? null;
+
+    return (
+        <li className="border-b border-lt-border py-2 last:border-b-0">
+            <span className="text-sm text-lt-fg">{securitySchemeLabel(scheme.name, definition)}</span>
+            {definition?.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{definition.description}</p> : null}
+            {scheme.scopes.length > 0 ? (
+                <div className="mt-1 flex flex-wrap gap-1">
+                    {scheme.scopes.map((scope) => (
+                        <code key={scope} className="rounded-lt-xs bg-lt-muted px-1.5 py-0.5 text-xs text-lt-muted-fg">
+                            {scope}
+                        </code>
+                    ))}
+                </div>
+            ) : null}
+        </li>
+    );
+}
+
+function SecurityRequirementRow({ requirement, components }: { requirement: SecurityRequirement; components: unknown }): React.ReactNode {
+    if (requirement.schemes.length === 0) {
+        return <p className="text-sm text-lt-muted-fg">Optional authentication</p>;
+    }
+
+    return (
+        <ul>
+            {requirement.schemes.map((scheme) => (
+                <SecuritySchemeRow key={scheme.name} scheme={scheme} components={components} />
+            ))}
+        </ul>
+    );
+}
+
+function SecuritySection({ security, components }: { security: SecurityRequirement[]; components: unknown }): React.ReactNode {
+    if (security.length === 0) return null;
+
+    return (
+        <section className="mb-6">
+            <h2 className="mb-2 text-sm font-semibold text-lt-fg">Authorization</h2>
+            {security.map((requirement, index) => (
+                <div key={index}>
+                    {index > 0 ? (
+                        <p className="my-2 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">OR</p>
+                    ) : null}
+                    <SecurityRequirementRow requirement={requirement} components={components} />
+                </div>
+            ))}
+        </section>
+    );
+}
+
+export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: OperationViewProps): React.ReactNode {
     const operation = useMemo(
         () => (operationId ? parseOperation(spec, operationId) : null),
         [spec, operationId],
@@ -155,7 +351,10 @@ export function OperationView({ spec, operationId }: OperationViewProps): React.
                     <span className="rounded-lt-xs bg-lt-primary px-2 py-0.5 text-xs font-semibold uppercase text-lt-primary-fg">
                         {operation.summary.method}
                     </span>
-                    <span className="font-mono text-sm text-lt-muted-fg">{operation.summary.path}</span>
+                    <span className="font-mono text-sm">
+                        {baseUrl ? <span className="text-lt-muted-fg">{baseUrl}</span> : null}
+                        <span className="text-lt-muted-fg">{operation.summary.path}</span>
+                    </span>
                     {operation.summary.deprecated ? (
                         <span className="rounded-lt-xs bg-lt-danger px-2 py-0.5 text-xs text-lt-danger-fg">
                             deprecated
@@ -168,6 +367,8 @@ export function OperationView({ spec, operationId }: OperationViewProps): React.
                 ) : null}
             </header>
 
+            <SecuritySection security={operation.security} components={components} />
+
             {operation.paramGroups.length > 0 ? (
                 <section className="mb-6">
                     <h2 className="mb-2 text-sm font-semibold text-lt-fg">Parameters</h2>
@@ -177,8 +378,8 @@ export function OperationView({ spec, operationId }: OperationViewProps): React.
                 </section>
             ) : null}
 
-            <RequestBodySection requests={operation.requests} components={components} />
-            <ResponsesSection responses={operation.responses} components={components} />
+            <RequestBodySection requests={operation.requests} components={components} expandDepth={expandDepth} />
+            <ResponsesSection responses={operation.responses} components={components} expandDepth={expandDepth} />
         </div>
     );
 }
