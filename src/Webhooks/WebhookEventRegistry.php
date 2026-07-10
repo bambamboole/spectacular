@@ -92,18 +92,25 @@ final class WebhookEventRegistry
     /**
      * @return list<string>
      */
-    private function scanPaths(): array
+    public static function resolveScanPaths(mixed $webhookScanPaths, mixed $fallbackScanPaths): array
     {
-        $scanPaths = config('spectacular.asyncapi.webhooks.scan_paths');
-
-        if ($scanPaths === null) {
-            $scanPaths = config('spectacular.asyncapi.scan_paths', []);
-        }
+        $scanPaths = $webhookScanPaths ?? $fallbackScanPaths ?? [];
 
         if (! is_array($scanPaths)) {
             return [];
         }
 
         return array_values(array_filter($scanPaths, is_string(...)));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function scanPaths(): array
+    {
+        return self::resolveScanPaths(
+            config('spectacular.asyncapi.webhooks.scan_paths'),
+            config('spectacular.asyncapi.scan_paths', []),
+        );
     }
 }
