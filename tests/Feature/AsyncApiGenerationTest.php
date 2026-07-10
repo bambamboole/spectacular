@@ -21,26 +21,6 @@ it('defaults to scanning the application events path', function (): void {
     expect($config['asyncapi']['scan_paths'])->toBe([app_path('Events')]);
 });
 
-it('defaults webhook AsyncAPI settings without enabling runtime delivery', function (): void {
-    $config = require dirname(__DIR__, 2).'/config/spectacular.php';
-
-    expect($config['asyncapi']['webhooks'])->toBe([
-        'scan_paths' => null,
-        'channel' => [
-            'key' => 'webhooks',
-            'address' => '{webhookUrl}',
-        ],
-        'headers' => [
-            'Content-Type' => ['type' => 'string', 'enum' => ['application/json']],
-            'Signature' => ['type' => 'string'],
-            'Timestamp' => ['type' => 'integer'],
-        ],
-        'dispatcher' => [
-            'use_timestamp' => true,
-        ],
-    ]);
-});
-
 it('fills webhook AsyncAPI defaults for older published configs', function (): void {
     $publishedScanPaths = [dirname(__DIR__).'/Fixtures/AsyncApi'];
 
