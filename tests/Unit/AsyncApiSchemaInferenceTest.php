@@ -9,7 +9,6 @@ use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidBroadcastNotifica
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\MalformedPayloadWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\PublicPropertiesBroadcast;
-use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotifiable;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
 use Carbon\CarbonImmutable;
 
@@ -43,7 +42,7 @@ it('infers webhook payload schemas from configured payload methods', function ()
 
 it('infers broadcast notification payload schemas from toBroadcast methods', function (): void {
     $schema = app(PayloadSchemaFactory::class)
-        ->forNotification(InvoicePaidBroadcastNotification::class, UserNotifiable::class);
+        ->forNotification(InvoicePaidBroadcastNotification::class);
 
     expect($schema['required'])->toBe(['invoiceId', 'amount', 'paidAt', 'id', 'type'])
         ->and($schema['properties']['invoiceId'])->toBe(['type' => 'integer'])

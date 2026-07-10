@@ -52,10 +52,9 @@ final class PayloadSchemaFactory
 
     /**
      * @param  class-string  $notificationClass
-     * @param  class-string|null  $notifiableClass
      * @return array<string, mixed>
      */
-    public function forNotification(string $notificationClass, ?string $notifiableClass = null): array
+    public function forNotification(string $notificationClass): array
     {
         $notification = new ReflectionClass($notificationClass);
 

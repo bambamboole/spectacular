@@ -80,14 +80,13 @@ final readonly class MessageDefinitionFactory
             return null;
         }
 
-        $notifiable = $attribute->notifiables[0] ?? null;
         $message = array_filter([
             'name' => $this->notificationBroadcastName($notification),
             'title' => $attribute->title,
             'summary' => $attribute->summary,
             'description' => $attribute->description,
             'tags' => array_map(fn (string $tag): array => ['name' => $tag], $attribute->tags),
-            'payload' => $this->payloads->forNotification($notification->getName(), $notifiable),
+            'payload' => $this->payloads->forNotification($notification->getName()),
         ], fn (mixed $value): bool => $value !== null && $value !== []);
 
         if ($includeLaravelExtensions) {
