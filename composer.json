@@ -30,8 +30,8 @@
         "laravel/pint": "^1.29",
         "lattice-php/lattice": "^0.36",
         "orchestra/testbench": "^11.0",
-        "pestphp/pest": "^4.0",
-        "pestphp/pest-plugin-laravel": "^4.0"
+        "pestphp/pest": "^5.0",
+        "pestphp/pest-plugin-laravel": "^5.0"
     },
     "suggest": {
         "lattice-php/lattice": "Render the generated OpenAPI/AsyncAPI documents as a UI with the Spectacular Lattice viewer (^0.36)."
