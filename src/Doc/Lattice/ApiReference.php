@@ -6,7 +6,7 @@ namespace Bambamboole\Spectacular\Doc\Lattice;
 
 use InvalidArgumentException;
 use Lattice\Lattice\Attributes\AsComponent;
-use Lattice\Lattice\Core\Components\Component;
+use Lattice\Lattice\Ui\Components\Component;
 
 #[AsComponent('spectacular.api-reference')]
 final class ApiReference extends Component
