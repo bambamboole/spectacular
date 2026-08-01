@@ -189,6 +189,40 @@ php artisan spectacular:asyncapi --path=asyncapi.json
 php artisan spectacular:asyncapi --pretty=false   # compact JSON
 ```
 
+## Displaying docs with Lattice
+
+Spectacular ships a [Lattice](https://latticephp.com) component (`lattice-php/lattice` `^0.36`, install separately)
+that renders a generated OpenAPI document as a browsable API reference:
+
+```php
+use Bambamboole\Spectacular\Doc\Lattice\ApiReference;
+use Dedoc\Scramble\Generator;
+use Illuminate\Support\Facades\Cache;
+use Lattice\Lattice\Attributes\AsPage;
+use Lattice\Lattice\Core\PageSchema;
+use Lattice\Lattice\Http\Page;
+
+#[AsPage(route: 'docs', name: 'docs', middleware: ['auth'])]
+final class ApiDocsPage extends Page
+{
+    public function render(PageSchema $schema, Generator $generator): PageSchema
+    {
+        $document = Cache::rememberForever(
+            'spectacular.openapi',
+            fn () => $generator(),
+        );
+
+        return $schema->schema([ApiReference::make()->spec($document)]);
+    }
+}
+```
+
+Scramble's generator only needs `phpstan/phpdoc-parser` and `nikic/php-parser` at runtime (PHPStan itself is a
+`require-dev` package of Scramble), so generating the document on request works in production. It still walks your
+whole app via reflection and AST parsing though, so cache the result rather than regenerating it per request —
+`Cache::forget('spectacular.openapi')` on deploy, or a shorter TTL, both work. Gate the page behind `middleware` (or
+an env check) if the reference shouldn't be public.
+
 ## Testing
 
 ```bash
