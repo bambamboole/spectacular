@@ -232,6 +232,18 @@ function ResponsesSection({
             {current ? (
                 <div>
                     {current.title ? <p className="mb-2 text-sm text-lt-muted-fg">{current.title}</p> : null}
+                    {current.headers.length > 0 ? (
+                        <div className="mb-4">
+                            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                                Response headers
+                            </h3>
+                            <ul>
+                                {current.headers.map((header) => (
+                                    <ParamRow key={header.name} param={header} />
+                                ))}
+                            </ul>
+                        </div>
+                    ) : null}
                     {current.schema || current.examples.length > 0 ? (
                         <SchemaExampleView
                             key={contractLabel(current)}
