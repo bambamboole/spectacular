@@ -194,14 +194,16 @@ php artisan spectacular:asyncapi --pretty=false   # compact JSON
 Spectacular ships a [Lattice](https://latticephp.com) component (`lattice-php/lattice` `^0.36`, install separately)
 that renders a generated OpenAPI document as a browsable API reference. Its frontend is auto-discovered by Lattice's
 Vite plugin — no manual `registry.ts` registration needed — but Spectacular ships raw `.ts`/`.tsx` compiled by your
-own app's Vite build, not a published npm package, so its two runtime dependencies won't be installed automatically.
+own app's Vite build, not a published npm package, so its runtime dependencies won't be installed automatically.
 Add them to your app's `package.json`:
 
 ```bash
-npm install @apidevtools/json-schema-ref-parser @stoplight/json-schema-tree
+npm install @apidevtools/json-schema-ref-parser @stoplight/json-schema-tree buffer
 ```
 
-Skipping this leaves the build failing with an unresolved import for one of the two packages.
+`@apidevtools/json-schema-ref-parser` resolves `$ref`s when rendering a schema tree, `@stoplight/json-schema-tree`
+turns the dereferenced schema into a tree the viewer renders, and `buffer` polyfills a Node global the ref-parser
+package expects in browsers. Missing any of these surfaces as a build-time "cannot resolve module" error.
 
 ```php
 use Bambamboole\Spectacular\Doc\Lattice\ApiReference;
@@ -227,17 +229,6 @@ final class ApiDocsPage extends Page
 ```
 
 
-The viewer's React component has its own npm dependencies, which your app's `package.json` needs alongside
-`@lattice-php/lattice`:
-
-```bash
-npm install @apidevtools/json-schema-ref-parser @stoplight/json-schema-tree buffer
-```
-
-`@apidevtools/json-schema-ref-parser` resolves `$ref`s when rendering a schema tree, `@stoplight/json-schema-tree`
-turns the dereferenced schema into a tree the viewer renders, and `buffer` polyfills a Node global the ref-parser
-package expects that browsers don't provide. Missing one of these surfaces as a build-time "cannot resolve module"
-error rather than a broken viewer.
 
 Scramble's generator only needs `phpstan/phpdoc-parser` and `nikic/php-parser` at runtime (PHPStan itself is a
 `require-dev` package of Scramble), so generating the document on request works in production. It still walks your
