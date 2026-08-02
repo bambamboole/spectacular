@@ -13,6 +13,7 @@ use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
+use LogicException;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
 it('does not expose a duplicate webhook runtime', function (): void {
@@ -154,6 +155,51 @@ it('applies per-call webhook channel overrides', function (): void {
         ->and($document['channels']['tenant-webhooks']['messages'])->toHaveKey('invoice.paid')
         ->and($document['operations']['invoice.paid.send']['channel']['$ref'])->toBe('#/channels/tenant-webhooks')
         ->and($document['operations']['invoice.paid.send']['messages'][0]['$ref'])->toBe('#/channels/tenant-webhooks/messages/invoice.paid');
+});
+
+it('rejects a channel key reused for a different address or kind', function (string $address): void {
+    configureFixtureAsyncApi();
+
+    app(AsyncApiGenerator::class)->generate([
+        'webhooks' => [
+            'channel' => [
+                'key' => 'orders',
+                'address' => $address,
+            ],
+        ],
+    ]);
+})->with([
+    'different address and kind' => '{webhookUrl}',
+    'different kind' => 'orders',
+])->throws(LogicException::class, 'Conflicting AsyncAPI channel key [orders]');
+
+it('rejects duplicate message and operation keys across broadcast and webhook definitions', function (): void {
+    config()->set('webhooks.scan_paths', [dirname(__DIR__).'/Fixtures/AsyncApiCollision']);
+    app()->forgetInstance(WebhookEventRegistry::class);
+    config()->set('spectacular.asyncapi.scan_paths', [asyncApiFixturePath()]);
+
+    app(AsyncApiGenerator::class)->generate();
+})->throws(
+    LogicException::class,
+    'Duplicate AsyncAPI message key [Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.ImmediateBroadcast] and operation key [Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.ImmediateBroadcast.send]',
+);
+
+it('excludes protected webhookLinks methods from the documented envelope', function (): void {
+    configureWebhookFixtureAsyncApi();
+
+    $properties = app(AsyncApiGenerator::class)
+        ->generate()['components']['messages']['protected.links']['payload']['properties'];
+
+    expect($properties)->not->toHaveKey('links');
+});
+
+it('excludes webhookLinks methods with required arguments from the documented envelope', function (): void {
+    configureWebhookFixtureAsyncApi();
+
+    $properties = app(AsyncApiGenerator::class)
+        ->generate()['components']['messages']['required.links']['payload']['properties'];
+
+    expect($properties)->not->toHaveKey('links');
 });
 
 it('honors custom notifiable broadcast channels that accept the notification', function (): void {
@@ -355,6 +401,13 @@ function configureFixtureAsyncApi(): void
             ],
         ],
     ]);
+}
+
+function configureWebhookFixtureAsyncApi(): void
+{
+    config()->set('webhooks.scan_paths', [dirname(__DIR__).'/Fixtures/AsyncApiWebhookLinks']);
+    app()->forgetInstance(WebhookEventRegistry::class);
+    config()->set('spectacular.asyncapi.scan_paths', []);
 }
 
 function asyncApiFixturePath(): string

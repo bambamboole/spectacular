@@ -9,6 +9,7 @@ use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
 use Bambamboole\Spectacular\AsyncApi\Messages\AsyncMessageDefinition;
 use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\AsyncApi\Support\ClassDiscoverer;
+use LogicException;
 use ReflectionAttribute;
 use ReflectionClass;
 
@@ -31,14 +32,31 @@ final readonly class AsyncApiGenerator
         $definitions = $this->messageDefinitions($settings);
 
         $channels = [];
+        $channelDefinitions = [];
         $operations = [];
         $messages = [];
         $includeLaravelExtensions = (bool) ($settings['laravel_extensions'] ?? true);
 
         foreach ($definitions as $definition) {
+            $operationKey = $definition->key.'.send';
+
+            if (isset($messages[$definition->key]) || isset($operations[$operationKey])) {
+                throw new LogicException("Duplicate AsyncAPI message key [{$definition->key}] and operation key [{$operationKey}]");
+            }
+
             $messageRef = '#/components/messages/'.$this->jsonPointerSegment($definition->key);
 
             foreach ($definition->channels as $channel) {
+                $existingChannel = $channelDefinitions[$channel->key] ?? null;
+
+                if ($existingChannel !== null
+                    && ($existingChannel->address !== $channel->address || $existingChannel->kind !== $channel->kind)) {
+                    throw new LogicException(
+                        "Conflicting AsyncAPI channel key [{$channel->key}]: existing address [{$existingChannel->address}] and kind [{$existingChannel->kind}], incoming address [{$channel->address}] and kind [{$channel->kind}]",
+                    );
+                }
+
+                $channelDefinitions[$channel->key] ??= $channel;
                 $channels[$channel->key] ??= [
                     'address' => $channel->address,
                     'messages' => [],
@@ -58,7 +76,7 @@ final readonly class AsyncApiGenerator
             }
 
             $primaryChannel = $definition->channels[0];
-            $operations[$definition->key.'.send'] = [
+            $operations[$operationKey] = [
                 'action' => 'send',
                 'channel' => [
                     '$ref' => '#/channels/'.$this->jsonPointerSegment($primaryChannel->key),
