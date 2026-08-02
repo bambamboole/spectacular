@@ -100,19 +100,13 @@ function validateParameters(parameters: Param[], values: RequestValues, errors: 
     for (const param of parameters) {
         const key = parameterKey(param);
         const value = values.parameters[key] ?? "";
+        const limitation = parameterLimitation(param);
 
-        if (!hasPrimitiveSchema(param)) {
-            errors.parameters[key] = "Only primitive parameters can be executed.";
-            continue;
-        }
+        if (limitation !== null) {
+            if (param.required || value !== "") {
+                errors.parameters[key] = limitation;
+            }
 
-        if (param.location === "cookie") {
-            errors.parameters[key] = "Cookie parameters cannot be sent from a browser.";
-            continue;
-        }
-
-        if (param.location === "header" && isForbiddenHeader(param.name)) {
-            errors.parameters[key] = "This header cannot be sent from a browser.";
             continue;
         }
 
@@ -120,6 +114,22 @@ function validateParameters(parameters: Param[], values: RequestValues, errors: 
             errors.parameters[key] = `This ${parameterLocationLabel(param.location)} parameter is required.`;
         }
     }
+}
+
+export function parameterLimitation(param: Param): string | null {
+    if (!hasPrimitiveSchema(param)) {
+        return "Only primitive parameters can be executed.";
+    }
+
+    if (param.location === "cookie") {
+        return "Cookie parameters cannot be sent from a browser.";
+    }
+
+    if (param.location === "header" && isForbiddenHeader(param.name)) {
+        return "This header cannot be sent from a browser.";
+    }
+
+    return null;
 }
 
 function validateBody(operation: Operation, values: RequestValues, errors: RequestErrors): Contract | null {

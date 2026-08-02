@@ -252,8 +252,12 @@ describe("RequestPlayground", () => {
         await expect.element(screen.getByRole("button", { name: /Try it out/ })).toBeVisible();
     });
 
-    it("shows validation errors for unsupported parameter controls", async () => {
-        const filters = parameter({ name: "filters", schema: { type: "array", items: { type: "string" } } });
+    it("shows limitations and blocks required unsupported parameters", async () => {
+        const filters = parameter({
+            name: "filters",
+            required: true,
+            schema: { type: "array", items: { type: "string" } },
+        });
         const fetchMock = vi.fn();
         vi.stubGlobal("fetch", fetchMock);
         const screen = await render(
@@ -272,6 +276,41 @@ describe("RequestPlayground", () => {
 
         await expect.element(screen.getByText("Only primitive parameters can be executed.")).toBeVisible();
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps an empty optional complex parameter documented without blocking execution", async () => {
+        const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200, statusText: "OK" }));
+        vi.stubGlobal("fetch", fetchMock);
+        const spec = {
+            openapi: "3.1.0",
+            info: { title: "Test API", version: "1.0.0" },
+            paths: {
+                "/widgets": {
+                    get: {
+                        parameters: [
+                            { name: "filters", in: "query", schema: { type: "array", items: { type: "string" } } },
+                        ],
+                        responses: { "200": { description: "OK" } },
+                    },
+                },
+            },
+        };
+        const screen = await render(
+            <OperationView spec={spec} operationId="get-widgets" baseUrl="https://api.example.test" />,
+        );
+        const tryButton = screen.getByRole("button", { name: "Try it out" });
+
+        await expect.element(screen.getByText("filters", { exact: true })).toBeVisible();
+        await expect.element(screen.getByText("Only primitive parameters can be executed.")).toBeVisible();
+        await expect.element(screen.getByLabelText("filters")).not.toBeInTheDocument();
+        await expect
+            .element(screen.getByLabelText("Request snippet", { exact: true }))
+            .toHaveTextContent("curl --request 'GET' --url 'https://api.example.test/widgets'");
+        await expect.element(tryButton).not.toBeDisabled();
+
+        await tryButton.click();
+
+        await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
     });
 
     it("blocks execution when an operation has only unsupported request bodies", async () => {

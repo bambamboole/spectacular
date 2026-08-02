@@ -13,7 +13,12 @@ import {
 import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
 import { executeRequest, type ExecutedResponse, type ExecutionError } from "./execute-request";
 import { LiveResponsePanel } from "./LiveResponsePanel";
-import { buildRequest, redactAuthorization, type RequestErrors } from "./request-builder";
+import {
+    buildRequest,
+    parameterLimitation,
+    redactAuthorization,
+    type RequestErrors,
+} from "./request-builder";
 import {
     initialRequestValues,
     jsonRequestContracts,
@@ -50,7 +55,7 @@ export function RequestPlayground({
         () => buildRequest({ operation, baseUrl, values, token }),
         [operation, baseUrl, values, token],
     );
-    const nonInteractiveParameterErrors = parameterErrorsWithoutControls(operation, buildResult.errors);
+    const nonInteractiveParameterLimitations = parameterLimitationsWithoutControls(operation);
     const hasUnsupportedRequestBody = operation.requests.length > 0 && jsonContracts.length === 0;
     const snippet = useMemo(() => {
         if (buildResult.request === null) {
@@ -164,13 +169,13 @@ export function RequestPlayground({
                     );
                 })}
 
-                {nonInteractiveParameterErrors.length > 0 || hasUnsupportedRequestBody ? (
+                {nonInteractiveParameterLimitations.length > 0 || hasUnsupportedRequestBody ? (
                     <section aria-live="polite" className="flex flex-col gap-2">
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
                             Request limitations
                         </h3>
                         <ul className="flex flex-col gap-1 text-xs text-lt-danger">
-                            {nonInteractiveParameterErrors.map(({ key, name, message }) => (
+                            {nonInteractiveParameterLimitations.map(({ key, name, message }) => (
                                 <li key={key}>
                                     {name}: {message}
                                 </li>
@@ -333,39 +338,21 @@ function firstErrorFieldKey(operation: Operation, errors: RequestErrors): string
     return errors.body === null ? null : "body";
 }
 
-function parameterErrorsWithoutControls(
+function parameterLimitationsWithoutControls(
     operation: Operation,
-    errors: RequestErrors | null,
 ): Array<{ key: string; name: string; message: string }> {
-    if (errors === null) {
-        return [];
-    }
-
     return operation.paramGroups.flatMap((group) =>
         group.params.flatMap((param) => {
             const key = parameterKey(param);
-            const message = errors.parameters[key];
+            const message = parameterLimitation(param);
 
-            return message !== undefined && !isRenderableParameter(group.location, param)
-                ? [{ key, name: param.name, message }]
-                : [];
+            return message === null ? [] : [{ key, name: param.name, message }];
         }),
     );
 }
 
 function isRenderableParameter(location: string, param: Param): boolean {
-    return ["path", "query", "header"].includes(location) && isPrimitiveParameter(param);
-}
-
-function isPrimitiveParameter(param: Param): boolean {
-    const schema = parameterSchema(param);
-
-    return !(
-        "$ref" in schema ||
-        "oneOf" in schema ||
-        "allOf" in schema ||
-        "anyOf" in schema
-    ) && typeof schema.type === "string" && ["string", "number", "integer", "boolean"].includes(schema.type);
+    return ["path", "query", "header"].includes(location) && parameterLimitation(param) === null;
 }
 
 function parameterSchema(param: Param): Record<string, unknown> {

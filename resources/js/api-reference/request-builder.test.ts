@@ -47,6 +47,7 @@ function operation(params: Param[] = [], requests: Contract[] = []): Operation {
             { location: "path", params: params.filter((param) => param.location === "path") },
             { location: "query", params: params.filter((param) => param.location === "query") },
             { location: "header", params: params.filter((param) => param.location === "header") },
+            { location: "cookie", params: params.filter((param) => param.location === "cookie") },
         ].filter((group) => group.params.length > 0),
         requests,
         responses: [],
@@ -118,6 +119,97 @@ describe("buildRequest", () => {
         ).toEqual({
             request: { method: "POST", url: "https://api.example.test/widgets/7", headers: {}, body: null },
             errors: null,
+        });
+    });
+
+    it("omits an empty optional complex parameter", () => {
+        const id = parameter({ name: "id", location: "path", required: true });
+        const filters = parameter({ name: "filters", location: "query", schema: { type: "array" } });
+
+        expect(
+            buildRequest({
+                operation: operation([id, filters]),
+                baseUrl: "https://api.example.test",
+                values: values([
+                    [id, "7"],
+                    [filters, ""],
+                ]),
+                token: null,
+            }),
+        ).toEqual({
+            request: { method: "POST", url: "https://api.example.test/widgets/7", headers: {}, body: null },
+            errors: null,
+        });
+    });
+
+    it.each([
+        ["cookie", parameter({ name: "session", location: "cookie" })],
+        ["forbidden header", parameter({ name: "Host", location: "header" })],
+    ])("omits an empty optional %s parameter", (_label, unsupported) => {
+        expect(
+            buildRequest({
+                operation: operation([unsupported]),
+                baseUrl: "https://api.example.test",
+                values: values([[unsupported, ""]]),
+                token: null,
+            }),
+        ).toEqual({
+            request: { method: "POST", url: "https://api.example.test/widgets/{id}", headers: {}, body: null },
+            errors: null,
+        });
+    });
+
+    it.each([
+        [
+            "complex",
+            parameter({ name: "filters", location: "query", required: true, schema: { type: "array" } }),
+            "Only primitive parameters can be executed.",
+        ],
+        [
+            "cookie",
+            parameter({ name: "session", location: "cookie", required: true }),
+            "Cookie parameters cannot be sent from a browser.",
+        ],
+        [
+            "forbidden header",
+            parameter({ name: "Host", location: "header", required: true }),
+            "This header cannot be sent from a browser.",
+        ],
+    ])("blocks an empty required %s parameter", (_label, unsupported, message) => {
+        expect(
+            buildRequest({
+                operation: operation([unsupported]),
+                baseUrl: "https://api.example.test",
+                values: values([[unsupported, ""]]),
+                token: null,
+            }),
+        ).toEqual({
+            request: null,
+            errors: {
+                parameters: { [parameterKey(unsupported)]: message },
+                body: null,
+                request: null,
+            },
+        });
+    });
+
+    it("blocks a populated cookie parameter", () => {
+        const cookie = parameter({ name: "session", location: "cookie" });
+
+        expect(
+            buildRequest({
+                operation: operation([cookie]),
+                baseUrl: "https://api.example.test",
+                values: values([[cookie, "secret"]]),
+                token: null,
+            }),
+        ).toEqual({
+            request: null,
+            errors: {
+                parameters: { "cookie:session": "Cookie parameters cannot be sent from a browser." },
+                body: null,
+                request: null,
+            },
         });
     });
 
