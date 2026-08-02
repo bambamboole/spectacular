@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Workbench\App\Events;
 
-use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
+use Bambamboole\LaravelWebhooks\Attributes\WebhookEvent;
 
 #[WebhookEvent(name: 'invoice.paid', title: 'Invoice Paid', summary: 'Sent when a workbench invoice is paid.', tags: ['billing'])]
 final class InvoicePaid

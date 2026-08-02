@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
+use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Bambamboole\Spectacular\AsyncApi\AsyncApiGenerator;
 use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
 use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
-use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
 use Bambamboole\Spectacular\SpectacularServiceProvider;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\ImmediateBroadcast;
@@ -42,12 +42,10 @@ it('fills webhook AsyncAPI defaults for older published configs', function (): v
         ->and(config('spectacular.asyncapi.scan_paths'))->toBe($publishedScanPaths);
 });
 
-it('treats specialized async attributes as message metadata', function (): void {
+it('treats broadcast notification attributes as message metadata', function (): void {
     $notification = new ReflectionClass(BroadcastNotification::class);
-    $webhook = new ReflectionClass(WebhookEvent::class);
 
-    expect($notification->isSubclassOf(Message::class))->toBeTrue()
-        ->and($webhook->isSubclassOf(Message::class))->toBeTrue();
+    expect($notification->isSubclassOf(Message::class))->toBeTrue();
 
     $attribute = new BroadcastNotification(
         notifiables: [UserNotificationBroadcast::class],
@@ -60,86 +58,21 @@ it('treats specialized async attributes as message metadata', function (): void 
         ->and($attribute->title)->toBe('Invoice paid')
         ->and($attribute->summary)->toBe('Sent after an invoice is paid')
         ->and($attribute->tags)->toBe(['billing']);
+});
 
-    $webhookAttribute = new WebhookEvent(
-        name: 'invoice.paid',
-        payloadMethod: 'webhookPayload',
-        headers: ['X-Tenant' => ['type' => 'string']],
-        title: 'Invoice paid',
-        tags: ['billing'],
-    );
+it('documents webhook definitions discovered by Laravel Webhooks', function (): void {
+    configureFixtureAsyncApi();
 
-    expect($webhookAttribute->name)->toBe('invoice.paid')
-        ->and($webhookAttribute->payloadMethod)->toBe('webhookPayload')
-        ->and($webhookAttribute->headers)->toBe(['X-Tenant' => ['type' => 'string']])
-        ->and($webhookAttribute->title)->toBe('Invoice paid')
-        ->and($webhookAttribute->tags)->toBe(['billing']);
+    $document = app(AsyncApiGenerator::class)->generate();
+    $paid = $document['components']['messages']['invoice.paid'];
+    $refunded = $document['components']['messages']['invoice.refunded'];
 
-    $reflectedAttributes = (new ReflectionClass(InvoicePaidWebhook::class))
-        ->getAttributes(Message::class, ReflectionAttribute::IS_INSTANCEOF);
-
-    expect($reflectedAttributes)->toHaveCount(1);
-
-    $fixtureDirectory = sys_get_temp_dir().'/spectacular-specialized-asyncapi-'.str_replace('.', '', uniqid('', true));
-    $className = 'SpecializedInvoicePaidBroadcast'.str_replace('.', '', uniqid('', true));
-    $eventClass = 'Bambamboole\\Spectacular\\Tests\\Generated\\'.$className;
-    $fixturePath = $fixtureDirectory.'/'.$className.'.php';
-
-    mkdir($fixtureDirectory);
-
-    file_put_contents($fixturePath, <<<PHP
-<?php
-declare(strict_types=1);
-
-namespace Bambamboole\Spectacular\Tests\Generated;
-
-use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
-use Illuminate\Broadcasting\Channel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
-
-#[WebhookEvent(name: 'invoice.paid', title: 'Invoice paid', tags: ['billing'])]
-final class {$className} implements ShouldBroadcast
-{
-    public int \$invoiceId = 123;
-
-    public function broadcastOn(): Channel
-    {
-        return new Channel('webhooks.invoices');
-    }
-}
-PHP);
-
-    config()->set('spectacular.asyncapi', [
-        'version' => '3.0.0',
-        'default_content_type' => 'application/json',
-        'laravel_extensions' => true,
-        'info' => [
-            'title' => 'Test AsyncAPI',
-            'version' => '1.2.3',
-        ],
-        'scan_paths' => [
-            $fixtureDirectory,
-        ],
-    ]);
-
-    try {
-        $document = app(AsyncApiGenerator::class)->generate();
-    } finally {
-        if (file_exists($fixturePath)) {
-            unlink($fixturePath);
-        }
-
-        if (is_dir($fixtureDirectory)) {
-            rmdir($fixtureDirectory);
-        }
-    }
-
-    $messageKey = str_replace('\\', '.', $eventClass);
-
-    expect($document['channels'])->toHaveKey('webhooks.invoices')
-        ->and($document['channels']['webhooks.invoices']['messages'])->toHaveKey($messageKey)
-        ->and($document['components']['messages'][$messageKey]['title'])->toBe('Invoice paid')
-        ->and($document['components']['messages'][$messageKey]['tags'])->toBe([['name' => 'billing']]);
+    expect($paid['title'])->toBe('Invoice Paid')
+        ->and($paid['tags'])->toBe([['name' => 'billing']])
+        ->and($paid['payload']['properties']['data']['properties']['invoiceId'])->toBe(['type' => 'integer'])
+        ->and($paid['payload']['properties']['links']['properties']['self'])->toBe(['type' => 'string'])
+        ->and($paid['payload']['required'])->toBe(['id', 'event', 'createdAt', 'data'])
+        ->and($refunded['payload']['properties'])->not->toHaveKey('links');
 });
 
 it('generates an AsyncAPI document for tagged Laravel broadcast events', function (): void {
@@ -190,16 +123,11 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
         ->and($immediateMessage['x-laravel-broadcast-now'])->toBeTrue();
 });
 
-it('applies per-call webhook scan path and channel overrides', function (): void {
+it('applies per-call webhook channel overrides', function (): void {
     configureFixtureAsyncApi();
-
-    config()->set('spectacular.asyncapi.webhooks.scan_paths', []);
 
     $document = app(AsyncApiGenerator::class)->generate([
         'webhooks' => [
-            'scan_paths' => [
-                asyncApiFixturePath(),
-            ],
             'channel' => [
                 'key' => 'tenant-webhooks',
                 'address' => '{tenantWebhookUrl}',
@@ -212,20 +140,6 @@ it('applies per-call webhook scan path and channel overrides', function (): void
         ->and($document['channels']['tenant-webhooks']['messages'])->toHaveKey('invoice.paid')
         ->and($document['operations']['invoice.paid.send']['channel']['$ref'])->toBe('#/channels/tenant-webhooks')
         ->and($document['operations']['invoice.paid.send']['messages'][0]['$ref'])->toBe('#/channels/tenant-webhooks/messages/invoice.paid');
-});
-
-it('honors an explicit empty per-call webhook scan path override', function (): void {
-    configureFixtureAsyncApi();
-
-    $document = app(AsyncApiGenerator::class)->generate([
-        'webhooks' => [
-            'scan_paths' => [],
-        ],
-    ]);
-
-    expect($document['channels'])->not->toHaveKey('webhooks')
-        ->and($document['components']['messages'])->not->toHaveKey('invoice.paid')
-        ->and($document['components']['messages'])->not->toHaveKey('invoice.refunded');
 });
 
 it('honors custom notifiable broadcast channels that accept the notification', function (): void {
@@ -395,6 +309,9 @@ it('matches the workbench AsyncAPI fixture', function (): void {
 
 function configureFixtureAsyncApi(): void
 {
+    config()->set('webhooks.scan_paths', [asyncApiFixturePath()]);
+    app()->forgetInstance(WebhookEventRegistry::class);
+
     config()->set('spectacular.asyncapi', [
         'version' => '3.0.0',
         'default_content_type' => 'application/json',

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\Tests\Fixtures\AsyncApi;
 
-use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
+use Bambamboole\LaravelWebhooks\Attributes\WebhookEvent;
 use Carbon\CarbonImmutable;
 
 #[WebhookEvent(
@@ -31,5 +31,13 @@ final class InvoicePaidWebhook
             'paidAt' => CarbonImmutable::parse('2026-07-03 12:00:00'),
             'status' => BroadcastStatus::Sent,
         ];
+    }
+
+    /**
+     * @return array{self:string}
+     */
+    public function webhookLinks(): array
+    {
+        return ['self' => 'https://example.test/invoices/'.$this->invoiceId];
     }
 }

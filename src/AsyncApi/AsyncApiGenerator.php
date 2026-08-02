@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\AsyncApi;
 
+use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
 use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
 use Bambamboole\Spectacular\AsyncApi\Messages\AsyncMessageDefinition;
 use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\AsyncApi\Support\ClassDiscoverer;
-use Bambamboole\Spectacular\Webhooks\WebhookEventRegistry;
 use ReflectionAttribute;
 use ReflectionClass;
 
@@ -114,7 +114,7 @@ final readonly class AsyncApiGenerator
             ->values()
             ->all();
 
-        foreach ($this->webhooks->all($this->webhookScanPaths($settings)) as $webhook) {
+        foreach ($this->webhooks->all() as $webhook) {
             $messageDefinitions[] = $this->messages->fromWebhook($webhook, $this->webhookSettings($settings));
         }
 
@@ -127,29 +127,7 @@ final readonly class AsyncApiGenerator
      */
     private function resolveSettings(array $overrides): array
     {
-        $settings = array_replace_recursive(config('spectacular.asyncapi', []), $overrides);
-
-        // array_replace_recursive merges lists per index, so an explicit (possibly
-        // empty) scan path override would still inherit configured default entries.
-        if (isset($overrides['webhooks'])
-            && is_array($overrides['webhooks'])
-            && array_key_exists('scan_paths', $overrides['webhooks'])) {
-            $settings['webhooks']['scan_paths'] = $overrides['webhooks']['scan_paths'];
-        }
-
-        return $settings;
-    }
-
-    /**
-     * @param  array<string, mixed>  $settings
-     * @return list<string>
-     */
-    private function webhookScanPaths(array $settings): array
-    {
-        return WebhookEventRegistry::resolveScanPaths(
-            $settings['webhooks']['scan_paths'] ?? null,
-            $settings['scan_paths'] ?? null,
-        );
+        return array_replace_recursive(config('spectacular.asyncapi', []), $overrides);
     }
 
     /**

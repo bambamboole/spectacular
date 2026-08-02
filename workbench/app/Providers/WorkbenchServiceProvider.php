@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Workbench\App\Providers;
 
+use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
@@ -36,9 +37,10 @@ final class WorkbenchServiceProvider extends ServiceProvider
 
         config(['scramble.security_strategy' => MiddlewareAuthSecurityStrategy::class]);
 
-        config()->set('spectacular.asyncapi.webhooks.scan_paths', [
+        config()->set('webhooks.scan_paths', [
             dirname(__DIR__, 2).'/app/Events',
         ]);
+        $this->app->forgetInstance(WebhookEventRegistry::class);
 
         $this->readBoostConfigFromPackageRoot();
     }

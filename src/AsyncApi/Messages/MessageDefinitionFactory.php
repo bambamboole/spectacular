@@ -3,10 +3,10 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\AsyncApi\Messages;
 
+use Bambamboole\LaravelWebhooks\WebhookEventDefinition;
 use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
 use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
-use Bambamboole\Spectacular\Webhooks\WebhookEventDefinition;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Notifications\Events\BroadcastNotificationCreated;
@@ -119,9 +119,23 @@ final readonly class MessageDefinitionFactory
         $channel = is_array($channel) ? $channel : [];
         $channelKey = is_string($channel['key'] ?? null) ? $channel['key'] : 'webhooks';
         $channelAddress = is_string($channel['address'] ?? null) ? $channel['address'] : '{webhookUrl}';
-        $data = $definition->attribute->payload !== null
-            ? ['$ref' => $definition->attribute->payload]
-            : $this->payloads->forMethod($definition->class, $definition->attribute->payloadMethod);
+        $data = $this->payloads->forMethod($definition->class, 'webhookPayload');
+        $properties = [
+            'id' => ['type' => 'string', 'format' => 'uuid'],
+            'event' => ['type' => 'string', 'enum' => [$definition->name]],
+            'createdAt' => ['type' => 'string', 'format' => 'date-time'],
+            'data' => $data,
+        ];
+
+        $event = new ReflectionClass($definition->class);
+
+        if ($event->hasMethod('webhookLinks')) {
+            $method = $event->getMethod('webhookLinks');
+
+            if ($method->isPublic() && $method->getNumberOfRequiredParameters() === 0) {
+                $properties['links'] = $this->payloads->forMethod($definition->class, 'webhookLinks');
+            }
+        }
 
         $message = array_filter([
             'name' => $definition->name,
@@ -129,24 +143,10 @@ final readonly class MessageDefinitionFactory
             'summary' => $definition->summary,
             'description' => $definition->description,
             'tags' => array_map(fn (string $tag): array => ['name' => $tag], $definition->tags),
-            'headers' => $this->webhookHeaders($definition, $webhooks),
+            'headers' => $this->webhookHeaders($webhooks),
             'payload' => [
                 'type' => 'object',
-                'properties' => [
-                    'id' => [
-                        'type' => 'string',
-                        'format' => 'uuid',
-                    ],
-                    'event' => [
-                        'type' => 'string',
-                        'enum' => [$definition->name],
-                    ],
-                    'createdAt' => [
-                        'type' => 'string',
-                        'format' => 'date-time',
-                    ],
-                    'data' => $data,
-                ],
+                'properties' => $properties,
                 'required' => ['id', 'event', 'createdAt', 'data'],
             ],
             'x-spectacular-webhook-event' => $definition->name,
@@ -171,10 +171,11 @@ final readonly class MessageDefinitionFactory
      * @param  array<string, mixed>  $webhooks
      * @return array<string, mixed>
      */
-    private function webhookHeaders(WebhookEventDefinition $definition, array $webhooks): array
+    private function webhookHeaders(array $webhooks): array
     {
-        $headers = $this->normalizeHeaders(is_array($webhooks['headers'] ?? null) ? $webhooks['headers'] : []);
-        $headers = array_replace($headers, $this->normalizeHeaders($definition->attribute->headers));
+        $headers = $this->normalizeHeaders(
+            is_array($webhooks['headers'] ?? null) ? $webhooks['headers'] : [],
+        );
 
         return array_filter([
             'type' => 'object',

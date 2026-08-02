@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\Tests\Fixtures\AsyncApi;
 
-use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
+use Bambamboole\LaravelWebhooks\Attributes\WebhookEvent;
 use Carbon\CarbonImmutable;
 
 #[WebhookEvent(
