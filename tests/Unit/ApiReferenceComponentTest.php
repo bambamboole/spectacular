@@ -35,6 +35,18 @@ it('defaults to the current no-modifier behaviour', function (): void {
         ->and($props['expandDepth'])->toBe(0);
 });
 
+it('defaults the request token to null', function (): void {
+    $props = ApiReference::make()->jsonSerialize()['props'];
+
+    expect($props['token'])->toBeNull();
+});
+
+it('sets the bearer token used by the request playground', function (): void {
+    $props = ApiReference::make()->token('secret-token')->jsonSerialize()['props'];
+
+    expect($props['token'])->toBe('secret-token');
+});
+
 it('sets the operation prop for embedding a single endpoint', function (): void {
     $node = ApiReference::make()->operation('get-users-id')->jsonSerialize();
 

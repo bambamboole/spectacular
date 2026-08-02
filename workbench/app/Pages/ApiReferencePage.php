@@ -22,6 +22,10 @@ final class ApiReferencePage extends Page
             flags: JSON_THROW_ON_ERROR,
         );
 
-        return $schema->schema([ApiReference::make()->spec($document)]);
+        return $schema->schema([
+            ApiReference::make()
+                ->spec($document)
+                ->token((string) config('services.spectacular.demo_token', 'workbench-token')),
+        ]);
     }
 }
