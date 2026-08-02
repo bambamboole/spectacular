@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Badge } from "@lattice-php/lattice/ui";
+import { Badge, Input } from "@lattice-php/lattice/ui";
+import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
 import { httpMethodColor } from "./http-method-color";
 import type { Navigation, NavGroup, Server } from "./types";
 
@@ -32,18 +33,18 @@ function ServerPicker({ servers, selectedServerUrl, onServerChange }: {
     }
 
     return (
-        <select
+        <NativeSelect
             value={selectedServerUrl ?? ""}
             onChange={(event) => onServerChange(event.target.value)}
             aria-label="Select server"
-            className="w-full rounded-lt-sm border border-lt-input bg-lt-bg px-2 py-1 text-sm text-lt-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-lt-ring"
+            className="w-full"
         >
             {servers.map((server) => (
                 <option key={server.url} value={server.url}>
                     {serverLabel(server)}
                 </option>
             ))}
-        </select>
+        </NativeSelect>
     );
 }
 
@@ -86,13 +87,13 @@ export function ApiReferenceNav({
                 </div>
             ) : null}
             <div className="border-b border-lt-border p-3">
-                <input
+                <Input
                     type="text"
                     value={filter}
                     onChange={(event) => setFilter(event.target.value)}
                     placeholder="Filter operations…"
                     aria-label="Filter operations"
-                    className="w-full rounded-lt-sm border border-lt-input bg-lt-bg px-2 py-1 text-sm text-lt-fg placeholder:text-lt-muted-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-lt-ring"
+                    className="w-full"
                 />
             </div>
             <div className="flex-1 overflow-y-auto p-2">
