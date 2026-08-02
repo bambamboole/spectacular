@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/bambamboole/spectacular/compare/0.2.0...0.2.1) (2026-08-02)
+
+
+### Bug Fixes
+
+* declare the PHP discovery root so component types reach consuming apps ([0dbf258](https://github.com/bambamboole/spectacular/commit/0dbf2589b471f6a01740e0b11927440bb6dd4068))
+* register the Lattice plugin for auto-discovery and lazy-load the viewer ([a312414](https://github.com/bambamboole/spectacular/commit/a3124141da7f744f6aa43e1d632b8fde8dbd5329))
+* register the Lattice plugin for auto-discovery and lazy-load the viewer ([5cc4ac2](https://github.com/bambamboole/spectacular/commit/5cc4ac2bbc975436dcf0808801d70bb2105341ab))
+
 ## [0.2.0](https://github.com/bambamboole/spectacular/compare/0.1.0...0.2.0) (2026-08-01)
 
 
