@@ -2,6 +2,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import laravel from "laravel-vite-plugin";
 import { defineConfig } from "vite";
+import { svgSprite } from "@lattice-php/vite-svg-sprite";
 
 export default defineConfig({
     plugins: [
@@ -13,6 +14,9 @@ export default defineConfig({
         }),
         react(),
         tailwindcss(),
+        svgSprite({
+            iconDirs: ["node_modules/@lattice-php/lattice/resources/icons"],
+        }),
     ],
     resolve: {
         dedupe: ["react", "react-dom", "@inertiajs/react", "@lattice-php/lattice"],

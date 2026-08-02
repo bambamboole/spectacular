@@ -205,6 +205,37 @@ npm install @apidevtools/json-schema-ref-parser @stoplight/json-schema-tree buff
 turns the dereferenced schema into a tree the viewer renders, and `buffer` polyfills a Node global the ref-parser
 package expects in browsers. Missing any of these surfaces as a build-time "cannot resolve module" error.
 
+If your app doesn't already render Lattice icons elsewhere, you'll also need an SVG sprite for the viewer's copy
+button and expand/collapse chevrons to actually be visible (the components render without one, just with empty
+icons — nothing errors or warns):
+
+```bash
+npm install -D @lattice-php/vite-svg-sprite
+```
+
+```ts
+// vite.config.ts
+import { svgSprite } from "@lattice-php/vite-svg-sprite";
+
+export default defineConfig({
+    plugins: [
+        // ...your other plugins
+        svgSprite({ iconDirs: ["node_modules/@lattice-php/lattice/resources/icons"] }),
+    ],
+});
+```
+
+Then pass the sprite to your `<Provider>`:
+
+```tsx
+import sprite from "virtual:svg-sprite";
+
+<Provider registry={registry} sprite={sprite}>
+```
+
+See [`@lattice-php/vite-svg-sprite`](https://www.npmjs.com/package/@lattice-php/vite-svg-sprite) for merging in your
+own icons alongside Lattice's.
+
 ```php
 use Bambamboole\Spectacular\Doc\Lattice\ApiReference;
 use Dedoc\Scramble\Generator;
