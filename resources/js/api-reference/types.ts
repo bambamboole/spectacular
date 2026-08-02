@@ -34,6 +34,8 @@ export type Contract = {
 export type Operation = {
     summary: OperationSummary;
     serverUrl: string;
+    servers: Server[];
+    usesRootServers: boolean;
     description: string | null;
     tags: string[];
     paramGroups: ParamGroup[];

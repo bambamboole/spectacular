@@ -225,7 +225,9 @@ function isForbiddenMethodOverride(name: string, value: string | undefined): boo
 
     const normalizedName = name.toLowerCase();
 
-    return METHOD_OVERRIDE_HEADER_NAMES.has(normalizedName) && FORBIDDEN_METHOD_OVERRIDE_VALUES.has(value.trim().toUpperCase());
+    return METHOD_OVERRIDE_HEADER_NAMES.has(normalizedName) && value
+        .split(",")
+        .some((method) => FORBIDDEN_METHOD_OVERRIDE_VALUES.has(method.trim().toUpperCase()));
 }
 
 function hasPrimitiveSchema(param: Param): boolean {

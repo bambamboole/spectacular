@@ -42,6 +42,8 @@ function operation(params: Param[] = [], requests: Contract[] = []): Operation {
             deprecated: false,
         },
         serverUrl: "https://api.example.test",
+        servers: [{ url: "https://api.example.test", description: null }],
+        usesRootServers: true,
         description: null,
         tags: [],
         paramGroups: [
@@ -343,6 +345,9 @@ describe("buildRequest", () => {
         ["X-HTTP-Method", "connect"],
         ["X-HTTP-Method-Override", "TRACE"],
         ["X-Method-Override", "Track"],
+        ["X-HTTP-Method", "PATCH, trace"],
+        ["X-HTTP-Method-Override", " connect , PATCH"],
+        ["X-Method-Override", "POST, TrAcK "],
     ])("rejects %s when its value is the forbidden method %s", (name, value) => {
         const forbidden = parameter({ name, location: "header" });
 
@@ -372,14 +377,14 @@ describe("buildRequest", () => {
                 buildRequest({
                     operation: operation([allowed]),
                     baseUrl: "https://api.example.test",
-                    values: values([[allowed, "PATCH"]]),
+                    values: values([[allowed, "POST, PATCH"]]),
                     token: null,
                 }),
             ).toEqual({
                 request: {
                     method: "POST",
                     url: "https://api.example.test/widgets/{id}",
-                    headers: { [name]: "PATCH" },
+                    headers: { [name]: "POST, PATCH" },
                     body: null,
                 },
                 errors: null,

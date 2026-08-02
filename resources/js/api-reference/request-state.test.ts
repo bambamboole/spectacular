@@ -39,6 +39,8 @@ function operation(overrides: Partial<Operation> = {}): Operation {
             deprecated: false,
         },
         serverUrl: "https://api.example.test",
+        servers: [{ url: "https://api.example.test", description: null }],
+        usesRootServers: true,
         description: null,
         tags: [],
         paramGroups: [],

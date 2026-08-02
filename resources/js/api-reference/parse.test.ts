@@ -587,6 +587,7 @@ describe("buildNavigation servers", () => {
 
         const rootOnly = {
             ...operationWithServers,
+            servers: [rootServer, { url: "https://staging.root.example/v1" }],
             paths: {
                 "/widgets": {
                     get: { responses: { "200": { description: "OK" } } },
@@ -599,6 +600,11 @@ describe("buildNavigation servers", () => {
         expect(parseOperation(rootOnly, "get-widgets", "https://staging.root.example/v1")?.serverUrl).toBe(
             "https://staging.root.example/v1",
         );
+        expect(parseOperation(rootOnly, "get-widgets")?.usesRootServers).toBe(true);
+        expect(parseOperation(operationWithServers, "get-widgets")?.servers).toEqual([
+            { url: "https://acme.operation.example", description: null },
+        ]);
+        expect(parseOperation(operationWithServers, "get-widgets")?.usesRootServers).toBe(false);
         expect(parseOperation({ ...rootOnly, servers: [] }, "get-widgets")?.serverUrl).toBe("/");
     });
 });

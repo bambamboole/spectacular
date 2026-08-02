@@ -372,11 +372,24 @@ export function filterNavigationByTags(nav: Navigation, tags: string[]): Navigat
     return { ...nav, groups, summaries };
 }
 
-export function parseOperation(spec: any, opId: string, selectedRootServerUrl: string | null = null): Operation | null {
+export function parseOperation(spec: any, opId: string, selectedServerUrl: string | null = null): Operation | null {
     const found = findOperation(spec, opId);
     if (!found) return null;
 
     const { path, method, pathItem, operation } = found;
+    const operationServers = normalizeServers(operation.servers);
+    const pathServers = normalizeServers(pathItem.servers);
+    const usesRootServers = operationServers.length === 0 && pathServers.length === 0;
+    const servers = operationServers.length > 0
+        ? operationServers
+        : pathServers.length > 0
+          ? pathServers
+          : buildServers(spec);
+    const effectiveServerUrl = usesRootServers && selectedServerUrl !== null
+        ? selectedServerUrl
+        : selectedServerUrl !== null && servers.some((server) => server.url === selectedServerUrl)
+          ? selectedServerUrl
+          : servers[0]!.url;
 
     const summary: OperationSummary = {
         id: opId,
@@ -388,11 +401,9 @@ export function parseOperation(spec: any, opId: string, selectedRootServerUrl: s
 
     return {
         summary,
-        serverUrl:
-            normalizeServers(operation.servers)[0]?.url ??
-            normalizeServers(pathItem.servers)[0]?.url ??
-            selectedRootServerUrl ??
-            buildServers(spec)[0]!.url,
+        serverUrl: effectiveServerUrl,
+        servers,
+        usesRootServers,
         description: operation.description ?? null,
         tags: operation.tags ?? [],
         paramGroups: buildParamGroups(spec, pathItem.parameters ?? [], operation.parameters ?? []),

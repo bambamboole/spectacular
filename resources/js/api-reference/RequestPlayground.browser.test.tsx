@@ -80,6 +80,8 @@ function playgroundOperation(overrides: Partial<Operation> = {}): Operation {
         security: [],
         ...overrides,
         serverUrl: overrides.serverUrl ?? "https://api.example.test",
+        servers: overrides.servers ?? [{ url: "https://api.example.test", description: null }],
+        usesRootServers: overrides.usesRootServers ?? true,
     };
 }
 
@@ -370,6 +372,77 @@ describe("RequestPlayground", () => {
         await expect.element(snippet).toHaveTextContent("https://production.example.test/widgets");
         await screen.getByLabelText("Select server").selectOptions("https://staging.example.test");
         await expect.element(snippet).toHaveTextContent("https://staging.example.test/widgets");
+    });
+
+    it("shows and executes the selected operation-level server instead of the root server", async () => {
+        const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200, statusText: "OK" }));
+        vi.stubGlobal("fetch", fetchMock);
+        const spec = {
+            openapi: "3.1.0",
+            info: { title: "Test API", version: "1.0.0" },
+            servers: [
+                { url: "https://production.example.test", description: "Production" },
+                { url: "https://staging.example.test", description: "Staging" },
+            ],
+            paths: {
+                "/widgets": {
+                    get: {
+                        servers: [
+                            { url: "https://canary.operation.example", description: "Canary operation" },
+                            { url: "https://sandbox.operation.example", description: "Sandbox operation" },
+                        ],
+                        responses: { "200": { description: "OK" } },
+                    },
+                },
+            },
+        };
+        const screen = await render(
+            <ApiReference node={apiReferenceNode({ spec, defaultOperation: "get-widgets", hideHeader: true })}>
+                {null}
+            </ApiReference>,
+        );
+        const serverPicker = screen.getByLabelText("Select server");
+        const snippet = screen.getByLabelText("Request snippet", { exact: true });
+
+        await expect.element(serverPicker).toHaveValue("https://canary.operation.example");
+        await expect.element(snippet).toHaveTextContent("https://canary.operation.example/widgets");
+        await serverPicker.selectOptions("https://sandbox.operation.example");
+        await expect.element(serverPicker).toHaveValue("https://sandbox.operation.example");
+        await expect.element(snippet).toHaveTextContent("https://sandbox.operation.example/widgets");
+
+        await screen.getByRole("button", { name: "Try it out" }).click();
+
+        await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("https://sandbox.operation.example/widgets");
+    });
+
+    it("allows fixed-operation references to select an operation-level server", async () => {
+        const spec = {
+            openapi: "3.1.0",
+            info: { title: "Test API", version: "1.0.0" },
+            paths: {
+                "/widgets": {
+                    get: {
+                        servers: [
+                            { url: "https://canary.operation.example", description: "Canary operation" },
+                            { url: "https://sandbox.operation.example", description: "Sandbox operation" },
+                        ],
+                        responses: { "200": { description: "OK" } },
+                    },
+                },
+            },
+        };
+        const screen = await render(
+            <ApiReference node={apiReferenceNode({ spec, operation: "get-widgets", hideHeader: true })}>
+                {null}
+            </ApiReference>,
+        );
+        const serverPicker = screen.getByLabelText("Select server");
+        const snippet = screen.getByLabelText("Request snippet", { exact: true });
+
+        await expect.element(serverPicker).toHaveValue("https://canary.operation.example");
+        await serverPicker.selectOptions("https://sandbox.operation.example");
+        await expect.element(snippet).toHaveTextContent("https://sandbox.operation.example/widgets");
     });
 
     it("clears seeded values for optional hidden unsupported parameters", async () => {
