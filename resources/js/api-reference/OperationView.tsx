@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { SegmentedPills } from "@lattice-php/lattice/ui";
+import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
 import { parseOperation } from "./parse";
 import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
@@ -107,22 +109,14 @@ function SchemaExampleView({
 
     return (
         <div>
-            <div className="mb-2 flex flex-wrap gap-1 border-b border-lt-border pb-2">
-                {SCHEMA_TABS.map(({ key, label }) => (
-                    <button
-                        key={key}
-                        type="button"
-                        onClick={() => setTab(key)}
-                        aria-pressed={tab === key}
-                        className={`rounded-lt-sm px-2 py-1 text-xs transition-colors ${
-                            tab === key
-                                ? "bg-lt-primary text-lt-primary-fg"
-                                : "bg-lt-muted text-lt-muted-fg hover:bg-lt-accent hover:text-lt-accent-fg"
-                        }`}
-                    >
-                        {label}
-                    </button>
-                ))}
+            <div className="mb-2 pb-2">
+                <SegmentedPills
+                    name="schema-example-tab"
+                    ariaLabel="Schema or example"
+                    options={SCHEMA_TABS.map(({ key, label }) => ({ label, value: key, data: null }))}
+                    value={tab}
+                    onSelect={(value) => setTab(value as SchemaTab)}
+                />
             </div>
             {tab === "schema" ? (
                 schema ? (
@@ -203,31 +197,27 @@ function ResponsesSection({
     components: unknown;
     expandDepth: number;
 }): React.ReactNode {
-    const [active, setActive] = useState(0);
-
     if (responses.length === 0) return null;
 
-    const current = responses[active] ?? responses[0];
+    const [activeLabel, setActiveLabel] = useState<string>(contractLabel(responses[0]));
+    const current = responses.find((response) => contractLabel(response) === activeLabel) ?? responses[0];
+    const options: Option[] = responses.map((response) => ({
+        label: contractLabel(response),
+        value: contractLabel(response),
+        data: null,
+    }));
 
     return (
         <section>
             <h2 className="mb-2 text-sm font-semibold text-lt-fg">Responses</h2>
-            <div className="mb-3 flex flex-wrap gap-1 border-b border-lt-border pb-2">
-                {responses.map((response, index) => (
-                    <button
-                        key={`${response.status ?? "default"}-${response.mediaType ?? "none"}-${index}`}
-                        type="button"
-                        onClick={() => setActive(index)}
-                        aria-pressed={index === active}
-                        className={`rounded-lt-sm px-2 py-1 text-xs transition-colors ${
-                            index === active
-                                ? "bg-lt-primary text-lt-primary-fg"
-                                : "bg-lt-muted text-lt-muted-fg hover:bg-lt-accent hover:text-lt-accent-fg"
-                        }`}
-                    >
-                        {contractLabel(response)}
-                    </button>
-                ))}
+            <div className="mb-3 pb-2">
+                <SegmentedPills
+                    name="response-status"
+                    ariaLabel="Response status"
+                    options={options}
+                    value={activeLabel}
+                    onSelect={setActiveLabel}
+                />
             </div>
             {current ? (
                 <div>
