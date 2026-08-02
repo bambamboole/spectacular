@@ -226,6 +226,19 @@ final class ApiDocsPage extends Page
 }
 ```
 
+
+The viewer's React component has its own npm dependencies, which your app's `package.json` needs alongside
+`@lattice-php/lattice`:
+
+```bash
+npm install @apidevtools/json-schema-ref-parser @stoplight/json-schema-tree buffer
+```
+
+`@apidevtools/json-schema-ref-parser` resolves `$ref`s when rendering a schema tree, `@stoplight/json-schema-tree`
+turns the dereferenced schema into a tree the viewer renders, and `buffer` polyfills a Node global the ref-parser
+package expects that browsers don't provide. Missing one of these surfaces as a build-time "cannot resolve module"
+error rather than a broken viewer.
+
 Scramble's generator only needs `phpstan/phpdoc-parser` and `nikic/php-parser` at runtime (PHPStan itself is a
 `require-dev` package of Scramble), so generating the document on request works in production. It still walks your
 whole app via reflection and AST parsing though, so cache the result rather than regenerating it per request —
