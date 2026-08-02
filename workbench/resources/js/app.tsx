@@ -9,9 +9,9 @@ import {
     registry,
 } from "@lattice-php/lattice";
 import { createRoot } from "react-dom/client";
-import { spectacularComponents } from "../../../resources/js/plugin";
+import spectacularPlugin from "../../../resources/js/plugin";
 
-const appRegistry = extendRegistry(registry, spectacularComponents);
+const appRegistry = extendRegistry(registry, spectacularPlugin);
 
 createInertiaApp({
     resolve: createPageResolver({}),

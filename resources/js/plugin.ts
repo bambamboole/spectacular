@@ -1,9 +1,10 @@
-import { createPlugin, eagerComponent } from "@lattice-php/lattice";
-import ApiReference from "./api-reference/ApiReference";
+import { createPlugin, lazyComponent } from "@lattice-php/lattice";
 
-export const spectacularComponents = createPlugin({
+export default createPlugin({
     name: "spectacular",
     components: {
-        "spectacular.api-reference": eagerComponent(ApiReference),
+        "spectacular.api-reference": lazyComponent(
+            () => import("./api-reference/ApiReference"),
+        ),
     },
 });
