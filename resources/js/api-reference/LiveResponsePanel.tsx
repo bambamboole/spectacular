@@ -1,0 +1,65 @@
+import { Badge } from "@lattice-php/lattice/ui";
+import type { ExecutedResponse, ExecutionError } from "./execute-request";
+
+type LiveResponsePanelProps = {
+    result: ExecutedResponse | ExecutionError | null;
+};
+
+export function LiveResponsePanel({ result }: LiveResponsePanelProps): React.ReactNode {
+    if (result === null) {
+        return null;
+    }
+
+    if (result.kind === "error") {
+        return (
+            <section aria-live="polite" className="flex flex-col gap-3 border-t border-lt-border pt-6">
+                <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold text-lt-fg">Live response</h3>
+                    <Badge color="danger">Error</Badge>
+                </div>
+                <p className="text-sm text-lt-danger">{result.message}</p>
+            </section>
+        );
+    }
+
+    return (
+        <section aria-live="polite" className="flex flex-col gap-4 border-t border-lt-border pt-6">
+            <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold text-lt-fg">Live response</h3>
+                <Badge color={responseBadgeColor(result.status)}>
+                    {result.status} {result.statusText}
+                </Badge>
+                <span className="text-xs text-lt-muted-fg">{result.durationMs} ms</span>
+            </div>
+            {result.headers.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                        Response headers
+                    </h4>
+                    <dl className="flex flex-col gap-1 text-xs">
+                        {result.headers.map(([name, value]) => (
+                            <div key={name} className="flex flex-wrap gap-2">
+                                <dt className="font-mono text-lt-fg">{name}</dt>
+                                <dd className="wrap-anywhere text-lt-muted-fg">{value}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
+            ) : null}
+            <pre
+                aria-label="Live response body"
+                className="max-w-full overflow-x-auto whitespace-pre-wrap wrap-anywhere rounded-lt-sm bg-lt-muted p-3 text-xs text-lt-fg"
+            >
+                {result.body}
+            </pre>
+        </section>
+    );
+}
+
+function responseBadgeColor(status: number): "success" | "warning" | "danger" {
+    if (status >= 200 && status < 300) {
+        return "success";
+    }
+
+    return status >= 400 && status < 500 ? "warning" : "danger";
+}

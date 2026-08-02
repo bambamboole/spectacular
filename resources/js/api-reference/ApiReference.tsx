@@ -16,6 +16,7 @@ type ApiReferenceProps = {
     hideHeader?: boolean;
     title?: string | null;
     expandDepth?: number;
+    token?: string | null;
 };
 
 function firstSummaryId(navigation: Navigation | null): string | null {
@@ -61,6 +62,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         hideHeader = false,
         title = null,
         expandDepth = 0,
+        token = null,
     } = node.props as ApiReferenceProps;
 
     const [spec, setSpec] = useState<unknown>(inlineSpec ?? null);
@@ -160,6 +162,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                         spec={spec}
                         operationId={operation}
                         baseUrl={selectedServerUrl}
+                        token={token}
                         expandDepth={expandDepth}
                     />
                 </div>
@@ -190,6 +193,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                 spec={spec}
                                 operationId={id}
                                 baseUrl={selectedServerUrl}
+                                token={token}
                                 expandDepth={expandDepth}
                             />
                         </section>
@@ -218,6 +222,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                     spec={spec}
                     operationId={selectedId}
                     baseUrl={selectedServerUrl}
+                    token={token}
                     expandDepth={expandDepth}
                 />
             </div>

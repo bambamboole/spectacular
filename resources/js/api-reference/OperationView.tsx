@@ -5,12 +5,14 @@ import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
 import { OperationHeader } from "./OperationHeader";
 import { parseOperation } from "./parse";
+import { RequestPlayground } from "./RequestPlayground";
 import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
 
 type OperationViewProps = {
     spec: unknown;
     operationId: string | null;
     baseUrl?: string | null;
+    token?: string | null;
     expandDepth?: number;
 };
 
@@ -334,7 +336,7 @@ function SecuritySection({ security, components }: { security: SecurityRequireme
     );
 }
 
-export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: OperationViewProps): React.ReactNode {
+export function OperationView({ spec, operationId, baseUrl, token, expandDepth = 0 }: OperationViewProps): React.ReactNode {
     const operation = useMemo(
         () => (operationId ? parseOperation(spec, operationId) : null),
         [spec, operationId],
@@ -369,6 +371,12 @@ export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: O
             ) : null}
 
             <RequestBodySection requests={operation.requests} components={components} expandDepth={expandDepth} />
+            <RequestPlayground
+                operation={operation}
+                baseUrl={baseUrl ?? null}
+                token={token ?? null}
+                components={components}
+            />
             <ResponsesSection responses={operation.responses} components={components} expandDepth={expandDepth} />
         </div>
     );
