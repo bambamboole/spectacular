@@ -170,6 +170,9 @@ function schemaForMarkdown(schema: unknown, components: unknown): unknown {
     }
 
     const resolvedSchema = withoutSchemaIds(replaceGeneratedDefinitionRefs(resolved, definitionNames));
+    const normalizedExistingDefinitions = isRecord(resolvedSchema) && isRecord(resolvedSchema.$defs)
+        ? resolvedSchema.$defs
+        : {};
     const definitions = Object.fromEntries(
         Object.entries(context.definitions).map(([name, definition]) => [
             definitionNames.get(generatedDefinitionRefForName(name)) ?? name,
@@ -178,7 +181,7 @@ function schemaForMarkdown(schema: unknown, components: unknown): unknown {
     );
 
     return isRecord(resolvedSchema)
-        ? { ...resolvedSchema, $defs: { ...existingDefinitions, ...definitions } }
+        ? { ...resolvedSchema, $defs: { ...normalizedExistingDefinitions, ...definitions } }
         : resolvedSchema;
 }
 

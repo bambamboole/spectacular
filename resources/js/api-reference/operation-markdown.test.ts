@@ -379,4 +379,45 @@ Validation failed
         expect(markdown).toMatch(/"child": \{\s+"\$ref": "#\/\$defs\/NodeComponent"\s+\}/);
         expect(markdown).not.toContain("#/components/schemas/");
     });
+
+    it("normalizes existing definitions that participate in component recursion", () => {
+        const markdown = operationToMarkdown(
+            {
+                ...operation,
+                requests: [
+                    {
+                        ...operation.requests[0]!,
+                        schema: { $ref: "#/components/schemas/Node" },
+                        examples: [],
+                    },
+                ],
+                responses: [],
+            },
+            {
+                schemas: {
+                    Node: {
+                        type: "object",
+                        $defs: {
+                            Node: { type: "string" },
+                            Envelope: {
+                                $id: "https://schemas.example.test/envelope",
+                                type: "object",
+                                properties: { node: { $ref: "#/components/schemas/Node" } },
+                            },
+                        },
+                        properties: {
+                            envelope: { $ref: "#/$defs/Envelope" },
+                            child: { $ref: "#/components/schemas/Node" },
+                        },
+                    },
+                },
+            },
+        );
+
+        expect(markdown).toContain('"$ref": "#/$defs/Envelope"');
+        expect(markdown).toContain('"$ref": "#/$defs/NodeComponent"');
+        expect(markdown).not.toContain("spectacular-internal://schema/");
+        expect(markdown).not.toContain("#/components/schemas/");
+        expect(markdown).not.toContain('"$id"');
+    });
 });
