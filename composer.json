@@ -74,6 +74,9 @@
         ]
     },
     "extra": {
+        "lattice": {
+            "plugin": "resources/js/plugin.ts"
+        },
         "laravel": {
             "providers": [
                 "Bambamboole\\Spectacular\\SpectacularServiceProvider"
