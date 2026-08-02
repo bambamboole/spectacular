@@ -200,11 +200,11 @@ channels that cannot be inferred.
 
 ### Webhook events
 
-Use `#[WebhookEvent]` on outbound webhook event classes you want listed in the AsyncAPI document and runtime webhook
-registry:
+Use Laravel Webhooks' `#[WebhookEvent]` attribute on outbound webhook event classes you want listed in the AsyncAPI
+document:
 
 ```php
-use Bambamboole\Spectacular\AsyncApi\Attributes\WebhookEvent;
+use Bambamboole\LaravelWebhooks\Attributes\WebhookEvent;
 
 #[WebhookEvent(
     name: 'invoice.paid',
@@ -229,57 +229,12 @@ final class InvoicePaidWebhook
 }
 ```
 
-`WebhookEventRegistry::all()` returns the discovered definitions, which an app can use to power its own webhook setup
-UI:
+Laravel Webhooks owns runtime event discovery, subscriptions, delivery, signing, retries, caching, and delivery
+history. Follow the [Laravel Webhooks documentation](https://github.com/bambamboole/laravel-webhooks) to configure
+those runtime concerns.
 
-```php
-use Bambamboole\Spectacular\Webhooks\WebhookEventRegistry;
-
-$events = collect(app(WebhookEventRegistry::class)->all())
-    ->map(fn ($event) => [
-        'name' => $event->name,
-        'title' => $event->title,
-        'summary' => $event->summary,
-    ]);
-```
-
-Spectacular documents and discovers webhook events, but your application owns webhook endpoint persistence and any
-subscription UI.
-
-### Optional webhook delivery
-
-Runtime delivery is optional and uses `spatie/laravel-webhook-server`:
-
-```bash
-composer require spatie/laravel-webhook-server
-```
-
-Bind `Bambamboole\Spectacular\Webhooks\WebhookSubscriptionRepository` to an application repository that returns active
-`Bambamboole\Spectacular\Webhooks\WebhookSubscription` objects for an event:
-
-```php
-use Bambamboole\Spectacular\Webhooks\WebhookSubscription;
-use Bambamboole\Spectacular\Webhooks\WebhookSubscriptionRepository;
-
-final class DatabaseWebhookSubscriptionRepository implements WebhookSubscriptionRepository
-{
-    public function forEvent(string $eventName, object $event): iterable
-    {
-        return [
-            new WebhookSubscription(
-                url: 'https://example.com/webhooks',
-                secret: 'signing-secret',
-                headers: ['X-Webhook-Source' => 'app'],
-                id: 'subscription-123',
-            ),
-        ];
-    }
-}
-```
-
-Then register `Bambamboole\Spectacular\Webhooks\DispatchWebhookEvent` as a listener for the webhook event classes your
-app wants delivered. If `spectacular.asyncapi.webhooks.scan_paths` is `null`, webhook discovery uses the base AsyncAPI
-`scan_paths`; set it to an explicit empty array to disable webhook event discovery.
+Spectacular limits its webhook role to the generated AsyncAPI channel, message metadata, envelope schema, configured
+headers, and the `spectacular:asyncapi` command.
 
 ### Laravel extensions
 
@@ -302,7 +257,6 @@ broadcasts now). Disable them with `laravel_extensions => false` in the config.
         app_path('Events'),
     ],
     'webhooks' => [
-        'scan_paths' => null,
         'channel' => [
             'key' => 'webhooks',
             'address' => '{webhookUrl}',
@@ -311,9 +265,6 @@ broadcasts now). Disable them with `laravel_extensions => false` in the config.
             'Content-Type' => ['type' => 'string', 'enum' => ['application/json']],
             'Signature' => ['type' => 'string'],
             'Timestamp' => ['type' => 'integer'],
-        ],
-        'dispatcher' => [
-            'use_timestamp' => true,
         ],
     ],
 ],

@@ -28,6 +28,13 @@ it('defaults to scanning the application events path', function (): void {
     expect($config['asyncapi']['scan_paths'])->toBe([app_path('Events')]);
 });
 
+it('keeps runtime webhook settings in Laravel Webhooks', function (): void {
+    $config = require dirname(__DIR__, 2).'/config/spectacular.php';
+
+    expect($config['asyncapi']['webhooks'])->toHaveKeys(['channel', 'headers'])
+        ->and($config['asyncapi']['webhooks'])->not->toHaveKeys(['scan_paths', 'dispatcher']);
+});
+
 it('fills webhook AsyncAPI defaults for older published configs', function (): void {
     $publishedScanPaths = [dirname(__DIR__).'/Fixtures/AsyncApi'];
 

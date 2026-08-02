@@ -17,7 +17,6 @@ return [
             app_path('Events'),
         ],
         'webhooks' => [
-            'scan_paths' => null,
             'channel' => [
                 'key' => 'webhooks',
                 'address' => '{webhookUrl}',
@@ -26,9 +25,6 @@ return [
                 'Content-Type' => ['type' => 'string', 'enum' => ['application/json']],
                 'Signature' => ['type' => 'string'],
                 'Timestamp' => ['type' => 'integer'],
-            ],
-            'dispatcher' => [
-                'use_timestamp' => true,
             ],
         ],
     ],
