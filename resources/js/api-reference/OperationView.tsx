@@ -197,9 +197,10 @@ function ResponsesSection({
     components: unknown;
     expandDepth: number;
 }): React.ReactNode {
+    const [activeLabel, setActiveLabel] = useState<string | null>(null);
+
     if (responses.length === 0) return null;
 
-    const [activeLabel, setActiveLabel] = useState<string>(contractLabel(responses[0]));
     const current = responses.find((response) => contractLabel(response) === activeLabel) ?? responses[0];
     const options: Option[] = responses.map((response) => ({
         label: contractLabel(response),
@@ -215,7 +216,7 @@ function ResponsesSection({
                     name="response-status"
                     ariaLabel="Response status"
                     options={options}
-                    value={activeLabel}
+                    value={activeLabel ?? options[0]?.value ?? ""}
                     onSelect={setActiveLabel}
                 />
             </div>
