@@ -13,7 +13,6 @@ use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
-use LogicException;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
 it('does not expose a duplicate webhook runtime', function (): void {
