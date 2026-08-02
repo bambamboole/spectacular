@@ -1218,7 +1218,237 @@ git commit -m "feat: use Lattice Input and NativeSelect in the nav sidebar"
 
 ---
 
-### Task 9: Full verification pass
+### Task 9: Wire up the SVG icon sprite
+
+**Added after Task 9's original verification pass found a real gap:** DOM inspection (`document.querySelectorAll('symbol')` → `[]`) proved Task 6's copy-button icon and Task 7's chevron icon are structurally present (`<use href="#copy">`, `<use href="#chevron-down">`) but invisible — nothing in the document defines those symbol ids. `workbench/resources/js/app.tsx`'s `<Provider>` never receives a `sprite` prop (defaults to `{ href: "" }`, per `node_modules/@lattice-php/lattice/dist/provider-base.js:10-11`), and no Vite config registers a sprite plugin. Functionality (click-to-copy, expand/collapse) still works — only the glyphs are missing. Human-approved fix: wire up the sprite for the workbench, and document the same requirement for consumers, parallel to Task 1's npm-package documentation.
+
+**Files:**
+- Modify: `package.json` (root)
+- Modify: `vite.config.ts`
+- Modify: `tsconfig.json`
+- Modify: `workbench/resources/js/app.tsx`
+- Modify: `README.md`
+
+**Interfaces:**
+- Consumes: `@lattice-php/vite-svg-sprite`'s `svgSprite` Vite plugin and its `virtual:svg-sprite` module (default export shape `{ href: string, ids?: readonly string[], source?: string }`, matching `SpriteValue` in `node_modules/@lattice-php/lattice/dist/icons/sprite.d.ts`).
+- Produces: no new exports — `workbench/resources/js/app.tsx`'s `<Provider>` gains a `sprite` prop.
+
+- [ ] **Step 1: Add the sprite plugin dependency**
+
+```bash
+npm install -D @lattice-php/vite-svg-sprite
+```
+
+Add it to `package.json`'s `devDependencies` (alphabetical, matching the file's existing `sort-packages`-style ordering) if the install doesn't already place it correctly — verify after running the command.
+
+- [ ] **Step 2: Register the plugin in `vite.config.ts`**
+
+Read the current file:
+
+```bash
+cat vite.config.ts
+```
+
+It currently reads:
+
+```ts
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import laravel from "laravel-vite-plugin";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: ["workbench/resources/css/app.css", "workbench/resources/js/app.tsx"],
+            publicDirectory: "vendor/orchestra/testbench-core/laravel/public",
+            buildDirectory: "build",
+            refresh: true,
+        }),
+        react(),
+        tailwindcss(),
+    ],
+    resolve: {
+        dedupe: ["react", "react-dom", "@inertiajs/react", "@lattice-php/lattice"],
+    },
+});
+```
+
+Add the `svgSprite` plugin, pointed at Lattice's own bundled icon set (`node_modules/@lattice-php/lattice/resources/icons`, confirmed to contain `chevron-down.svg`, `copy.svg`, `check.svg`, and 54 others — this is the same directory Lattice's own built-in components' icon names resolve against):
+
+```ts
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import laravel from "laravel-vite-plugin";
+import { defineConfig } from "vite";
+import { svgSprite } from "@lattice-php/vite-svg-sprite";
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: ["workbench/resources/css/app.css", "workbench/resources/js/app.tsx"],
+            publicDirectory: "vendor/orchestra/testbench-core/laravel/public",
+            buildDirectory: "build",
+            refresh: true,
+        }),
+        react(),
+        tailwindcss(),
+        svgSprite({
+            iconDirs: ["node_modules/@lattice-php/lattice/resources/icons"],
+        }),
+    ],
+    resolve: {
+        dedupe: ["react", "react-dom", "@inertiajs/react", "@lattice-php/lattice"],
+    },
+});
+```
+
+- [ ] **Step 3: Add the virtual-module client types**
+
+Read `tsconfig.json`. Add `"@lattice-php/vite-svg-sprite/client"` to `compilerOptions.types` (create the `types` array if it doesn't exist; if it exists with other entries, append to it — don't replace).
+
+- [ ] **Step 4: Wire the sprite into the workbench's `<Provider>`**
+
+Read `workbench/resources/js/app.tsx`. It currently reads:
+
+```tsx
+import "../css/app.css";
+import { createInertiaApp } from "@inertiajs/react";
+import {
+    createLayoutResolver,
+    createPageResolver,
+    extendRegistry,
+    Provider,
+    registry,
+} from "@lattice-php/lattice";
+import { createRoot } from "react-dom/client";
+import spectacularPlugin from "../../../resources/js/plugin";
+
+const appRegistry = extendRegistry(registry, spectacularPlugin);
+
+createInertiaApp({
+    resolve: createPageResolver({}),
+    layout: createLayoutResolver(),
+    setup({ el, App, props }) {
+        if (!el) {
+            return;
+        }
+        createRoot(el).render(
+            <Provider registry={appRegistry}>
+                <App {...props} />
+            </Provider>,
+        );
+    },
+});
+```
+
+Add the sprite import and pass it to `<Provider>`:
+
+```tsx
+import "../css/app.css";
+import { createInertiaApp } from "@inertiajs/react";
+import {
+    createLayoutResolver,
+    createPageResolver,
+    extendRegistry,
+    Provider,
+    registry,
+} from "@lattice-php/lattice";
+import { createRoot } from "react-dom/client";
+import sprite from "virtual:svg-sprite";
+import spectacularPlugin from "../../../resources/js/plugin";
+
+const appRegistry = extendRegistry(registry, spectacularPlugin);
+
+createInertiaApp({
+    resolve: createPageResolver({}),
+    layout: createLayoutResolver(),
+    setup({ el, App, props }) {
+        if (!el) {
+            return;
+        }
+        createRoot(el).render(
+            <Provider registry={appRegistry} sprite={sprite}>
+                <App {...props} />
+            </Provider>,
+        );
+    },
+});
+```
+
+- [ ] **Step 5: Document the sprite requirement for consumers**
+
+In `README.md`'s "Displaying docs with Lattice" section, immediately after the existing npm-install paragraph (the one Task 1 updated to include `buffer`), add:
+
+```markdown
+If your app doesn't already render Lattice icons elsewhere, you'll also need an SVG sprite for the viewer's copy
+button and expand/collapse chevrons to actually be visible (the components render without one, just with empty
+icons — nothing errors or warns):
+
+​```bash
+npm install -D @lattice-php/vite-svg-sprite
+​```
+
+​```ts
+// vite.config.ts
+import { svgSprite } from "@lattice-php/vite-svg-sprite";
+
+export default defineConfig({
+    plugins: [
+        // ...your other plugins
+        svgSprite({ iconDirs: ["node_modules/@lattice-php/lattice/resources/icons"] }),
+    ],
+});
+​```
+
+Then pass the sprite to your `<Provider>`:
+
+​```tsx
+import sprite from "virtual:svg-sprite";
+
+<Provider registry={registry} sprite={sprite}>
+```
+
+See [`@lattice-php/vite-svg-sprite`](https://www.npmjs.com/package/@lattice-php/vite-svg-sprite) for merging in your
+own icons alongside Lattice's.
+```
+
+(The `​` characters above are zero-width markers separating the nested code fences from this instruction's own — when inserting into `README.md`, use real triple-backtick fences, not nested ones; write this as plain content in the file, the same way Task 1's README insertion was written directly rather than through a nested fence.)
+
+- [ ] **Step 6: Verify**
+
+```bash
+npm run typecheck
+npm test
+npm run build
+```
+
+All three must succeed. `npm run build` succeeding confirms the `virtual:svg-sprite` import resolves.
+
+- [ ] **Step 7: Manual regression check — this time with DOM inspection, not just a screenshot**
+
+```bash
+composer serve
+```
+
+Open `http://127.0.0.1:8000/docs` in a fresh tab (not a previously-open one, to rule out stale bundle/HMR state) and run in the page's console (or via a JS-execution browser tool):
+
+```js
+document.querySelectorAll('symbol').length
+```
+
+Expected: greater than 0 (the sprite's symbols are now present in the document). Then select an operation with a deprecated response or expand a schema tree row, and confirm the chevron/copy icons are now visually a real glyph, not a blank 12×12 box — take a screenshot and visually confirm, don't rely on DOM presence of `<use>` alone (that was true before this fix too, and was not sufficient evidence). Stop the server when done.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add package.json vite.config.ts tsconfig.json workbench/resources/js/app.tsx README.md
+git commit -m "fix: wire up the Lattice SVG sprite so viewer icons actually render"
+```
+
+---
+
+### Task 10: Full verification pass
 
 **Files:** none (verification only).
 
