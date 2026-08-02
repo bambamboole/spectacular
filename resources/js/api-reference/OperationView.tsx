@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Badge, SegmentedPills } from "@lattice-php/lattice/ui";
+import { Badge, CopyableText, SegmentedPills } from "@lattice-php/lattice/ui";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
 import { httpMethodColor } from "./http-method-color";
@@ -355,10 +355,12 @@ export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: O
                     <Badge color={httpMethodColor(operation.summary.method)} className="text-xs font-semibold uppercase">
                         {operation.summary.method}
                     </Badge>
-                    <span className="font-mono text-sm">
-                        {baseUrl ? <span className="text-lt-muted-fg">{baseUrl}</span> : null}
-                        <span className="text-lt-muted-fg">{operation.summary.path}</span>
-                    </span>
+                    <CopyableText value={`${baseUrl ?? ""}${operation.summary.path}`} label="operation URL">
+                        <span className="font-mono text-sm text-lt-muted-fg">
+                            {baseUrl}
+                            {operation.summary.path}
+                        </span>
+                    </CopyableText>
                     {operation.summary.deprecated ? <Badge color="danger">deprecated</Badge> : null}
                 </div>
                 <h1 className="mt-2 text-lg font-semibold text-lt-fg">{operation.summary.title}</h1>
