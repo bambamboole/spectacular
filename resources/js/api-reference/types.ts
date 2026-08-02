@@ -27,6 +27,7 @@ export type Contract = {
     schema: unknown;
     title: string | null;
     examples: ContractExample[];
+    headers: Param[];
 };
 export type Operation = {
     summary: OperationSummary;

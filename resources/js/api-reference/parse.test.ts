@@ -227,6 +227,7 @@ describe("parseOperation", () => {
                 schema: { type: "object", properties: { name: { type: "string" } } },
                 title: "User payload",
                 examples: [],
+                headers: [],
             },
         ]);
     });
@@ -242,6 +243,7 @@ describe("parseOperation", () => {
                 schema: { type: "object" },
                 title: "OK",
                 examples: [],
+                headers: [],
             },
             {
                 role: "response",
@@ -250,6 +252,7 @@ describe("parseOperation", () => {
                 schema: { type: "object", properties: { message: { type: "string" } } },
                 title: "Not found",
                 examples: [],
+                headers: [],
             },
         ]);
     });
@@ -265,6 +268,7 @@ describe("parseOperation", () => {
                 schema: null,
                 title: "OK",
                 examples: [],
+                headers: [],
             },
         ]);
     });
@@ -300,6 +304,7 @@ describe("parseOperation", () => {
                 schema: { type: "object", properties: { name: { type: "string" } } },
                 title: "User creation payload",
                 examples: [],
+                headers: [],
             },
         ]);
     });
@@ -583,5 +588,106 @@ describe("effective security resolution", () => {
         const op = parseOperation(securitySpec, "get-optional")!;
 
         expect(op.security).toEqual([{ schemes: [] }]);
+    });
+});
+
+describe("response headers", () => {
+    it("extracts response headers into Param entries", () => {
+        const op = parseOperation(
+            {
+                openapi: "3.0.0",
+                info: { title: "Headers API", version: "1.0.0", description: null },
+                paths: {
+                    "/widgets": {
+                        get: {
+                            operationId: "getWidgets",
+                            responses: {
+                                "200": {
+                                    description: "OK",
+                                    content: { "application/json": { schema: { type: "object" } } },
+                                    headers: {
+                                        "X-RateLimit-Limit": {
+                                            description: "Requests allowed per window",
+                                            schema: { type: "integer" },
+                                        },
+                                        "X-RateLimit-Remaining": {
+                                            required: true,
+                                            schema: { type: "integer" },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            "get-widgets",
+        )!;
+
+        expect(op.responses[0].headers).toEqual([
+            {
+                name: "X-RateLimit-Limit",
+                location: "header",
+                required: false,
+                deprecated: false,
+                description: "Requests allowed per window",
+                schema: { type: "integer" },
+            },
+            {
+                name: "X-RateLimit-Remaining",
+                location: "header",
+                required: true,
+                deprecated: false,
+                description: null,
+                schema: { type: "integer" },
+            },
+        ]);
+    });
+
+    it("resolves a $ref response header from components.headers", () => {
+        const op = parseOperation(
+            {
+                openapi: "3.0.0",
+                info: { title: "Headers API", version: "1.0.0", description: null },
+                paths: {
+                    "/widgets": {
+                        get: {
+                            operationId: "getWidgets",
+                            responses: {
+                                "200": {
+                                    description: "OK",
+                                    headers: {
+                                        "X-Request-Id": { $ref: "#/components/headers/RequestId" },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                components: {
+                    headers: {
+                        RequestId: { description: "Correlates logs to this request", schema: { type: "string" } },
+                    },
+                },
+            },
+            "get-widgets",
+        )!;
+
+        expect(op.responses[0].headers).toEqual([
+            {
+                name: "X-Request-Id",
+                location: "header",
+                required: false,
+                deprecated: false,
+                description: "Correlates logs to this request",
+                schema: { type: "string" },
+            },
+        ]);
+    });
+
+    it("returns an empty array when a response has no headers", () => {
+        const op = parseOperation(spec, "get-users-id")!;
+
+        expect(op.responses[0].headers).toEqual([]);
     });
 });

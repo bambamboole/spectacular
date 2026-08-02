@@ -42,7 +42,7 @@ type RawOperation = {
     deprecated?: boolean;
     parameters?: RawParameter[];
     requestBody?: { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject> };
-    responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject> }>;
+    responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject>; headers?: Record<string, RawParameter> }>;
     security?: Array<Record<string, string[]>>;
 };
 
@@ -77,7 +77,7 @@ function operationTitle(operation: RawOperation, method: string, path: string): 
     return `${method.toUpperCase()} ${path}`;
 }
 
-function resolveRef<T>(spec: any, ref: string | undefined, kind: "parameters" | "requestBodies" | "responses" | "examples"): T | null {
+function resolveRef<T>(spec: any, ref: string | undefined, kind: "parameters" | "requestBodies" | "responses" | "examples" | "headers"): T | null {
     if (typeof ref !== "string") return null;
     const name = ref.split("/").pop();
     if (!name) return null;
@@ -176,6 +176,18 @@ function buildParam(parameter: RawParameter): Param {
     };
 }
 
+function buildResponseHeaders(spec: any, headers: Record<string, RawParameter> | undefined): Param[] {
+    if (!headers) return [];
+
+    return Object.entries(headers).map(([name, header]) => {
+        const resolved = header.$ref
+            ? (resolveRef<RawParameter>(spec, header.$ref, "headers") ?? header)
+            : header;
+
+        return buildParam({ ...resolved, name, in: "header" });
+    });
+}
+
 function buildParamGroups(spec: any, sharedParameters: RawParameter[], operationParameters: RawParameter[]): ParamGroup[] {
     const merged = new Map<string, RawParameter>();
 
@@ -243,6 +255,7 @@ function buildRequests(spec: any, requestBody: RawOperation["requestBody"]): Con
         schema: mediaTypeObject?.schema ?? null,
         title,
         examples: buildExamples(spec, mediaTypeObject),
+        headers: [],
     }));
 }
 
@@ -259,9 +272,10 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
         const title = resolved.description ?? null;
         const content = resolved.content ?? {};
         const mediaTypes = Object.entries(content);
+        const headers = buildResponseHeaders(spec, resolved.headers);
 
         if (mediaTypes.length === 0) {
-            contracts.push({ role: "response", status, mediaType: null, schema: null, title, examples: [] });
+            contracts.push({ role: "response", status, mediaType: null, schema: null, title, examples: [], headers });
             continue;
         }
 
@@ -273,6 +287,7 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
                 schema: mediaTypeObject?.schema ?? null,
                 title,
                 examples: buildExamples(spec, mediaTypeObject),
+                headers,
             });
         }
     }
