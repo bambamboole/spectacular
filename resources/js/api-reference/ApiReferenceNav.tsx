@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { Badge, Input } from "@lattice-php/lattice/ui";
+import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
+import { httpMethodColor } from "./http-method-color";
 import type { Navigation, NavGroup, Server } from "./types";
 
 type ApiReferenceNavProps = {
@@ -30,18 +33,17 @@ function ServerPicker({ servers, selectedServerUrl, onServerChange }: {
     }
 
     return (
-        <select
+        <NativeSelect
             value={selectedServerUrl ?? ""}
             onChange={(event) => onServerChange(event.target.value)}
             aria-label="Select server"
-            className="w-full rounded-lt-sm border border-lt-input bg-lt-bg px-2 py-1 text-sm text-lt-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-lt-ring"
         >
             {servers.map((server) => (
                 <option key={server.url} value={server.url}>
                     {serverLabel(server)}
                 </option>
             ))}
-        </select>
+        </NativeSelect>
     );
 }
 
@@ -84,13 +86,12 @@ export function ApiReferenceNav({
                 </div>
             ) : null}
             <div className="border-b border-lt-border p-3">
-                <input
+                <Input
                     type="text"
                     value={filter}
                     onChange={(event) => setFilter(event.target.value)}
                     placeholder="Filter operations…"
                     aria-label="Filter operations"
-                    className="w-full rounded-lt-sm border border-lt-input bg-lt-bg px-2 py-1 text-sm text-lt-fg placeholder:text-lt-muted-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-lt-ring"
                 />
             </div>
             <div className="flex-1 overflow-y-auto p-2">
@@ -118,10 +119,14 @@ export function ApiReferenceNav({
                                                     : "text-lt-fg hover:bg-lt-muted"
                                             }`}
                                         >
-                                            <span className="font-mono text-xs text-lt-muted-fg">{summary.method}</span>
+                                            <Badge color={httpMethodColor(summary.method)} className="text-xs">
+                                                {summary.method}
+                                            </Badge>
                                             <span className="truncate">{summary.path}</span>
                                             {summary.deprecated ? (
-                                                <span className="ml-auto shrink-0 text-xs text-lt-danger">deprecated</span>
+                                                <Badge color="danger" className="ml-auto shrink-0">
+                                                    deprecated
+                                                </Badge>
                                             ) : null}
                                         </button>
                                     </li>

@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
+import { Badge, CopyableText, SegmentedPills } from "@lattice-php/lattice/ui";
+import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
+import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
+import { httpMethodColor } from "./http-method-color";
 import { parseOperation } from "./parse";
 import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
 
@@ -54,7 +58,7 @@ function ParamRow({ param }: { param: Param }): React.ReactNode {
                     {paramTypeLabel(param.schema)}
                 </span>
                 {param.required ? <span className="text-lt-danger">*</span> : null}
-                {param.deprecated ? <span className="text-xs text-lt-muted-fg">deprecated</span> : null}
+                {param.deprecated ? <Badge color="danger">deprecated</Badge> : null}
             </div>
             {param.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{param.description}</p> : null}
         </li>
@@ -84,12 +88,14 @@ const SCHEMA_TABS: Array<{ key: SchemaTab; label: string }> = [
 ];
 
 function SchemaExampleView({
+    name,
     schema,
     examples,
     components,
     noSchemaMessage,
     expandDepth,
 }: {
+    name: string;
     schema: unknown;
     examples: ContractExample[];
     components: unknown;
@@ -107,22 +113,14 @@ function SchemaExampleView({
 
     return (
         <div>
-            <div className="mb-2 flex flex-wrap gap-1 border-b border-lt-border pb-2">
-                {SCHEMA_TABS.map(({ key, label }) => (
-                    <button
-                        key={key}
-                        type="button"
-                        onClick={() => setTab(key)}
-                        aria-pressed={tab === key}
-                        className={`rounded-lt-sm px-2 py-1 text-xs transition-colors ${
-                            tab === key
-                                ? "bg-lt-primary text-lt-primary-fg"
-                                : "bg-lt-muted text-lt-muted-fg hover:bg-lt-accent hover:text-lt-accent-fg"
-                        }`}
-                    >
-                        {label}
-                    </button>
-                ))}
+            <div className="mb-2 pb-2">
+                <SegmentedPills
+                    name={name}
+                    ariaLabel="Schema or example"
+                    options={SCHEMA_TABS.map(({ key, label }) => ({ label, value: key, data: null }))}
+                    value={tab}
+                    onSelect={(value) => setTab(value as SchemaTab)}
+                />
             </div>
             {tab === "schema" ? (
                 schema ? (
@@ -133,10 +131,10 @@ function SchemaExampleView({
             ) : (
                 <div>
                     {examples.length > 1 ? (
-                        <select
+                        <NativeSelect
                             value={selected}
                             onChange={(event) => setSelected(Number(event.target.value))}
-                            className="mb-2 rounded-lt-sm border border-lt-border bg-lt-muted px-2 py-1 text-xs text-lt-fg"
+                            className="mb-2"
                         >
                             {examples.map((example, index) => (
                                 <option key={example.name ?? index} value={index}>
@@ -144,7 +142,7 @@ function SchemaExampleView({
                                     {example.summary ? ` — ${example.summary}` : ""}
                                 </option>
                             ))}
-                        </select>
+                        </NativeSelect>
                     ) : current?.summary ? (
                         <p className="mb-1 text-xs text-lt-muted-fg">{current.summary}</p>
                     ) : null}
@@ -179,6 +177,7 @@ function RequestBodySection({
                     </p>
                     {request.schema || request.examples.length > 0 ? (
                         <SchemaExampleView
+                            name={`request-${request.mediaType ?? "none"}-${index}-tab`}
                             schema={request.schema}
                             examples={request.examples}
                             components={components}
@@ -203,38 +202,48 @@ function ResponsesSection({
     components: unknown;
     expandDepth: number;
 }): React.ReactNode {
-    const [active, setActive] = useState(0);
+    const [activeLabel, setActiveLabel] = useState<string | null>(null);
 
     if (responses.length === 0) return null;
 
-    const current = responses[active] ?? responses[0];
+    const current = responses.find((response) => contractLabel(response) === activeLabel) ?? responses[0];
+    const options: Option[] = responses.map((response) => ({
+        label: contractLabel(response),
+        value: contractLabel(response),
+        data: null,
+    }));
 
     return (
         <section>
             <h2 className="mb-2 text-sm font-semibold text-lt-fg">Responses</h2>
-            <div className="mb-3 flex flex-wrap gap-1 border-b border-lt-border pb-2">
-                {responses.map((response, index) => (
-                    <button
-                        key={`${response.status ?? "default"}-${response.mediaType ?? "none"}-${index}`}
-                        type="button"
-                        onClick={() => setActive(index)}
-                        aria-pressed={index === active}
-                        className={`rounded-lt-sm px-2 py-1 text-xs transition-colors ${
-                            index === active
-                                ? "bg-lt-primary text-lt-primary-fg"
-                                : "bg-lt-muted text-lt-muted-fg hover:bg-lt-accent hover:text-lt-accent-fg"
-                        }`}
-                    >
-                        {contractLabel(response)}
-                    </button>
-                ))}
+            <div className="mb-3 pb-2">
+                <SegmentedPills
+                    name="response-status"
+                    ariaLabel="Response status"
+                    options={options}
+                    value={activeLabel ?? options[0]?.value ?? ""}
+                    onSelect={setActiveLabel}
+                />
             </div>
             {current ? (
                 <div>
                     {current.title ? <p className="mb-2 text-sm text-lt-muted-fg">{current.title}</p> : null}
+                    {current.headers.length > 0 ? (
+                        <div className="mb-4">
+                            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                                Response headers
+                            </h3>
+                            <ul>
+                                {current.headers.map((header) => (
+                                    <ParamRow key={header.name} param={header} />
+                                ))}
+                            </ul>
+                        </div>
+                    ) : null}
                     {current.schema || current.examples.length > 0 ? (
                         <SchemaExampleView
                             key={contractLabel(current)}
+                            name={`response-${contractLabel(current)}-tab`}
                             schema={current.schema}
                             examples={current.examples}
                             components={components}
@@ -348,18 +357,16 @@ export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: O
         <div className="min-w-0 flex-1 overflow-y-auto p-6">
             <header className="mb-6">
                 <div className="flex items-center gap-2">
-                    <span className="rounded-lt-xs bg-lt-primary px-2 py-0.5 text-xs font-semibold uppercase text-lt-primary-fg">
+                    <Badge color={httpMethodColor(operation.summary.method)} className="text-xs font-semibold uppercase">
                         {operation.summary.method}
-                    </span>
-                    <span className="font-mono text-sm">
-                        {baseUrl ? <span className="text-lt-muted-fg">{baseUrl}</span> : null}
-                        <span className="text-lt-muted-fg">{operation.summary.path}</span>
-                    </span>
-                    {operation.summary.deprecated ? (
-                        <span className="rounded-lt-xs bg-lt-danger px-2 py-0.5 text-xs text-lt-danger-fg">
-                            deprecated
+                    </Badge>
+                    <CopyableText value={`${baseUrl ?? ""}${operation.summary.path}`} label="operation URL">
+                        <span className="font-mono text-sm text-lt-muted-fg">
+                            {baseUrl}
+                            {operation.summary.path}
                         </span>
-                    ) : null}
+                    </CopyableText>
+                    {operation.summary.deprecated ? <Badge color="danger">deprecated</Badge> : null}
                 </div>
                 <h1 className="mt-2 text-lg font-semibold text-lt-fg">{operation.summary.title}</h1>
                 {operation.description ? (

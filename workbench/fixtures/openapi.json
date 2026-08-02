@@ -41,6 +41,14 @@
                                     ]
                                 }
                             }
+                        },
+                        "headers": {
+                            "X-Total-Count": {
+                                "description": "Total number of categories.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            }
                         }
                     }
                 },

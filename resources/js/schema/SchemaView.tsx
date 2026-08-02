@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { buildSchemaRows, type SchemaRow } from "./build-rows";
+import { Icon } from "@lattice-php/lattice/icons";
 
 function Row({ row, depth, expandDepth }: { row: SchemaRow; depth: number; expandDepth: number }): React.ReactNode {
     const [open, setOpen] = useState(depth < expandDepth);
@@ -9,8 +10,16 @@ function Row({ row, depth, expandDepth }: { row: SchemaRow; depth: number; expan
         <div className="border-l border-lt-border pl-3">
             <div className="flex items-center gap-2 py-1">
                 {hasChildren ? (
-                    <button type="button" onClick={() => setOpen((v) => !v)} className="text-lt-muted-fg">
-                        {open ? "▾" : "▸"}
+                    <button
+                        type="button"
+                        onClick={() => setOpen((v) => !v)}
+                        className="text-lt-muted-fg"
+                        aria-expanded={open}
+                    >
+                        <Icon
+                            name="chevron-down"
+                            className={`size-lt-icon-xs transition-transform${open ? "" : " -rotate-90"}`}
+                        />
                     </button>
                 ) : (
                     <span className="w-3" />

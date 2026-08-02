@@ -1,4 +1,3 @@
-import "./polyfills";
 import "../css/app.css";
 import { createInertiaApp } from "@inertiajs/react";
 import {
@@ -9,6 +8,7 @@ import {
     registry,
 } from "@lattice-php/lattice";
 import { createRoot } from "react-dom/client";
+import sprite from "virtual:svg-sprite";
 import spectacularPlugin from "../../../resources/js/plugin";
 
 const appRegistry = extendRegistry(registry, spectacularPlugin);
@@ -21,7 +21,7 @@ createInertiaApp({
             return;
         }
         createRoot(el).render(
-            <Provider registry={appRegistry}>
+            <Provider registry={appRegistry} sprite={sprite}>
                 <App {...props} />
             </Provider>,
         );
