@@ -231,6 +231,8 @@ Then pass the sprite to your `<Provider>`:
 import sprite from "virtual:svg-sprite";
 
 <Provider registry={registry} sprite={sprite}>
+    {/* ...your app */}
+</Provider>;
 ```
 
 See [`@lattice-php/vite-svg-sprite`](https://www.npmjs.com/package/@lattice-php/vite-svg-sprite) for merging in your
@@ -258,8 +260,6 @@ final class ApiDocsPage extends Page
     }
 }
 ```
-
-
 
 Scramble's generator only needs `phpstan/phpdoc-parser` and `nikic/php-parser` at runtime (PHPStan itself is a
 `require-dev` package of Scramble), so generating the document on request works in production. It still walks your
