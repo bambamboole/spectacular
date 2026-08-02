@@ -1,0 +1,91 @@
+import { initialContractExample } from "./schema-example";
+import type { Contract, Operation, Param } from "./types";
+
+export type RequestValues = {
+    parameters: Record<string, string>;
+    mediaType: string | null;
+    body: string;
+};
+
+export function parameterKey(param: Param): string {
+    return `${param.location}:${param.name}`;
+}
+
+export function isJsonMediaType(mediaType: string | null): boolean {
+    if (mediaType === null) {
+        return false;
+    }
+
+    const normalized = mediaType.split(";", 1)[0].trim().toLowerCase();
+
+    return normalized === "application/json" || normalized.endsWith("+json");
+}
+
+export function jsonRequestContracts(operation: Operation): Contract[] {
+    return operation.requests.filter((contract) => isJsonMediaType(contract.mediaType));
+}
+
+export function initialRequestValues(operation: Operation, components?: unknown): RequestValues {
+    const parameters = Object.fromEntries(
+        operation.paramGroups.flatMap((group) =>
+            group.params.map((param) => [parameterKey(param), initialParameterValue(param)]),
+        ),
+    );
+    const contract = jsonRequestContracts(operation)[0];
+
+    if (contract === undefined) {
+        return { parameters, mediaType: null, body: "" };
+    }
+
+    return {
+        parameters,
+        mediaType: contract.mediaType,
+        body: prettyJson(initialContractExample(contract, components)),
+    };
+}
+
+function initialParameterValue(param: Param): string {
+    const directExample = scalarString(param.example);
+    if (directExample !== null) {
+        return directExample;
+    }
+
+    if (!isRecord(param.schema)) {
+        return "";
+    }
+
+    for (const key of ["example", "default"] as const) {
+        const value = scalarString(param.schema[key]);
+        if (value !== null) {
+            return value;
+        }
+    }
+
+    if (Array.isArray(param.schema.enum)) {
+        return scalarString(param.schema.enum[0]) ?? "";
+    }
+
+    return "";
+}
+
+function scalarString(value: unknown): string | null {
+    if (typeof value === "string") {
+        return value;
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+        return String(value);
+    }
+
+    return null;
+}
+
+function prettyJson(value: unknown): string {
+    const serialized = JSON.stringify(value, null, 2);
+
+    return serialized ?? "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
