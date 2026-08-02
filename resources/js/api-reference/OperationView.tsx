@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { SegmentedPills } from "@lattice-php/lattice/ui";
+import { Badge, SegmentedPills } from "@lattice-php/lattice/ui";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
+import { httpMethodColor } from "./http-method-color";
 import { parseOperation } from "./parse";
 import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
 
@@ -351,18 +352,14 @@ export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: O
         <div className="min-w-0 flex-1 overflow-y-auto p-6">
             <header className="mb-6">
                 <div className="flex items-center gap-2">
-                    <span className="rounded-lt-xs bg-lt-primary px-2 py-0.5 text-xs font-semibold uppercase text-lt-primary-fg">
+                    <Badge color={httpMethodColor(operation.summary.method)} className="text-xs font-semibold uppercase">
                         {operation.summary.method}
-                    </span>
+                    </Badge>
                     <span className="font-mono text-sm">
                         {baseUrl ? <span className="text-lt-muted-fg">{baseUrl}</span> : null}
                         <span className="text-lt-muted-fg">{operation.summary.path}</span>
                     </span>
-                    {operation.summary.deprecated ? (
-                        <span className="rounded-lt-xs bg-lt-danger px-2 py-0.5 text-xs text-lt-danger-fg">
-                            deprecated
-                        </span>
-                    ) : null}
+                    {operation.summary.deprecated ? <Badge color="danger">deprecated</Badge> : null}
                 </div>
                 <h1 className="mt-2 text-lg font-semibold text-lt-fg">{operation.summary.title}</h1>
                 {operation.description ? (

@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { Badge } from "@lattice-php/lattice/ui";
+import { httpMethodColor } from "./http-method-color";
 import type { Navigation, NavGroup, Server } from "./types";
 
 type ApiReferenceNavProps = {
@@ -118,10 +120,14 @@ export function ApiReferenceNav({
                                                     : "text-lt-fg hover:bg-lt-muted"
                                             }`}
                                         >
-                                            <span className="font-mono text-xs text-lt-muted-fg">{summary.method}</span>
+                                            <Badge color={httpMethodColor(summary.method)} className="text-xs">
+                                                {summary.method}
+                                            </Badge>
                                             <span className="truncate">{summary.path}</span>
                                             {summary.deprecated ? (
-                                                <span className="ml-auto shrink-0 text-xs text-lt-danger">deprecated</span>
+                                                <Badge color="danger" className="ml-auto shrink-0">
+                                                    deprecated
+                                                </Badge>
                                             ) : null}
                                         </button>
                                     </li>
