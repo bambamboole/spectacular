@@ -41,6 +41,7 @@ function operation(params: Param[] = [], requests: Contract[] = []): Operation {
             title: "Update widget",
             deprecated: false,
         },
+        serverUrl: "https://api.example.test",
         description: null,
         tags: [],
         paramGroups: [
@@ -318,7 +319,7 @@ describe("buildRequest", () => {
         });
     });
 
-    it.each(["Cookie", "Host", "Content-Length", "Origin"])("rejects the forbidden %s header", (name) => {
+    it.each(["Cookie", "Cookie2", "Set-Cookie", "Host", "Content-Length", "Origin"])("rejects the forbidden %s header", (name) => {
         const forbidden = parameter({ name, location: "header" });
 
         expect(
@@ -337,6 +338,54 @@ describe("buildRequest", () => {
             },
         });
     });
+
+    it.each([
+        ["X-HTTP-Method", "connect"],
+        ["X-HTTP-Method-Override", "TRACE"],
+        ["X-Method-Override", "Track"],
+    ])("rejects %s when its value is the forbidden method %s", (name, value) => {
+        const forbidden = parameter({ name, location: "header" });
+
+        expect(
+            buildRequest({
+                operation: operation([forbidden]),
+                baseUrl: "https://api.example.test",
+                values: values([[forbidden, value]]),
+                token: null,
+            }),
+        ).toEqual({
+            request: null,
+            errors: {
+                parameters: { [`header:${name}`]: "This header cannot be sent from a browser." },
+                body: null,
+                request: null,
+            },
+        });
+    });
+
+    it.each(["X-HTTP-Method", "X-HTTP-Method-Override", "X-Method-Override"])(
+        "allows %s with a non-forbidden method value",
+        (name) => {
+            const allowed = parameter({ name, location: "header" });
+
+            expect(
+                buildRequest({
+                    operation: operation([allowed]),
+                    baseUrl: "https://api.example.test",
+                    values: values([[allowed, "PATCH"]]),
+                    token: null,
+                }),
+            ).toEqual({
+                request: {
+                    method: "POST",
+                    url: "https://api.example.test/widgets/{id}",
+                    headers: { [name]: "PATCH" },
+                    body: null,
+                },
+                errors: null,
+            });
+        },
+    );
 
     it.each(["array", "object"])("rejects %s parameters as non-executable", (type) => {
         const complex = parameter({ name: "complex", schema: { type } });

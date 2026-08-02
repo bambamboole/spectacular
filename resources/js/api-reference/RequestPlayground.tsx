@@ -46,7 +46,7 @@ export function RequestPlayground({
     const idPrefix = `${operation.summary.id}-${useId().replaceAll(/[^a-zA-Z0-9_-]/g, "")}`;
     const playgroundRef = useRef<HTMLElement>(null);
     const activeControllerRef = useRef<AbortController | null>(null);
-    const [values, setValues] = useState<RequestValues>(() => initialRequestValues(operation, components));
+    const [values, setValues] = useState<RequestValues>(() => initialPlaygroundValues(operation, components));
     const [snippetLanguage, setSnippetLanguage] = useState<SnippetLanguage>("curl");
     const [isLoading, setIsLoading] = useState(false);
     const [liveResult, setLiveResult] = useState<ExecutedResponse | ExecutionError | null>(null);
@@ -349,6 +349,19 @@ function parameterLimitationsWithoutControls(
             return message === null ? [] : [{ key, name: param.name, message }];
         }),
     );
+}
+
+function initialPlaygroundValues(operation: Operation, components: unknown): RequestValues {
+    const values = initialRequestValues(operation, components);
+    const parameters = { ...values.parameters };
+
+    for (const param of operation.paramGroups.flatMap((group) => group.params)) {
+        if (!param.required && parameterLimitation(param) !== null) {
+            parameters[parameterKey(param)] = "";
+        }
+    }
+
+    return { ...values, parameters };
 }
 
 function isRenderableParameter(location: string, param: Param): boolean {

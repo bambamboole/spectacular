@@ -38,6 +38,7 @@ function operation(overrides: Partial<Operation> = {}): Operation {
             title: "Create widget",
             deprecated: false,
         },
+        serverUrl: "https://api.example.test",
         description: null,
         tags: [],
         paramGroups: [],

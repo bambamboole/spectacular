@@ -10,6 +10,7 @@ const operation: Operation = {
         title: "Create widget",
         deprecated: false,
     },
+    serverUrl: "https://api.example.test",
     description: "Creates a widget.",
     tags: [],
     security: [
@@ -122,6 +123,22 @@ Creates a widget.
 
 **Content-Type:** \`application/json\`
 
+### Schema
+
+\`\`\`json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "example": "Widget"
+    }
+  }
+}
+\`\`\`
+
+### Example
+
 \`\`\`json
 {
   "name": "Widget"
@@ -140,6 +157,22 @@ Widget created
 | --- | --- | --- | --- | --- |
 | X-Request-Id | header | string | no | Correlates the request |
 
+#### Schema
+
+\`\`\`json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "example": "widget_123"
+    }
+  }
+}
+\`\`\`
+
+#### Example
+
 \`\`\`json
 {
   "id": "widget_123"
@@ -149,6 +182,8 @@ Widget created
 ### 422 application/json
 
 Validation failed
+
+#### Example
 
 \`\`\`json
 {
@@ -187,5 +222,54 @@ Validation failed
 | Name | In | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | filter\\|status | query | string[] | no | One<br>two\\|three |`);
+    });
+
+    it("serializes resolved schemas separately from named and derived examples", () => {
+        const components = {
+            schemas: {
+                WidgetInput: {
+                    type: "object",
+                    required: ["name"],
+                    properties: { name: { type: "string", minLength: 2, example: "Widget" } },
+                },
+                Widget: {
+                    type: "object",
+                    required: ["id"],
+                    properties: { id: { type: "string", pattern: "^widget_", example: "widget_123" } },
+                },
+            },
+        };
+        const markdown = operationToMarkdown(
+            {
+                ...operation,
+                requests: [
+                    {
+                        ...operation.requests[0]!,
+                        schema: { $ref: "#/components/schemas/WidgetInput" },
+                        examples: [{ name: "desk", summary: "A desk widget", value: { name: "Desk" } }],
+                    },
+                ],
+                responses: [
+                    {
+                        ...operation.responses[0]!,
+                        schema: { $ref: "#/components/schemas/Widget" },
+                        examples: [],
+                    },
+                ],
+            },
+            components,
+        );
+
+        expect(markdown).toContain("### Schema");
+        expect(markdown).toContain('"required": [\n    "name"\n  ]');
+        expect(markdown).toContain('"minLength": 2');
+        expect(markdown).toContain("### Example: desk");
+        expect(markdown).toContain("A desk widget");
+        expect(markdown).toContain('"name": "Desk"');
+        expect(markdown).toContain("#### Schema");
+        expect(markdown).toContain('"pattern": "^widget_"');
+        expect(markdown).toContain("#### Example");
+        expect(markdown).toContain('"id": "widget_123"');
+        expect(markdown).not.toContain("#/components/schemas/");
     });
 });

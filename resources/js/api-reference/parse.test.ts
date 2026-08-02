@@ -525,10 +525,81 @@ describe("buildNavigation servers", () => {
         ]);
     });
 
-    it("returns an empty array when servers is absent", () => {
+    it("defaults to the relative root server when servers is absent", () => {
         const nav = buildNavigation(spec);
 
-        expect(nav.servers).toEqual([]);
+        expect(nav.servers).toEqual([{ url: "/", description: null }]);
+    });
+
+    it("resolves server precedence and substitutes variable defaults", () => {
+        const rootServer = {
+            url: "https://{environment}.root.example/{version}",
+            variables: {
+                environment: { default: "production" },
+                version: { default: "v1" },
+            },
+        };
+        const pathServer = {
+            url: "https://{region}.path.example",
+            variables: { region: { default: "eu" } },
+        };
+        const operationServer = {
+            url: "https://{tenant}.operation.example",
+            variables: { tenant: { default: "acme" } },
+        };
+        const operationWithServers = {
+            openapi: "3.1.0",
+            info: { title: "Test API", version: "1.0.0" },
+            servers: [rootServer],
+            paths: {
+                "/widgets": {
+                    servers: [pathServer],
+                    get: {
+                        servers: [operationServer],
+                        responses: { "200": { description: "OK" } },
+                    },
+                },
+            },
+        };
+
+        expect(buildNavigation(operationWithServers).servers[0]?.url).toBe(
+            "https://production.root.example/v1",
+        );
+        expect(parseOperation(operationWithServers, "get-widgets")?.serverUrl).toBe(
+            "https://acme.operation.example",
+        );
+        expect(parseOperation(operationWithServers, "get-widgets", "https://staging.root.example")?.serverUrl).toBe(
+            "https://acme.operation.example",
+        );
+
+        const pathOnly = {
+            ...operationWithServers,
+            paths: {
+                "/widgets": {
+                    servers: [pathServer],
+                    get: { responses: { "200": { description: "OK" } } },
+                },
+            },
+        };
+        expect(parseOperation(pathOnly, "get-widgets", "https://staging.root.example")?.serverUrl).toBe(
+            "https://eu.path.example",
+        );
+
+        const rootOnly = {
+            ...operationWithServers,
+            paths: {
+                "/widgets": {
+                    get: { responses: { "200": { description: "OK" } } },
+                },
+            },
+        };
+        expect(parseOperation(rootOnly, "get-widgets")?.serverUrl).toBe(
+            "https://production.root.example/v1",
+        );
+        expect(parseOperation(rootOnly, "get-widgets", "https://staging.root.example/v1")?.serverUrl).toBe(
+            "https://staging.root.example/v1",
+        );
+        expect(parseOperation({ ...rootOnly, servers: [] }, "get-widgets")?.serverUrl).toBe("/");
     });
 });
 

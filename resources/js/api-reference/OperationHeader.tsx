@@ -4,9 +4,17 @@ import { httpMethodColor } from "./http-method-color";
 import { operationToMarkdown } from "./operation-markdown";
 import type { Operation } from "./types";
 
-export function OperationHeader({ operation, baseUrl }: { operation: Operation; baseUrl?: string | null }): React.ReactNode {
-    const markdown = useMemo(() => operationToMarkdown(operation), [operation]);
-    const operationUrl = `${baseUrl ?? ""}${operation.summary.path}`;
+export function OperationHeader({
+    operation,
+    baseUrl,
+    components,
+}: {
+    operation: Operation;
+    baseUrl?: string | null;
+    components?: unknown;
+}): React.ReactNode {
+    const markdown = useMemo(() => operationToMarkdown(operation, components), [operation, components]);
+    const operationUrl = `${(baseUrl ?? "").replace(/\/+$/, "")}/${operation.summary.path.replace(/^\/+/, "")}`;
 
     return (
         <header className="mb-6">

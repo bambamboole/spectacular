@@ -338,8 +338,8 @@ function SecuritySection({ security, components }: { security: SecurityRequireme
 
 export function OperationView({ spec, operationId, baseUrl, token, expandDepth = 0 }: OperationViewProps): React.ReactNode {
     const operation = useMemo(
-        () => (operationId ? parseOperation(spec, operationId) : null),
-        [spec, operationId],
+        () => (operationId ? parseOperation(spec, operationId, baseUrl ?? null) : null),
+        [spec, operationId, baseUrl],
     );
     const components = (spec as { components?: unknown } | null)?.components ?? null;
 
@@ -357,7 +357,7 @@ export function OperationView({ spec, operationId, baseUrl, token, expandDepth =
 
     return (
         <div className="min-w-0 flex-1 overflow-y-auto p-6">
-            <OperationHeader operation={operation} baseUrl={baseUrl} />
+            <OperationHeader operation={operation} baseUrl={operation.serverUrl} components={components} />
 
             <SecuritySection security={operation.security} components={components} />
 
@@ -373,7 +373,7 @@ export function OperationView({ spec, operationId, baseUrl, token, expandDepth =
             <RequestBodySection requests={operation.requests} components={components} expandDepth={expandDepth} />
             <RequestPlayground
                 operation={operation}
-                baseUrl={baseUrl ?? null}
+                baseUrl={operation.serverUrl}
                 token={token ?? null}
                 components={components}
             />

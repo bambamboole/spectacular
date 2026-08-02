@@ -26,6 +26,7 @@ const FORBIDDEN_HEADER_NAMES = new Set([
     "connection",
     "content-length",
     "cookie",
+    "cookie2",
     "date",
     "dnt",
     "expect",
@@ -34,12 +35,17 @@ const FORBIDDEN_HEADER_NAMES = new Set([
     "origin",
     "permissions-policy",
     "referer",
+    "set-cookie",
     "te",
     "trailer",
     "transfer-encoding",
     "upgrade",
     "via",
 ]);
+
+const METHOD_OVERRIDE_HEADER_NAMES = new Set(["x-http-method", "x-http-method-override", "x-method-override"]);
+
+const FORBIDDEN_METHOD_OVERRIDE_VALUES = new Set(["CONNECT", "TRACE", "TRACK"]);
 
 export function buildRequest(input: {
     operation: Operation;
@@ -100,7 +106,7 @@ function validateParameters(parameters: Param[], values: RequestValues, errors: 
     for (const param of parameters) {
         const key = parameterKey(param);
         const value = values.parameters[key] ?? "";
-        const limitation = parameterLimitation(param);
+        const limitation = parameterLimitation(param, value);
 
         if (limitation !== null) {
             if (param.required || value !== "") {
@@ -116,7 +122,7 @@ function validateParameters(parameters: Param[], values: RequestValues, errors: 
     }
 }
 
-export function parameterLimitation(param: Param): string | null {
+export function parameterLimitation(param: Param, value?: string): string | null {
     if (!hasPrimitiveSchema(param)) {
         return "Only primitive parameters can be executed.";
     }
@@ -126,6 +132,10 @@ export function parameterLimitation(param: Param): string | null {
     }
 
     if (param.location === "header" && isForbiddenHeader(param.name)) {
+        return "This header cannot be sent from a browser.";
+    }
+
+    if (param.location === "header" && isForbiddenMethodOverride(param.name, value)) {
         return "This header cannot be sent from a browser.";
     }
 
@@ -208,6 +218,14 @@ function isForbiddenHeader(name: string): boolean {
     const normalized = name.toLowerCase();
 
     return FORBIDDEN_HEADER_NAMES.has(normalized) || normalized.startsWith("proxy-") || normalized.startsWith("sec-");
+}
+
+function isForbiddenMethodOverride(name: string, value: string | undefined): boolean {
+    if (value === undefined) return false;
+
+    const normalizedName = name.toLowerCase();
+
+    return METHOD_OVERRIDE_HEADER_NAMES.has(normalizedName) && FORBIDDEN_METHOD_OVERRIDE_VALUES.has(value.trim().toUpperCase());
 }
 
 function hasPrimitiveSchema(param: Param): boolean {

@@ -52,10 +52,18 @@ type RawOperation = {
     requestBody?: RawRequestBody;
     responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject>; headers?: Record<string, RawParameter> }>;
     security?: Array<Record<string, string[]>>;
+    servers?: RawServer[];
 };
 
 type RawPathItem = Record<string, unknown> & {
     parameters?: RawParameter[];
+    servers?: RawServer[];
+};
+
+type RawServer = {
+    url?: string;
+    description?: string | null;
+    variables?: Record<string, { default?: unknown }>;
 };
 
 /**
@@ -111,13 +119,31 @@ function findOperation(spec: any, opId: string): { path: string; method: string;
     return null;
 }
 
-function buildServers(spec: any): Server[] {
-    const servers = spec?.servers ?? [];
+function normalizeServers(servers: unknown): Server[] {
     if (!Array.isArray(servers)) return [];
 
     return servers
-        .filter((server): server is { url: string; description?: string | null } => typeof server?.url === "string")
-        .map((server) => ({ url: server.url, description: server.description ?? null }));
+        .filter((server): server is RawServer & { url: string } => typeof server?.url === "string")
+        .map((server) => ({
+            url: substituteServerVariables(server.url, server.variables),
+            description: server.description ?? null,
+        }));
+}
+
+function substituteServerVariables(url: string, variables: RawServer["variables"]): string {
+    if (!variables) return url;
+
+    return url.replaceAll(/\{([^{}]+)\}/g, (placeholder, name: string) => {
+        const defaultValue = variables[name]?.default;
+
+        return defaultValue === undefined ? placeholder : String(defaultValue);
+    });
+}
+
+function buildServers(spec: any): Server[] {
+    const servers = normalizeServers(spec?.servers);
+
+    return servers.length > 0 ? servers : [{ url: "/", description: null }];
 }
 
 export function buildNavigation(spec: any): Navigation {
@@ -346,7 +372,7 @@ export function filterNavigationByTags(nav: Navigation, tags: string[]): Navigat
     return { ...nav, groups, summaries };
 }
 
-export function parseOperation(spec: any, opId: string): Operation | null {
+export function parseOperation(spec: any, opId: string, selectedRootServerUrl: string | null = null): Operation | null {
     const found = findOperation(spec, opId);
     if (!found) return null;
 
@@ -362,6 +388,11 @@ export function parseOperation(spec: any, opId: string): Operation | null {
 
     return {
         summary,
+        serverUrl:
+            normalizeServers(operation.servers)[0]?.url ??
+            normalizeServers(pathItem.servers)[0]?.url ??
+            selectedRootServerUrl ??
+            buildServers(spec)[0]!.url,
         description: operation.description ?? null,
         tags: operation.tags ?? [],
         paramGroups: buildParamGroups(spec, pathItem.parameters ?? [], operation.parameters ?? []),

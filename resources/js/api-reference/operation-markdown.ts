@@ -1,15 +1,17 @@
 import { initialContractExample } from "./schema-example";
-import type { Contract, Operation, Param, SecurityRequirement } from "./types";
+import type { Contract, ContractExample, Operation, Param, SecurityRequirement } from "./types";
 
-export function operationToMarkdown(operation: Operation): string {
+const SCHEMA_REF_PREFIX = "#/components/schemas/";
+
+export function operationToMarkdown(operation: Operation, components?: unknown): string {
     const sections = [
         [`# ${operation.summary.title}`, `\`${operation.summary.method} ${operation.summary.path}\``, operation.description]
             .filter((section): section is string => Boolean(section))
             .join("\n\n"),
         securitySection(operation.security),
         parametersSection(operation.paramGroups.flatMap((group) => group.params)),
-        requestSection(operation.requests),
-        responsesSection(operation.responses),
+        requestSection(operation.requests, components),
+        responsesSection(operation.responses, components),
     ].filter((section): section is string => Boolean(section));
 
     return sections.join("\n\n");
@@ -54,38 +56,38 @@ function parameterTable(parameters: Param[]): string {
     ].join("\n");
 }
 
-function requestSection(requests: Contract[]): string | null {
+function requestSection(requests: Contract[], components: unknown): string | null {
     if (requests.length === 0) {
         return null;
     }
 
-    return ["## Request body", ...requests.map(requestContractSection)].join("\n\n");
+    return ["## Request body", ...requests.map((contract) => requestContractSection(contract, components))].join("\n\n");
 }
 
-function requestContractSection(contract: Contract): string {
+function requestContractSection(contract: Contract, components: unknown): string {
     return [
         contract.mediaType ? `**Content-Type:** \`${contract.mediaType}\`` : "**Content-Type:** unspecified",
         contract.title,
-        jsonFence(contract),
+        contractSections(contract, components, 3),
     ]
         .filter((section): section is string => Boolean(section))
         .join("\n\n");
 }
 
-function responsesSection(responses: Contract[]): string | null {
+function responsesSection(responses: Contract[], components: unknown): string | null {
     if (responses.length === 0) {
         return null;
     }
 
-    return ["## Responses", ...responses.map(responseContractSection)].join("\n\n");
+    return ["## Responses", ...responses.map((contract) => responseContractSection(contract, components))].join("\n\n");
 }
 
-function responseContractSection(contract: Contract): string {
+function responseContractSection(contract: Contract, components: unknown): string {
     return [
         `### ${contractLabel(contract)}`,
         contract.title,
         contract.headers.length > 0 ? ["#### Headers", parameterTable(contract.headers)].join("\n\n") : null,
-        jsonFence(contract),
+        contractSections(contract, components, 4),
     ]
         .filter((section): section is string => Boolean(section))
         .join("\n\n");
@@ -95,14 +97,91 @@ function contractLabel(contract: Contract): string {
     return [contract.status, contract.mediaType].filter((part): part is string => Boolean(part)).join(" ") || "default";
 }
 
-function jsonFence(contract: Contract): string | null {
-    if (contract.examples.length === 0 && contract.schema === null) {
+function contractSections(contract: Contract, components: unknown, headingLevel: number): string | null {
+    const sections: Array<string | null> = [];
+
+    if (contract.schema !== null) {
+        sections.push(
+            [`${"#".repeat(headingLevel)} Schema`, jsonFence(resolveLocalSchemaRefs(contract.schema, components))]
+                .filter((section): section is string => Boolean(section))
+                .join("\n\n"),
+        );
+    }
+
+    const examples = contract.examples.length > 0
+        ? contract.examples
+        : contract.schema === null
+          ? []
+          : [{ name: null, summary: null, value: initialContractExample(contract, components) }];
+
+    sections.push(...examples.map((example) => exampleSection(example, headingLevel)));
+
+    const rendered = sections.filter((section): section is string => Boolean(section));
+
+    return rendered.length === 0 ? null : rendered.join("\n\n");
+}
+
+function exampleSection(example: ContractExample, headingLevel: number): string {
+    const label = example.name ? `Example: ${example.name}` : "Example";
+
+    return [
+        `${"#".repeat(headingLevel)} ${label}`,
+        example.summary,
+        jsonFence(example.value),
+    ]
+        .filter((section): section is string => Boolean(section))
+        .join("\n\n");
+}
+
+function jsonFence(value: unknown): string | null {
+    const json = JSON.stringify(value, null, 2);
+
+    return json === undefined ? null : `\`\`\`json\n${json}\n\`\`\``;
+}
+
+function resolveLocalSchemaRefs(schema: unknown, components: unknown, visitedRefs = new Set<string>()): unknown {
+    if (Array.isArray(schema)) {
+        return schema.map((value) => resolveLocalSchemaRefs(value, components, visitedRefs));
+    }
+
+    if (!isRecord(schema)) {
+        return schema;
+    }
+
+    const ref = typeof schema.$ref === "string" && schema.$ref.startsWith(SCHEMA_REF_PREFIX)
+        ? schema.$ref
+        : null;
+
+    if (ref !== null && !visitedRefs.has(ref)) {
+        const referencedSchema = componentSchema(ref, components);
+
+        if (referencedSchema !== null) {
+            visitedRefs.add(ref);
+            const resolved = resolveLocalSchemaRefs(referencedSchema, components, visitedRefs);
+            const siblings = Object.fromEntries(
+                Object.entries(schema)
+                    .filter(([key]) => key !== "$ref")
+                    .map(([key, value]) => [key, resolveLocalSchemaRefs(value, components, visitedRefs)]),
+            );
+            visitedRefs.delete(ref);
+
+            return isRecord(resolved) ? { ...resolved, ...siblings } : resolved;
+        }
+    }
+
+    return Object.fromEntries(
+        Object.entries(schema).map(([key, value]) => [key, resolveLocalSchemaRefs(value, components, visitedRefs)]),
+    );
+}
+
+function componentSchema(ref: string, components: unknown): unknown | null {
+    if (!isRecord(components) || !isRecord(components.schemas)) {
         return null;
     }
 
-    const json = JSON.stringify(initialContractExample(contract), null, 2);
+    const name = ref.slice(SCHEMA_REF_PREFIX.length);
 
-    return json === undefined ? null : `\`\`\`json\n${json}\n\`\`\``;
+    return name === "" || !(name in components.schemas) ? null : components.schemas[name];
 }
 
 function typeLabel(schema: unknown): string {
@@ -130,4 +209,8 @@ function typeLabel(schema: unknown): string {
 
 function tableCell(value: string | null): string {
     return (value ?? "").replaceAll("|", "\\|").replaceAll(/\r?\n/g, "<br>");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }

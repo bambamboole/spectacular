@@ -33,6 +33,7 @@ export type Contract = {
 };
 export type Operation = {
     summary: OperationSummary;
+    serverUrl: string;
     description: string | null;
     tags: string[];
     paramGroups: ParamGroup[];
