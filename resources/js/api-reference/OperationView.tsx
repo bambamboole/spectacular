@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Badge, CopyableText, SegmentedPills } from "@lattice-php/lattice/ui";
+import { Badge, SegmentedPills } from "@lattice-php/lattice/ui";
 import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
-import { httpMethodColor } from "./http-method-color";
+import { OperationHeader } from "./OperationHeader";
 import { parseOperation } from "./parse";
 import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
 
@@ -355,24 +355,7 @@ export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: O
 
     return (
         <div className="min-w-0 flex-1 overflow-y-auto p-6">
-            <header className="mb-6">
-                <div className="flex items-center gap-2">
-                    <Badge color={httpMethodColor(operation.summary.method)} className="text-xs font-semibold uppercase">
-                        {operation.summary.method}
-                    </Badge>
-                    <CopyableText value={`${baseUrl ?? ""}${operation.summary.path}`} label="operation URL">
-                        <span className="font-mono text-sm text-lt-muted-fg">
-                            {baseUrl}
-                            {operation.summary.path}
-                        </span>
-                    </CopyableText>
-                    {operation.summary.deprecated ? <Badge color="danger">deprecated</Badge> : null}
-                </div>
-                <h1 className="mt-2 text-lg font-semibold text-lt-fg">{operation.summary.title}</h1>
-                {operation.description ? (
-                    <p className="mt-1 text-sm text-lt-muted-fg">{operation.description}</p>
-                ) : null}
-            </header>
+            <OperationHeader operation={operation} baseUrl={baseUrl} />
 
             <SecuritySection security={operation.security} components={components} />
 
