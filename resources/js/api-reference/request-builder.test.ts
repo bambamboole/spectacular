@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildRequest, redactAuthorization } from "./request-builder";
 import { parameterKey, type RequestValues } from "./request-state";
+import { curlSnippet } from "./snippets/curl";
+import { javascriptSnippet } from "./snippets/javascript";
 import type { Contract, Operation, Param } from "./types";
 
 function parameter(overrides: Partial<Param>): Param {
@@ -119,6 +121,53 @@ describe("buildRequest", () => {
         });
     });
 
+    it("deduplicates case-insensitive generated header collisions", () => {
+        const id = parameter({ name: "id", location: "path", required: true });
+        const contentType = parameter({ name: "content-type", location: "header" });
+        const authorization = parameter({ name: "authorization", location: "header" });
+        const result = buildRequest({
+            operation: operation([id, contentType, authorization], [requestContract()]),
+            baseUrl: "https://api.example.test",
+            values: values(
+                [
+                    [id, "7"],
+                    [contentType, "text/plain"],
+                    [authorization, "Basic stale-credential"],
+                ],
+                { mediaType: "application/json", body: '{"name":"Desk"}' },
+            ),
+            token: "real-secret-token",
+        });
+
+        expect(result).toEqual({
+            request: {
+                method: "POST",
+                url: "https://api.example.test/widgets/7",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: "Bearer real-secret-token",
+                },
+                body: '{"name":"Desk"}',
+            },
+            errors: null,
+        });
+
+        if (result.request === null) {
+            throw new Error("Expected a built request.");
+        }
+
+        const redacted = redactAuthorization(result.request);
+        for (const snippet of [curlSnippet.generate(redacted), javascriptSnippet.generate(redacted)]) {
+            expect(snippet.match(/Content-Type/g)).toHaveLength(1);
+            expect(snippet.match(/Authorization/g)).toHaveLength(1);
+            expect(snippet).toContain("application/json");
+            expect(snippet).toContain("Bearer <YOUR_TOKEN>");
+            expect(snippet).not.toContain("text/plain");
+            expect(snippet).not.toContain("stale-credential");
+            expect(snippet).not.toContain("real-secret-token");
+        }
+    });
+
     it("returns field errors for empty required path, query, and header values", () => {
         const id = parameter({ name: "id", location: "path", required: true });
         const filter = parameter({ name: "filter", location: "query", required: true });
@@ -210,10 +259,67 @@ describe("buildRequest", () => {
         ).toEqual({
             request: null,
             errors: {
-                parameters: { "query:complex": "Array and object parameters cannot be executed." },
+                parameters: { "query:complex": "Only primitive parameters can be executed." },
                 body: null,
                 request: null,
             },
+        });
+    });
+
+    it.each([
+        ["$ref", { $ref: "#/components/schemas/Identifier" }],
+        ["oneOf", { oneOf: [{ type: "string" }, { type: "integer" }] }],
+        ["allOf", { allOf: [{ type: "string" }] }],
+        ["anyOf", { anyOf: [{ type: "string" }] }],
+        ["missing type", {}],
+    ])("rejects the %s non-scalar parameter schema", (_label, schema) => {
+        const unresolved = parameter({ name: "unresolved", schema });
+
+        expect(
+            buildRequest({
+                operation: operation([unresolved]),
+                baseUrl: "https://api.example.test",
+                values: values([[unresolved, "value"]]),
+                token: null,
+            }),
+        ).toEqual({
+            request: null,
+            errors: {
+                parameters: { "query:unresolved": "Only primitive parameters can be executed." },
+                body: null,
+                request: null,
+            },
+        });
+    });
+
+    it.each([
+        [
+            "absolute",
+            "https://api.example.test/v1?locale=en#documentation",
+            "https://api.example.test/v1/widgets/a%2Fb?locale=en&search=desk%20%26%20chair",
+        ],
+        [
+            "relative",
+            "../api/v1?locale=en#documentation",
+            "../api/v1/widgets/a%2Fb?locale=en&search=desk%20%26%20chair",
+        ],
+    ])("joins an %s base URL query and fragment at the pathname", (_kind, baseUrl, expectedUrl) => {
+        const id = parameter({ name: "id", location: "path", required: true });
+        const search = parameter({ name: "search", location: "query" });
+
+        expect(
+            buildRequest({
+                operation: operation([id, search]),
+                baseUrl,
+                values: values([
+                    [id, "a/b"],
+                    [search, "desk & chair"],
+                ]),
+                token: null,
+            }),
+        ).toEqual({
+            request: { method: "POST", url: expectedUrl, headers: {}, body: null },
+            errors: null,
         });
     });
 

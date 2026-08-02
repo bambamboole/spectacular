@@ -65,11 +65,11 @@ export function buildRequest(input: {
     const body = input.values.body.trim() === "" ? null : input.values.body;
 
     if (body !== null && selectedContract !== null && selectedContract.mediaType !== null) {
-        headers["Content-Type"] = selectedContract.mediaType;
+        upsertHeader(headers, "Content-Type", selectedContract.mediaType);
     }
 
     if (input.token !== null && input.token !== "") {
-        headers.Authorization = `Bearer ${input.token}`;
+        upsertHeader(headers, "Authorization", `Bearer ${input.token}`);
     }
 
     return {
@@ -101,8 +101,8 @@ function validateParameters(parameters: Param[], values: RequestValues, errors: 
         const key = parameterKey(param);
         const value = values.parameters[key] ?? "";
 
-        if (isComplexParameter(param)) {
-            errors.parameters[key] = "Array and object parameters cannot be executed.";
+        if (!hasPrimitiveSchema(param)) {
+            errors.parameters[key] = "Only primitive parameters can be executed.";
             continue;
         }
 
@@ -184,9 +184,14 @@ function buildUrl(baseUrl: string, path: string, parameters: Param[], values: Re
         }
     }
 
-    const url = `${baseUrl.replace(/\/+$/, "")}/${resolvedPath.replace(/^\/+/, "")}`;
+    const baseWithoutFragment = baseUrl.split("#", 1)[0];
+    const queryIndex = baseWithoutFragment.indexOf("?");
+    const basePath = queryIndex === -1 ? baseWithoutFragment : baseWithoutFragment.slice(0, queryIndex);
+    const existingQuery = queryIndex === -1 ? "" : baseWithoutFragment.slice(queryIndex + 1);
+    const url = `${basePath.replace(/\/+$/, "")}/${resolvedPath.replace(/^\/+/, "")}`;
+    const combinedQuery = [existingQuery, ...query].filter((value) => value !== "");
 
-    return query.length === 0 ? url : `${url}?${query.join("&")}`;
+    return combinedQuery.length === 0 ? url : `${url}?${combinedQuery.join("&")}`;
 }
 
 function isForbiddenHeader(name: string): boolean {
@@ -195,12 +200,29 @@ function isForbiddenHeader(name: string): boolean {
     return FORBIDDEN_HEADER_NAMES.has(normalized) || normalized.startsWith("proxy-") || normalized.startsWith("sec-");
 }
 
-function isComplexParameter(param: Param): boolean {
+function hasPrimitiveSchema(param: Param): boolean {
     if (!isRecord(param.schema)) {
         return false;
     }
 
-    return param.schema.type === "array" || param.schema.type === "object";
+    if ("$ref" in param.schema || "oneOf" in param.schema || "allOf" in param.schema || "anyOf" in param.schema) {
+        return false;
+    }
+
+    return (
+        typeof param.schema.type === "string" &&
+        ["string", "number", "integer", "boolean"].includes(param.schema.type)
+    );
+}
+
+function upsertHeader(headers: Record<string, string>, name: string, value: string): void {
+    for (const existingName of Object.keys(headers)) {
+        if (existingName.toLowerCase() === name.toLowerCase()) {
+            delete headers[existingName];
+        }
+    }
+
+    headers[name] = value;
 }
 
 function parameterLocationLabel(location: string): string {
