@@ -1378,42 +1378,38 @@ createInertiaApp({
 
 - [ ] **Step 5: Document the sprite requirement for consumers**
 
-In `README.md`'s "Displaying docs with Lattice" section, immediately after the existing npm-install paragraph (the one Task 1 updated to include `buffer`), add:
+In `README.md`'s "Displaying docs with Lattice" section, immediately after the existing npm-install paragraph (the one Task 1 updated to include `buffer`), insert this content into `README.md` (literal content to add to the file, not a plan code sample — copy it in directly, dropping the `>` blockquote markers, the same approach Task 1 used for its own README insertion):
 
-```markdown
-If your app doesn't already render Lattice icons elsewhere, you'll also need an SVG sprite for the viewer's copy
-button and expand/collapse chevrons to actually be visible (the components render without one, just with empty
-icons — nothing errors or warns):
-
-​```bash
-npm install -D @lattice-php/vite-svg-sprite
-​```
-
-​```ts
-// vite.config.ts
-import { svgSprite } from "@lattice-php/vite-svg-sprite";
-
-export default defineConfig({
-    plugins: [
-        // ...your other plugins
-        svgSprite({ iconDirs: ["node_modules/@lattice-php/lattice/resources/icons"] }),
-    ],
-});
-​```
-
-Then pass the sprite to your `<Provider>`:
-
-​```tsx
-import sprite from "virtual:svg-sprite";
-
-<Provider registry={registry} sprite={sprite}>
-```
-
-See [`@lattice-php/vite-svg-sprite`](https://www.npmjs.com/package/@lattice-php/vite-svg-sprite) for merging in your
-own icons alongside Lattice's.
-```
-
-(The `​` characters above are zero-width markers separating the nested code fences from this instruction's own — when inserting into `README.md`, use real triple-backtick fences, not nested ones; write this as plain content in the file, the same way Task 1's README insertion was written directly rather than through a nested fence.)
+> If your app doesn't already render Lattice icons elsewhere, you'll also need an SVG sprite for the viewer's copy
+> button and expand/collapse chevrons to actually be visible (the components render without one, just with empty
+> icons — nothing errors or warns):
+>
+> ```bash
+> npm install -D @lattice-php/vite-svg-sprite
+> ```
+>
+> ```ts
+> // vite.config.ts
+> import { svgSprite } from "@lattice-php/vite-svg-sprite";
+>
+> export default defineConfig({
+>     plugins: [
+>         // ...your other plugins
+>         svgSprite({ iconDirs: ["node_modules/@lattice-php/lattice/resources/icons"] }),
+>     ],
+> });
+> ```
+>
+> Then pass the sprite to your `<Provider>`:
+>
+> ```tsx
+> import sprite from "virtual:svg-sprite";
+>
+> <Provider registry={registry} sprite={sprite}>
+> ```
+>
+> See [`@lattice-php/vite-svg-sprite`](https://www.npmjs.com/package/@lattice-php/vite-svg-sprite) for merging in your
+> own icons alongside Lattice's.
 
 - [ ] **Step 6: Verify**
 
