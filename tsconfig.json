@@ -12,7 +12,7 @@
         "skipLibCheck": true,
         "strict": true,
         "target": "ESNext",
-        "types": ["@lattice-php/vite-svg-sprite/client"]
+        "types": ["@lattice-php/vite-svg-sprite/client", "vite/client"]
     },
     "include": [
         "resources/js/**/*.ts",

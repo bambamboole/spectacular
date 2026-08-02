@@ -18,7 +18,7 @@ function Row({ row, depth, expandDepth }: { row: SchemaRow; depth: number; expan
                     >
                         <Icon
                             name="chevron-down"
-                            className={`size-lt-icon-xs transition-transform ${open ? "" : "-rotate-90"}`}
+                            className={`size-lt-icon-xs transition-transform${open ? "" : " -rotate-90"}`}
                         />
                     </button>
                 ) : (

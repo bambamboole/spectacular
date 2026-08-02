@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Badge, CopyableText, SegmentedPills } from "@lattice-php/lattice/ui";
+import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
 import { httpMethodColor } from "./http-method-color";
@@ -57,7 +58,7 @@ function ParamRow({ param }: { param: Param }): React.ReactNode {
                     {paramTypeLabel(param.schema)}
                 </span>
                 {param.required ? <span className="text-lt-danger">*</span> : null}
-                {param.deprecated ? <span className="text-xs text-lt-muted-fg">deprecated</span> : null}
+                {param.deprecated ? <Badge color="danger">deprecated</Badge> : null}
             </div>
             {param.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{param.description}</p> : null}
         </li>
@@ -87,12 +88,14 @@ const SCHEMA_TABS: Array<{ key: SchemaTab; label: string }> = [
 ];
 
 function SchemaExampleView({
+    name,
     schema,
     examples,
     components,
     noSchemaMessage,
     expandDepth,
 }: {
+    name: string;
     schema: unknown;
     examples: ContractExample[];
     components: unknown;
@@ -112,7 +115,7 @@ function SchemaExampleView({
         <div>
             <div className="mb-2 pb-2">
                 <SegmentedPills
-                    name="schema-example-tab"
+                    name={name}
                     ariaLabel="Schema or example"
                     options={SCHEMA_TABS.map(({ key, label }) => ({ label, value: key, data: null }))}
                     value={tab}
@@ -128,10 +131,10 @@ function SchemaExampleView({
             ) : (
                 <div>
                     {examples.length > 1 ? (
-                        <select
+                        <NativeSelect
                             value={selected}
                             onChange={(event) => setSelected(Number(event.target.value))}
-                            className="mb-2 rounded-lt-sm border border-lt-border bg-lt-muted px-2 py-1 text-xs text-lt-fg"
+                            className="mb-2"
                         >
                             {examples.map((example, index) => (
                                 <option key={example.name ?? index} value={index}>
@@ -139,7 +142,7 @@ function SchemaExampleView({
                                     {example.summary ? ` — ${example.summary}` : ""}
                                 </option>
                             ))}
-                        </select>
+                        </NativeSelect>
                     ) : current?.summary ? (
                         <p className="mb-1 text-xs text-lt-muted-fg">{current.summary}</p>
                     ) : null}
@@ -174,6 +177,7 @@ function RequestBodySection({
                     </p>
                     {request.schema || request.examples.length > 0 ? (
                         <SchemaExampleView
+                            name={`request-${request.mediaType ?? "none"}-${index}-tab`}
                             schema={request.schema}
                             examples={request.examples}
                             components={components}
@@ -239,6 +243,7 @@ function ResponsesSection({
                     {current.schema || current.examples.length > 0 ? (
                         <SchemaExampleView
                             key={contractLabel(current)}
+                            name={`response-${contractLabel(current)}-tab`}
                             schema={current.schema}
                             examples={current.examples}
                             components={components}

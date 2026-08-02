@@ -37,7 +37,6 @@ function ServerPicker({ servers, selectedServerUrl, onServerChange }: {
             value={selectedServerUrl ?? ""}
             onChange={(event) => onServerChange(event.target.value)}
             aria-label="Select server"
-            className="w-full"
         >
             {servers.map((server) => (
                 <option key={server.url} value={server.url}>
@@ -93,7 +92,6 @@ export function ApiReferenceNav({
                     onChange={(event) => setFilter(event.target.value)}
                     placeholder="Filter operations…"
                     aria-label="Filter operations"
-                    className="w-full"
                 />
             </div>
             <div className="flex-1 overflow-y-auto p-2">
