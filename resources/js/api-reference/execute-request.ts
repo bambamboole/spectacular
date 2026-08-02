@@ -35,7 +35,7 @@ export async function executeRequest(
             kind: "response",
             status: response.status,
             statusText: response.statusText,
-            durationMs: now() - startedAt,
+            durationMs: Math.max(0, now() - startedAt),
             headers: Array.from(response.headers.entries()).sort(([left], [right]) => {
                 if (left < right) {
                     return -1;

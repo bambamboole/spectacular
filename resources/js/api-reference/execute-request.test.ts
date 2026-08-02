@@ -101,6 +101,16 @@ describe("executeRequest", () => {
         expect(now).toHaveBeenCalledTimes(2);
     });
 
+    it("clamps a negative elapsed duration to zero", async () => {
+        mockFetch(new Response("ok"));
+        const now = vi.fn().mockReturnValueOnce(175).mockReturnValueOnce(100);
+
+        await expect(executeRequest(request, new AbortController().signal, now)).resolves.toMatchObject({
+            kind: "response",
+            durationMs: 0,
+        });
+    });
+
     it("returns a generic transport error without leaking request details", async () => {
         const sensitiveFailure = new Error(
             `${request.url} ${request.headers.Authorization} ${request.body} ${request.headers["Content-Type"]}`,
