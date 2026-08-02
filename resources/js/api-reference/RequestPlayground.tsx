@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import {
     Button,
     Card,
@@ -38,6 +38,7 @@ export function RequestPlayground({
     token,
     components,
 }: RequestPlaygroundProps): React.ReactNode {
+    const idPrefix = `${operation.summary.id}-${useId().replaceAll(/[^a-zA-Z0-9_-]/g, "")}`;
     const playgroundRef = useRef<HTMLElement>(null);
     const activeControllerRef = useRef<AbortController | null>(null);
     const [values, setValues] = useState<RequestValues>(() => initialRequestValues(operation, components));
@@ -50,6 +51,7 @@ export function RequestPlayground({
         [operation, baseUrl, values, token],
     );
     const nonInteractiveParameterErrors = parameterErrorsWithoutControls(operation, buildResult.errors);
+    const hasUnsupportedRequestBody = operation.requests.length > 0 && jsonContracts.length === 0;
     const snippet = useMemo(() => {
         if (buildResult.request === null) {
             return "";
@@ -89,6 +91,11 @@ export function RequestPlayground({
 
     async function tryRequest(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
+
+        if (hasUnsupportedRequestBody) {
+            return;
+        }
+
         const result = buildRequest({ operation, baseUrl, values, token });
 
         if (result.errors !== null) {
@@ -145,7 +152,7 @@ export function RequestPlayground({
                                 {supportedParams.map((param) => (
                                     <ParameterField
                                         key={parameterKey(param)}
-                                        operationId={operation.summary.id}
+                                        idPrefix={idPrefix}
                                         param={param}
                                         value={values.parameters[parameterKey(param)] ?? ""}
                                         error={buildResult.errors?.parameters[parameterKey(param)] ?? null}
@@ -157,7 +164,7 @@ export function RequestPlayground({
                     );
                 })}
 
-                {nonInteractiveParameterErrors.length > 0 ? (
+                {nonInteractiveParameterErrors.length > 0 || hasUnsupportedRequestBody ? (
                     <section aria-live="polite" className="flex flex-col gap-2">
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
                             Request limitations
@@ -168,6 +175,9 @@ export function RequestPlayground({
                                     {name}: {message}
                                 </li>
                             ))}
+                            {hasUnsupportedRequestBody ? (
+                                <li>Only JSON request bodies can be sent from the playground.</li>
+                            ) : null}
                         </ul>
                     </section>
                 ) : null}
@@ -175,10 +185,10 @@ export function RequestPlayground({
                 {jsonContracts.length > 0 ? (
                     <section className="flex flex-col gap-3">
                         {jsonContracts.length > 1 ? (
-                            <div className="flex min-w-48 flex-1 flex-col gap-2">
-                                <Label htmlFor={`${operation.summary.id}-request-media-type`}>Content type</Label>
+                            <div className="flex min-w-0 basis-full flex-1 flex-col gap-2 sm:basis-48">
+                                <Label htmlFor={`${idPrefix}-request-media-type`}>Content type</Label>
                                 <NativeSelect
-                                    id={`${operation.summary.id}-request-media-type`}
+                                    id={`${idPrefix}-request-media-type`}
                                     value={values.mediaType ?? ""}
                                     onChange={(event) => updateMediaType(event.target.value)}
                                 >
@@ -191,21 +201,21 @@ export function RequestPlayground({
                             </div>
                         ) : null}
                         <div className="flex flex-col gap-2">
-                            <Label htmlFor={`${operation.summary.id}-request-body`}>JSON body</Label>
+                            <Label htmlFor={`${idPrefix}-request-body`}>JSON body</Label>
                             <Textarea
-                                id={`${operation.summary.id}-request-body`}
+                                id={`${idPrefix}-request-body`}
                                 value={values.body}
                                 required={jsonContracts.find((contract) => contract.mediaType === values.mediaType)?.required}
                                 aria-invalid={Boolean(buildResult.errors?.body)}
                                 aria-describedby={
-                                    buildResult.errors?.body ? `${operation.summary.id}-body-error` : undefined
+                                    buildResult.errors?.body ? `${idPrefix}-body-error` : undefined
                                 }
                                 data-field-key="body"
                                 onChange={(event) => updateBody(event.target.value)}
                                 className="min-h-40 font-mono text-sm"
                             />
                             {buildResult.errors?.body ? (
-                                <p id={`${operation.summary.id}-body-error`} className="text-xs text-lt-danger">
+                                <p id={`${idPrefix}-body-error`} className="text-xs text-lt-danger">
                                     {buildResult.errors.body}
                                 </p>
                             ) : null}
@@ -214,6 +224,7 @@ export function RequestPlayground({
                 ) : null}
 
                 <SnippetPanel
+                    idPrefix={idPrefix}
                     language={snippetLanguage}
                     snippet={snippet}
                     onLanguageChange={setSnippetLanguage}
@@ -224,7 +235,7 @@ export function RequestPlayground({
                 ) : null}
 
                 <form onSubmit={tryRequest} className="flex flex-wrap items-center gap-3">
-                    <Button type="submit" disabled={isLoading}>
+                    <Button type="submit" disabled={isLoading || hasUnsupportedRequestBody}>
                         {isLoading ? <Spinner className="size-lt-icon-sm" /> : null}
                         Try it out
                     </Button>
@@ -237,24 +248,24 @@ export function RequestPlayground({
 }
 
 function ParameterField({
-    operationId,
+    idPrefix,
     param,
     value,
     error,
     onChange,
 }: {
-    operationId: string;
+    idPrefix: string;
     param: Param;
     value: string;
     error: string | null;
     onChange: (value: string) => void;
 }): React.ReactNode {
     const key = parameterKey(param);
-    const id = `${operationId}-${fieldId(key)}`;
+    const id = `${idPrefix}-${fieldId(key)}`;
     const schema = parameterSchema(param);
 
     return (
-        <div className="flex min-w-48 flex-1 flex-col gap-2">
+        <div className="flex min-w-0 basis-full flex-1 flex-col gap-2 sm:basis-48">
             <Label htmlFor={id}>{param.name}</Label>
             {Array.isArray(schema.enum) ? (
                 <NativeSelect
@@ -262,7 +273,7 @@ function ParameterField({
                     value={value}
                     required={param.required}
                     aria-invalid={error !== null}
-                    aria-describedby={error ? `${operationId}-${fieldId(key)}-error` : undefined}
+                    aria-describedby={error ? `${idPrefix}-${fieldId(key)}-error` : undefined}
                     data-field-key={key}
                     onChange={(event) => onChange(event.target.value)}
                 >
@@ -279,7 +290,7 @@ function ParameterField({
                     value={value}
                     required={param.required}
                     aria-invalid={error !== null}
-                    aria-describedby={error ? `${operationId}-${fieldId(key)}-error` : undefined}
+                    aria-describedby={error ? `${idPrefix}-${fieldId(key)}-error` : undefined}
                     data-field-key={key}
                     onChange={(event) => onChange(event.target.value)}
                 >
@@ -294,13 +305,13 @@ function ParameterField({
                     value={value}
                     required={param.required}
                     aria-invalid={error !== null}
-                    aria-describedby={error ? `${operationId}-${fieldId(key)}-error` : undefined}
+                    aria-describedby={error ? `${idPrefix}-${fieldId(key)}-error` : undefined}
                     data-field-key={key}
                     onChange={(event) => onChange(event.target.value)}
                 />
             )}
             {error ? (
-                <p id={`${operationId}-${fieldId(key)}-error`} className="text-xs text-lt-danger">
+                <p id={`${idPrefix}-${fieldId(key)}-error`} className="text-xs text-lt-danger">
                     {error}
                 </p>
             ) : null}

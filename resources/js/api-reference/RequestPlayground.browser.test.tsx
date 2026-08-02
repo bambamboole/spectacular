@@ -141,7 +141,7 @@ describe("RequestPlayground", () => {
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
 
         const selectedSnippet = await snippet.element();
-        await screen.getByTestId("request-snippet-copy").click();
+        await screen.getByRole("button", { name: "Copy request snippet" }).click();
         await body.fill("");
         await body.click();
         await userEvent.paste();
@@ -183,8 +183,8 @@ describe("RequestPlayground", () => {
 
         await expect.element(idError).toBeVisible();
         await expect.element(traceError).toBeVisible();
-        await expect.element(idField).toHaveAttribute("aria-describedby", "update-widget-path-id-error");
-        await expect.element(traceField).toHaveAttribute("aria-describedby", "update-widget-header-X-Trace-error");
+        await expect.element(idField).toHaveAttribute("aria-describedby");
+        await expect.element(traceField).toHaveAttribute("aria-describedby");
         await expect.element(idField).toHaveFocus();
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -207,7 +207,7 @@ describe("RequestPlayground", () => {
 
         await expect.element(body).toHaveValue("{invalid");
         await expect.element(screen.getByText("Enter a valid JSON request body.")).toBeVisible();
-        await expect.element(body).toHaveAttribute("aria-describedby", "update-widget-body-error");
+        await expect.element(body).toHaveAttribute("aria-describedby");
         await expect.element(body).toHaveFocus();
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -272,6 +272,70 @@ describe("RequestPlayground", () => {
 
         await expect.element(screen.getByText("Only primitive parameters can be executed.")).toBeVisible();
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("blocks execution when an operation has only unsupported request bodies", async () => {
+        const fetchMock = vi.fn();
+        vi.stubGlobal("fetch", fetchMock);
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    paramGroups: [],
+                    requests: [requestContract({ mediaType: "multipart/form-data" })],
+                })}
+                baseUrl="https://api.example.test"
+                token={null}
+                components={null}
+            />,
+        );
+        const tryButton = screen.getByRole("button", { name: "Try it out" });
+
+        await expect.element(screen.getByText("Only JSON request bodies can be sent from the playground.")).toBeVisible();
+        await expect.element(tryButton).toBeDisabled();
+
+        const button = (await tryButton.element()) as HTMLButtonElement;
+        button.disabled = false;
+        await tryButton.click();
+
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("assigns unique control, error, and test IDs to identical playground instances", async () => {
+        const id = parameter({ name: "id", location: "path", required: true });
+        const operation = playgroundOperation({
+            paramGroups: [{ location: "path", params: [id] }],
+            requests: [],
+        });
+        const screen = await render(
+            <div>
+                <RequestPlayground
+                    operation={operation}
+                    baseUrl="https://api.example.test"
+                    token={null}
+                    components={null}
+                />
+                <RequestPlayground
+                    operation={operation}
+                    baseUrl="https://api.example.test"
+                    token={null}
+                    components={null}
+                />
+            </div>,
+        );
+        const idFields = screen.getByLabelText("id").all();
+        const copyButtons = screen.getByRole("button", { name: "Copy request snippet" }).all();
+        const inputIds = await Promise.all(idFields.map(async (field) => (await field.element()).id));
+        const errorIds = await Promise.all(
+            idFields.map(async (field) => (await field.element()).getAttribute("aria-describedby")),
+        );
+        const testIds = await Promise.all(
+            copyButtons.map(async (button) => (await button.element()).getAttribute("data-test")),
+        );
+
+        expect(new Set(inputIds).size).toBe(2);
+        expect(new Set(errorIds).size).toBe(2);
+        expect(new Set(testIds).size).toBe(2);
+        expect(testIds).toEqual(expect.arrayContaining([expect.stringMatching(/^request-snippet-copy-/)]));
     });
 
     it("passes the token into single-operation, stacked, and sidebar playgrounds", async () => {

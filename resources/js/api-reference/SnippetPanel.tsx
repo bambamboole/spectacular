@@ -3,6 +3,7 @@ import { CopyButton, SegmentedPills } from "@lattice-php/lattice/ui";
 export type SnippetLanguage = "curl" | "javascript";
 
 type SnippetPanelProps = {
+    idPrefix: string;
     language: SnippetLanguage;
     snippet: string;
     onLanguageChange: (language: SnippetLanguage) => void;
@@ -13,12 +14,12 @@ const SNIPPET_LANGUAGES = [
     { label: "JavaScript", value: "javascript", data: null },
 ];
 
-export function SnippetPanel({ language, snippet, onLanguageChange }: SnippetPanelProps): React.ReactNode {
+export function SnippetPanel({ idPrefix, language, snippet, onLanguageChange }: SnippetPanelProps): React.ReactNode {
     return (
         <section className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <SegmentedPills
-                    name="request-snippet-language"
+                    name={`${idPrefix}-request-snippet-language`}
                     ariaLabel="Snippet language"
                     options={SNIPPET_LANGUAGES}
                     value={language}
@@ -27,7 +28,7 @@ export function SnippetPanel({ language, snippet, onLanguageChange }: SnippetPan
                 <CopyButton
                     value={snippet}
                     label="request snippet"
-                    testId="request-snippet-copy"
+                    testId={`request-snippet-copy-${idPrefix}`}
                 />
             </div>
             <pre
