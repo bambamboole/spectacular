@@ -11,6 +11,11 @@ use SplFileInfo;
 final class ClassDiscoverer
 {
     /**
+     * @var array<string, list<class-string>>
+     */
+    private array $discoveredClassesByPathSet = [];
+
+    /**
      * @param  array<int, string>  $paths
      * @return list<class-string>
      */
@@ -22,11 +27,17 @@ final class ClassDiscoverer
             ->values()
             ->all();
 
+        $pathSet = implode('|', $realPaths);
+
+        if (isset($this->discoveredClassesByPathSet[$pathSet])) {
+            return $this->discoveredClassesByPathSet[$pathSet];
+        }
+
         foreach ($realPaths as $path) {
             $this->requirePhpFiles($path);
         }
 
-        return collect(get_declared_classes())
+        return $this->discoveredClassesByPathSet[$pathSet] = collect(get_declared_classes())
             ->filter(fn (string $class): bool => $this->classIsInPaths($class, $realPaths))
             ->sort()
             ->values()

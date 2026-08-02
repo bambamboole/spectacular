@@ -16,6 +16,17 @@ return [
         'scan_paths' => [
             app_path('Events'),
         ],
+        'webhooks' => [
+            'channel' => [
+                'key' => 'webhooks',
+                'address' => '{webhookUrl}',
+            ],
+            'headers' => [
+                'Content-Type' => ['type' => 'string', 'enum' => ['application/json']],
+                'Signature' => ['type' => 'string'],
+                'Timestamp' => ['type' => 'integer'],
+            ],
+        ],
     ],
 
     'scramble' => [

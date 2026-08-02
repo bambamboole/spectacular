@@ -5,6 +5,7 @@ namespace Bambamboole\Spectacular;
 
 use Bambamboole\Spectacular\AsyncApi\AsyncApiGenerator;
 use Bambamboole\Spectacular\AsyncApi\Console\GenerateAsyncApiCommand;
+use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\AsyncApi\Support\ClassDiscoverer;
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
@@ -29,8 +30,11 @@ final class SpectacularServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
+        $this->mergeAsyncApiWebhookConfigDefaults();
+
         $this->app->singleton(ClassDiscoverer::class);
         $this->app->singleton(PayloadSchemaFactory::class);
+        $this->app->singleton(MessageDefinitionFactory::class);
         $this->app->singleton(AsyncApiGenerator::class);
 
         foreach (config('spectacular.scramble.extensions', []) as $extension) {
@@ -38,5 +42,16 @@ final class SpectacularServiceProvider extends PackageServiceProvider
                 Scramble::registerExtension($extension);
             }
         }
+    }
+
+    private function mergeAsyncApiWebhookConfigDefaults(): void
+    {
+        if (config()->has('spectacular.asyncapi.webhooks')) {
+            return;
+        }
+
+        $config = require __DIR__.'/../config/spectacular.php';
+
+        config()->set('spectacular.asyncapi.webhooks', $config['asyncapi']['webhooks']);
     }
 }

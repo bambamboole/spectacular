@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\Tests;
 
+use Bambamboole\LaravelWebhooks\WebhooksServiceProvider;
 use Bambamboole\Spectacular\SpectacularServiceProvider;
 use Dedoc\Scramble\Infer\Context;
 use Dedoc\Scramble\Scramble;
@@ -47,6 +48,7 @@ abstract class TestCase extends BaseTestCase
     protected function getPackageProviders($app): array
     {
         return [
+            WebhooksServiceProvider::class,
             ScrambleServiceProvider::class,
             QueryBuilderServiceProvider::class,
             SpectacularServiceProvider::class,

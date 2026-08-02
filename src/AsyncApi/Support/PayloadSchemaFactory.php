@@ -6,10 +6,12 @@ namespace Bambamboole\Spectacular\AsyncApi\Support;
 use BackedEnum;
 use DateTimeInterface;
 use ReflectionClass;
+use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionProperty;
 use ReflectionType;
 use ReflectionUnionType;
+use Throwable;
 use UnitEnum;
 
 final class PayloadSchemaFactory
@@ -34,12 +36,62 @@ final class PayloadSchemaFactory
     }
 
     /**
+     * @param  class-string  $class
+     * @return array<string, mixed>
+     */
+    public function forMethod(string $class, string $methodName): array
+    {
+        $class = new ReflectionClass($class);
+
+        if (! $class->hasMethod($methodName)) {
+            return ['type' => 'object'];
+        }
+
+        return $this->schemaFromArrayReturn($class, $class->getMethod($methodName)) ?? ['type' => 'object'];
+    }
+
+    /**
+     * @param  class-string  $notificationClass
+     * @return array<string, mixed>
+     */
+    public function forNotification(string $notificationClass): array
+    {
+        $notification = new ReflectionClass($notificationClass);
+
+        if ($notification->hasMethod('broadcastWith')) {
+            return $this->schemaFromArrayReturn($notification, $notification->getMethod('broadcastWith')) ?? ['type' => 'object'];
+        }
+
+        $schema = ['type' => 'object'];
+
+        foreach (['toBroadcast', 'toArray'] as $methodName) {
+            if (! $notification->hasMethod($methodName)) {
+                continue;
+            }
+
+            $schema = $this->schemaFromArrayReturn($notification, $notification->getMethod($methodName)) ?? $schema;
+
+            break;
+        }
+
+        return $this->withNotificationType($notification, $schema);
+    }
+
+    /**
      * @param  ReflectionClass<object>  $event
      * @return array<string, mixed>|null
      */
     private function schemaFromBroadcastWith(ReflectionClass $event): ?array
     {
-        $method = $event->getMethod('broadcastWith');
+        return $this->schemaFromArrayReturn($event, $event->getMethod('broadcastWith'));
+    }
+
+    /**
+     * @param  ReflectionClass<object>  $class
+     * @return array<string, mixed>|null
+     */
+    private function schemaFromArrayReturn(ReflectionClass $class, ReflectionMethod $method): ?array
+    {
         $doc = $method->getDocComment();
 
         if ($doc === false) {
@@ -53,30 +105,89 @@ final class PayloadSchemaFactory
         $returnType = trim(str_replace('*/', '', $matches[1]));
 
         if (str_starts_with($returnType, 'array{') && str_ends_with($returnType, '}')) {
-            return $this->schemaFromArrayShape($event, substr($returnType, 6, -1));
+            return $this->schemaFromArrayShape($class, substr($returnType, 6, -1)) ?? ['type' => 'object'];
         }
 
-        if (preg_match('/^array<string,\s*([^>]+)>$/', $returnType, $matches)) {
+        if (preg_match('/^array<string,\s*(.+)>$/', $returnType, $matches)) {
             return [
                 'type' => 'object',
-                'additionalProperties' => $this->schemaFromDocType($matches[1], $event),
+                'additionalProperties' => $this->schemaFromDocType($matches[1], $class),
             ];
+        }
+
+        if (preg_match('/object\s*\{\s*data\s*:\s*array\s*\{(.+)\}\s*\}/', $returnType, $matches)) {
+            return $this->schemaFromArrayShape($class, $matches[1]) ?? ['type' => 'object'];
         }
 
         return ['type' => 'object'];
     }
 
     /**
-     * @param  ReflectionClass<object>  $event
+     * @param  ReflectionClass<object>  $notification
+     * @param  array<string, mixed>  $schema
      * @return array<string, mixed>
      */
-    private function schemaFromArrayShape(ReflectionClass $event, string $shape): array
+    private function withNotificationType(ReflectionClass $notification, array $schema): array
+    {
+        $type = $notification->getName();
+
+        if ($notification->hasMethod('broadcastType')) {
+            $method = $notification->getMethod('broadcastType');
+
+            if ($method->isPublic() && $method->getNumberOfRequiredParameters() === 0) {
+                try {
+                    $broadcastType = $method->invoke($notification->newInstanceWithoutConstructor());
+
+                    if (is_string($broadcastType) && $broadcastType !== '') {
+                        $type = $broadcastType;
+                    }
+                } catch (Throwable) {
+                    $type = $notification->getName();
+                }
+            }
+        }
+
+        $schema['type'] ??= 'object';
+        $schema['properties'] ??= [];
+        $schema['properties']['id'] ??= [
+            'type' => 'string',
+            'format' => 'uuid',
+        ];
+        $schema['properties']['type'] = [
+            'type' => 'string',
+            'enum' => [$type],
+        ];
+
+        $schema['required'] ??= [];
+
+        if (! in_array('id', $schema['required'], true)) {
+            $schema['required'][] = 'id';
+        }
+
+        if (! in_array('type', $schema['required'], true)) {
+            $schema['required'][] = 'type';
+        }
+
+        return $schema;
+    }
+
+    /**
+     * @param  ReflectionClass<object>  $event
+     * @return array<string, mixed>|null
+     */
+    private function schemaFromArrayShape(ReflectionClass $event, string $shape): ?array
     {
         $properties = [];
         $required = [];
 
         foreach ($this->splitTopLevel($shape) as $entry) {
-            [$key, $type] = array_map(trim(...), explode(':', $entry, 2));
+            $parts = array_map(trim(...), explode(':', $entry, 2));
+
+            if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
+                return null;
+            }
+
+            [$key, $type] = $parts;
             $isOptional = str_ends_with($key, '?');
             $key = rtrim($key, '?');
             $properties[$key] = $this->schemaFromDocType($type, $event);

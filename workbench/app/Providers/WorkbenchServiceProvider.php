@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Workbench\App\Providers;
 
+use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
@@ -35,6 +36,11 @@ final class WorkbenchServiceProvider extends ServiceProvider
         config(['lattice.discover' => [dirname(__DIR__)]]);
 
         config(['scramble.security_strategy' => MiddlewareAuthSecurityStrategy::class]);
+
+        config()->set('webhooks.scan_paths', [
+            dirname(__DIR__, 2).'/app/Events',
+        ]);
+        $this->app->forgetInstance(WebhookEventRegistry::class);
 
         $this->readBoostConfigFromPackageRoot();
     }

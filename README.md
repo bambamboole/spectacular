@@ -158,6 +158,84 @@ From an event, Spectacular derives:
 )]
 ```
 
+### Broadcast notifications
+
+Use `#[BroadcastNotification]` on Laravel notification classes that are delivered through the `broadcast` channel:
+
+```php
+use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
+use Illuminate\Notifications\Messages\BroadcastMessage;
+use Illuminate\Notifications\Notification;
+
+#[BroadcastNotification(
+    notifiables: [User::class],
+    title: 'Invoice paid',
+    summary: 'Sent to users when an invoice is paid.',
+    tags: ['billing'],
+)]
+final class InvoicePaidNotification extends Notification
+{
+    public function via(object $notifiable): array
+    {
+        return ['broadcast'];
+    }
+
+    /**
+     * @return BroadcastMessage&object{data: array{invoiceId:int, amount:int}}
+     */
+    public function toBroadcast(object $notifiable): BroadcastMessage
+    {
+        return new BroadcastMessage([
+            'invoiceId' => 123,
+            'amount' => 4999,
+        ]);
+    }
+}
+```
+
+Spectacular infers notification channels from the `notifiables` classes. If a notifiable exposes
+`receivesBroadcastNotificationsOn()`, that value is used; otherwise the channel defaults to a private placeholder such
+as `private-App.Models.User.{userId}`. Pass explicit `channels` when notifications use custom or dynamic broadcast
+channels that cannot be inferred.
+
+### Webhook events
+
+Use Laravel Webhooks' `#[WebhookEvent]` attribute on outbound webhook event classes you want listed in the AsyncAPI
+document:
+
+```php
+use Bambamboole\LaravelWebhooks\Attributes\WebhookEvent;
+
+#[WebhookEvent(
+    name: 'invoice.paid',
+    title: 'Invoice paid',
+    summary: 'Sent when an invoice is paid.',
+    tags: ['billing'],
+)]
+final class InvoicePaidWebhook
+{
+    public function __construct(public int $invoiceId, public int $amount) {}
+
+    /**
+     * @return array{invoiceId:int, amount:int}
+     */
+    public function webhookPayload(): array
+    {
+        return [
+            'invoiceId' => $this->invoiceId,
+            'amount' => $this->amount,
+        ];
+    }
+}
+```
+
+Laravel Webhooks owns runtime event discovery, subscriptions, delivery, signing, retries, caching, and delivery
+history. Follow the [Laravel Webhooks documentation](https://github.com/bambamboole/laravel-webhooks) to configure
+those runtime concerns.
+
+Spectacular limits its webhook role to the generated AsyncAPI channel, message metadata, envelope schema, configured
+headers, and the `spectacular:asyncapi` command.
+
 ### Laravel extensions
 
 By default the document includes `x-laravel-*` extension fields (channel type, source event class, whether it
@@ -177,6 +255,17 @@ broadcasts now). Disable them with `laravel_extensions => false` in the config.
     'laravel_extensions' => true,
     'scan_paths' => [
         app_path('Events'),
+    ],
+    'webhooks' => [
+        'channel' => [
+            'key' => 'webhooks',
+            'address' => '{webhookUrl}',
+        ],
+        'headers' => [
+            'Content-Type' => ['type' => 'string', 'enum' => ['application/json']],
+            'Signature' => ['type' => 'string'],
+            'Timestamp' => ['type' => 'integer'],
+        ],
     ],
 ],
 ```
