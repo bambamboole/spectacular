@@ -9,10 +9,6 @@ use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\AsyncApi\Support\ClassDiscoverer;
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
-use Bambamboole\Spectacular\Webhooks\NullWebhookSubscriptionRepository;
-use Bambamboole\Spectacular\Webhooks\WebhookEventRegistry;
-use Bambamboole\Spectacular\Webhooks\WebhookPayloadFactory;
-use Bambamboole\Spectacular\Webhooks\WebhookSubscriptionRepository;
 use Dedoc\Scramble\Scramble;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -40,9 +36,6 @@ final class SpectacularServiceProvider extends PackageServiceProvider
         $this->app->singleton(PayloadSchemaFactory::class);
         $this->app->singleton(MessageDefinitionFactory::class);
         $this->app->singleton(AsyncApiGenerator::class);
-        $this->app->singleton(WebhookEventRegistry::class);
-        $this->app->singleton(WebhookPayloadFactory::class);
-        $this->app->bindIf(WebhookSubscriptionRepository::class, NullWebhookSubscriptionRepository::class);
 
         foreach (config('spectacular.scramble.extensions', []) as $extension) {
             if (is_string($extension)) {

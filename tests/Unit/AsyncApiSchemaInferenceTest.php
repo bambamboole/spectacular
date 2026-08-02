@@ -7,7 +7,6 @@ use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\CustomBroadcastWithNotificat
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\ExternalPayload;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidBroadcastNotification;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
-use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\MalformedPayloadWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\PublicPropertiesBroadcast;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
 use Carbon\CarbonImmutable;
@@ -63,7 +62,7 @@ it('infers broadcast notification payload schemas from toBroadcast methods', fun
 });
 
 it('falls back to object schemas for malformed array-shape payload docs', function (): void {
-    $schema = app(PayloadSchemaFactory::class)->forMethod(MalformedPayloadWebhook::class, 'webhookPayload');
+    $schema = app(PayloadSchemaFactory::class)->forMethod(MalformedArrayShapePayload::class, 'webhookPayload');
 
     expect($schema)->toBe(['type' => 'object']);
 });
@@ -103,3 +102,14 @@ it('maps dates, enums, nullable types, and unknown objects', function (): void {
         'x-php-type' => ExternalPayload::class,
     ]);
 });
+
+final class MalformedArrayShapePayload
+{
+    /**
+     * @return array{int}
+     */
+    public function webhookPayload(): array
+    {
+        return [123];
+    }
+}

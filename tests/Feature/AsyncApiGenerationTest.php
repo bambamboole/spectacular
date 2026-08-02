@@ -15,6 +15,13 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
+it('does not expose a duplicate webhook runtime', function (): void {
+    expect(class_exists('Bambamboole\\Spectacular\\AsyncApi\\Attributes\\WebhookEvent'))->toBeFalse()
+        ->and(class_exists('Bambamboole\\Spectacular\\Webhooks\\WebhookEventRegistry'))->toBeFalse()
+        ->and(class_exists('Bambamboole\\Spectacular\\Webhooks\\DispatchWebhookEvent'))->toBeFalse()
+        ->and(interface_exists('Bambamboole\\Spectacular\\Webhooks\\WebhookSubscriptionRepository'))->toBeFalse();
+});
+
 it('defaults to scanning the application events path', function (): void {
     $config = require dirname(__DIR__, 2).'/config/spectacular.php';
 
