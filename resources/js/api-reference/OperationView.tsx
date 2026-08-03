@@ -30,6 +30,7 @@ type OperationViewProps = {
     baseUrl?: string | null;
     token?: string | null;
     expandDepth?: number;
+    hideHeaderIdentity?: boolean;
 };
 
 type SecuritySchemeDefinition = {
@@ -418,7 +419,14 @@ function SecuritySection({ security, components }: { security: SecurityRequireme
     );
 }
 
-export function OperationView({ spec, operationId, baseUrl, token, expandDepth = 0 }: OperationViewProps): React.ReactNode {
+export function OperationView({
+    spec,
+    operationId,
+    baseUrl,
+    token,
+    expandDepth = 0,
+    hideHeaderIdentity = false,
+}: OperationViewProps): React.ReactNode {
     const operation = useMemo(
         () => (operationId ? parseOperation(spec, operationId, baseUrl ?? null) : null),
         [spec, operationId, baseUrl],
@@ -444,6 +452,7 @@ export function OperationView({ spec, operationId, baseUrl, token, expandDepth =
             components={components}
             token={token ?? null}
             expandDepth={expandDepth}
+            hideHeaderIdentity={hideHeaderIdentity}
         />
     );
 }
@@ -453,11 +462,13 @@ function OperationContent({
     components,
     token,
     expandDepth,
+    hideHeaderIdentity,
 }: {
     operation: Operation;
     components: unknown;
     token: string | null;
     expandDepth: number;
+    hideHeaderIdentity: boolean;
 }): React.ReactNode {
     const requestRootRef = useRef<HTMLDivElement>(null);
     const [requestValues, setRequestValues] = useState<RequestValues>(() =>
@@ -489,7 +500,11 @@ function OperationContent({
         <div ref={requestRootRef} className="min-w-0 flex-1 overflow-y-auto">
             <div className="grid min-w-0 items-start xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
                 <div className="min-w-0 p-6 xl:col-start-1 xl:row-start-1">
-                    <OperationHeader operation={operation} baseUrl={operation.serverUrl} components={components} />
+                    <OperationHeader
+                        operation={operation}
+                        baseUrl={operation.serverUrl}
+                        hideIdentity={hideHeaderIdentity}
+                    />
 
                     <SecuritySection security={operation.security} components={components} />
 
@@ -518,6 +533,7 @@ function OperationContent({
                     onValuesChange={setRequestValues}
                     hideInlineParameters
                     onValidationError={focusRequestField}
+                    showMarkdownCopy={!hideHeaderIdentity}
                     referenceContent={
                         <>
                             <RequestBodySection

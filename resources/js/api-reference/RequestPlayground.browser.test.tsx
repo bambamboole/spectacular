@@ -109,8 +109,15 @@ describe("RequestPlayground", () => {
         const id = screen.getByLabelText("id");
         const body = screen.getByLabelText("name");
         const snippet = screen.getByLabelText("Request snippet", { exact: true });
+        const requestPanel = screen.getByRole("complementary", { name: "Request" });
+        const execute = requestPanel.getByRole("button", { name: "Execute" });
+        const markdownCopy = requestPanel.getByRole("button", { name: "Copy as Markdown" });
 
         await expect.element(id).toHaveValue("42");
+        await expect.element(requestPanel.getByText("Try it out")).not.toBeInTheDocument();
+        expect(requestPanel.element().querySelector('[data-slot="card"]')).toBeNull();
+        expect(execute.element().parentElement).toBe(markdownCopy.element().parentElement);
+        await expect.element(markdownCopy).toHaveClass("ml-auto");
         await expect.element(screen.getByLabelText("status")).toBeVisible();
         await expect.element(screen.getByLabelText("X-Debug")).toBeVisible();
         await expect.element(body).toBeVisible();
@@ -140,7 +147,9 @@ describe("RequestPlayground", () => {
         await expect.poll(() => clipboardWrite.mock.calls.length).toBe(1);
         expect(clipboardWrite).toHaveBeenCalledWith(selectedSnippet);
         await expect.element(screen.getByRole("button", { name: "Copied Request snippet" })).toBeVisible();
-        await screen.getByRole("button", { name: "Execute" }).click();
+        await markdownCopy.click();
+        await expect.poll(() => clipboardWrite.mock.calls[1]?.[0]).toContain("# Update widget");
+        await execute.click();
 
         await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
         expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.example.test/v1/widgets/a%2Fb?status=archived");

@@ -302,10 +302,16 @@ function buildUrl(baseUrl: string, path: string, parameters: Param[], values: Re
     const queryIndex = baseWithoutFragment.indexOf("?");
     const basePath = queryIndex === -1 ? baseWithoutFragment : baseWithoutFragment.slice(0, queryIndex);
     const existingQuery = queryIndex === -1 ? "" : baseWithoutFragment.slice(queryIndex + 1);
-    const url = `${basePath.replace(/\/+$/, "")}/${resolvedPath.replace(/^\/+/, "")}`;
+    const url = operationUrl(basePath, resolvedPath);
     const combinedQuery = [existingQuery, ...query].filter((value) => value !== "");
 
     return combinedQuery.length === 0 ? url : `${url}?${combinedQuery.join("&")}`;
+}
+
+export function operationUrl(baseUrl: string | null | undefined, path: string): string {
+    const basePath = (baseUrl ?? "").split("#", 1)[0].split("?", 1)[0];
+
+    return `${basePath.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }
 
 function isForbiddenHeader(name: string): boolean {

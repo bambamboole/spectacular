@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RendererComponent } from "@lattice-php/lattice";
-import { Badge } from "@lattice-php/lattice/ui";
+import { Icon } from "@lattice-php/lattice/icons";
+import { Badge, CopyButton } from "@lattice-php/lattice/ui";
 import { ApiReferenceNav, ServerPicker } from "./ApiReferenceNav";
 import { httpMethodColor } from "./http-method-color";
+import { operationToMarkdown } from "./operation-markdown";
 import { OperationView } from "./OperationView";
 import { buildNavigation, filterNavigationByTags, parseOperation } from "./parse";
+import { operationUrl } from "./request-builder";
 import type { ApiInfo, Navigation } from "./types";
 
 type ApiReferenceProps = {
@@ -72,6 +75,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     const [error, setError] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(() => currentHashId());
     const [selectedStackedGroupId, setSelectedStackedGroupId] = useState<string | null>(null);
+    const [collapsedStackedKey, setCollapsedStackedKey] = useState<string | null>(null);
     const [selectedRootServerUrl, setSelectedRootServerUrl] = useState<string | null>(null);
     const [selectedOperationServerUrls, setSelectedOperationServerUrls] = useState<Record<string, string>>({});
 
@@ -110,6 +114,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         () => (rawNavigation && tags?.length ? filterNavigationByTags(rawNavigation, tags) : rawNavigation),
         [rawNavigation, tags],
     );
+    const components = (spec as { components?: unknown } | null)?.components ?? null;
     const activeOperationId = operation ?? selectedId;
     const activeStackedGroupId =
         navigation?.groups.find(
@@ -158,6 +163,15 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     }
 
     function selectStackedOperation(groupId: string, id: string): void {
+        const key = `${groupId}:${id}`;
+
+        if (id === selectedId && groupId === activeStackedGroupId && collapsedStackedKey !== key) {
+            setCollapsedStackedKey(key);
+
+            return;
+        }
+
+        setCollapsedStackedKey(null);
         setSelectedStackedGroupId(groupId);
         selectOperation(id);
     }
@@ -249,30 +263,68 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                     const summary = navigation.summaries[id];
                                     if (!summary) return null;
 
-                                    const isOpen = id === selectedId && group.id === activeStackedGroupId;
+                                    const stackedKey = `${group.id}:${id}`;
+                                    const isOpen = id === selectedId
+                                        && group.id === activeStackedGroupId
+                                        && collapsedStackedKey !== stackedKey;
                                     const contentId = `api-reference-operation-${group.id}-${id}`;
+                                    const serverUrl = selectedServerUrlFor(id);
+                                    const url = operationUrl(serverUrl, summary.path);
+                                    const parsedOperation = parseOperation(spec, id, serverUrl);
+                                    const markdown = parsedOperation
+                                        ? operationToMarkdown(parsedOperation, components)
+                                        : "";
 
                                     return (
                                         <div key={id} className="border-b border-lt-border last:border-b-0">
-                                            <button
-                                                type="button"
-                                                aria-expanded={isOpen}
-                                                aria-controls={contentId}
-                                                onClick={() => selectStackedOperation(group.id, id)}
-                                                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-lt-muted"
-                                            >
-                                                <Badge color={httpMethodColor(summary.method)} className="text-xs">
-                                                    {summary.method}
-                                                </Badge>
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block text-sm font-medium text-lt-fg">
-                                                        {summary.title}
-                                                    </span>
-                                                    <span className="block truncate font-mono text-xs text-lt-muted-fg">
-                                                        {summary.path}
-                                                    </span>
-                                                </span>
-                                            </button>
+                                            <div className="flex items-center gap-2 px-4 py-3 transition-colors hover:bg-lt-muted">
+                                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                                    <Badge color={httpMethodColor(summary.method)} className="text-xs">
+                                                        {summary.method}
+                                                    </Badge>
+                                                    <button
+                                                        type="button"
+                                                        aria-expanded={isOpen}
+                                                        aria-controls={contentId}
+                                                        onClick={() => selectStackedOperation(group.id, id)}
+                                                        className="min-w-0 text-left"
+                                                    >
+                                                        <span className="block text-sm font-medium text-lt-fg">
+                                                            {summary.title}
+                                                        </span>
+                                                        <span className="block break-all font-mono text-xs text-lt-muted-fg">
+                                                            {url}
+                                                        </span>
+                                                    </button>
+                                                    <CopyButton
+                                                        value={url}
+                                                        label={`${summary.title} URL`}
+                                                        iconOnly
+                                                        className="size-7 shrink-0"
+                                                    />
+                                                </div>
+                                                <CopyButton
+                                                    value={markdown}
+                                                    label={`${summary.title} as Markdown`}
+                                                    testId={`copy-${id}-markdown`}
+                                                    className="shrink-0"
+                                                >
+                                                    Copy as Markdown
+                                                </CopyButton>
+                                                <button
+                                                    type="button"
+                                                    aria-label={`${isOpen ? "Collapse" : "Expand"} ${summary.title}`}
+                                                    aria-expanded={isOpen}
+                                                    aria-controls={contentId}
+                                                    onClick={() => selectStackedOperation(group.id, id)}
+                                                    className="flex size-7 shrink-0 items-center justify-center rounded-lt-sm text-lt-muted-fg transition-colors hover:bg-lt-accent hover:text-lt-accent-fg"
+                                                >
+                                                    <Icon
+                                                        name="chevron-down"
+                                                        className={`size-lt-icon-xs transition-transform${isOpen ? "" : " -rotate-90"}`}
+                                                    />
+                                                </button>
+                                            </div>
                                             {isOpen ? (
                                                 <div id={contentId}>
                                                     <OperationView
@@ -282,6 +334,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                                         baseUrl={selectedServerUrlFor(id)}
                                                         token={token}
                                                         expandDepth={expandDepth}
+                                                        hideHeaderIdentity
                                                     />
                                                 </div>
                                             ) : null}

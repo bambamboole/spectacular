@@ -12,17 +12,15 @@ import {
 import { FormFieldFrame } from "@lattice-php/lattice/form";
 import {
     Button,
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
     Combobox,
+    CopyButton,
     Input,
     NativeSelect,
     Spinner,
 } from "@lattice-php/lattice/ui";
 import { executeRequest, type ExecutedResponse, type ExecutionError } from "./execute-request";
 import { LiveResponsePanel } from "./LiveResponsePanel";
+import { operationToMarkdown } from "./operation-markdown";
 import { RequestBodyEditor } from "./RequestBodyEditor";
 import {
     defaultRequestBodyValue,
@@ -57,6 +55,7 @@ export type RequestPlaygroundProps = {
     hideInlineParameters?: boolean;
     onValidationError?: (fieldKey: string | null) => void;
     referenceContent?: ReactNode;
+    showMarkdownCopy?: boolean;
 };
 
 export function RequestPlayground({
@@ -69,6 +68,7 @@ export function RequestPlayground({
     hideInlineParameters = false,
     onValidationError,
     referenceContent = null,
+    showMarkdownCopy = true,
 }: RequestPlaygroundProps): React.ReactNode {
     const idPrefix = `${operation.summary.id}-${useId().replaceAll(/[^a-zA-Z0-9_-]/g, "")}`;
     const playgroundRef = useRef<HTMLElement>(null);
@@ -120,6 +120,10 @@ export function RequestPlayground({
             ? curlSnippet.generate(request)
             : javascriptSnippet.generate(request);
     }, [buildResult, snippetLanguage]);
+    const markdown = useMemo(
+        () => (showMarkdownCopy ? operationToMarkdown(operation, components) : ""),
+        [showMarkdownCopy, operation, components],
+    );
 
     useEffect(() => {
         return () => {
@@ -201,120 +205,125 @@ export function RequestPlayground({
                 aria-label="Request"
                 className="min-w-0 px-6 pb-6 xl:col-start-1 xl:row-start-2"
             >
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Try it out</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-6">
-                        {operation.paramGroups
-                            .filter((group) => !hideInlineParameters || !isInlineParameterGroup(group.location))
-                            .map((group) => {
-                                const supportedParams = group.params.filter((param) =>
-                                    isRenderableParameter(group.location, param),
-                                );
+                <div className="flex flex-col gap-6">
+                    {operation.paramGroups
+                        .filter((group) => !hideInlineParameters || !isInlineParameterGroup(group.location))
+                        .map((group) => {
+                            const supportedParams = group.params.filter((param) =>
+                                isRenderableParameter(group.location, param),
+                            );
 
-                                if (supportedParams.length === 0) {
-                                    return null;
-                                }
+                            if (supportedParams.length === 0) {
+                                return null;
+                            }
 
-                                return (
-                                    <section key={group.location} className="flex flex-col gap-3">
-                                        <h3 className="text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
-                                            {group.location} parameters
-                                        </h3>
-                                        <div className="flex flex-wrap gap-4">
-                                            {supportedParams.map((param) => (
-                                                <RequestParameterField
-                                                    key={parameterKey(param)}
-                                                    idPrefix={idPrefix}
-                                                    param={param}
-                                                    value={values.parameters[parameterKey(param)] ?? ""}
-                                                    error={buildResult.errors?.parameters[parameterKey(param)] ?? null}
-                                                    onChange={(value) => updateParameter(param, value)}
-                                                />
+                            return (
+                                <section key={group.location} className="flex flex-col gap-3">
+                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                                        {group.location} parameters
+                                    </h3>
+                                    <div className="flex flex-wrap gap-4">
+                                        {supportedParams.map((param) => (
+                                            <RequestParameterField
+                                                key={parameterKey(param)}
+                                                idPrefix={idPrefix}
+                                                param={param}
+                                                value={values.parameters[parameterKey(param)] ?? ""}
+                                                error={buildResult.errors?.parameters[parameterKey(param)] ?? null}
+                                                onChange={(value) => updateParameter(param, value)}
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
+                            );
+                        })}
+
+                    {nonInteractiveParameterLimitations.length > 0 || hasUnsupportedRequestBody ? (
+                        <section aria-live="polite" className="flex flex-col gap-2">
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                                Request limitations
+                            </h3>
+                            <ul className="flex flex-col gap-1 text-xs text-lt-danger">
+                                {nonInteractiveParameterLimitations.map(({ key, name, message }) => (
+                                    <li key={key}>
+                                        {name}: {message}
+                                    </li>
+                                ))}
+                                {hasUnsupportedRequestBody ? (
+                                    <li>
+                                        {jsonContracts.length === 0
+                                            ? "Only JSON request bodies can be sent from the playground."
+                                            : requestBodySchema?.error}
+                                    </li>
+                                ) : null}
+                            </ul>
+                        </section>
+                    ) : null}
+
+                    {jsonContracts.length > 0 ? (
+                        <section className="flex flex-col gap-3">
+                            {jsonContracts.length > 1 ? (
+                                <FormFieldFrame
+                                    id={`${idPrefix}-request-media-type`}
+                                    label="Content type"
+                                    className="min-w-0 basis-full flex-1 sm:basis-48"
+                                >
+                                    {(controlProps) => (
+                                        <NativeSelect
+                                            {...controlProps}
+                                            value={values.mediaType ?? ""}
+                                            onChange={(event) => updateMediaType(event.target.value)}
+                                        >
+                                            {jsonContracts.map((contract) => (
+                                                <option key={contract.mediaType} value={contract.mediaType ?? ""}>
+                                                    {contract.mediaType}
+                                                </option>
                                             ))}
-                                        </div>
-                                    </section>
-                                );
-                            })}
+                                        </NativeSelect>
+                                    )}
+                                </FormFieldFrame>
+                            ) : null}
+                            {requestBodySchema?.schema !== null && requestBodySchema !== null ? (
+                                <RequestBodyEditor
+                                    idPrefix={`${idPrefix}-request-body`}
+                                    schema={requestBodySchema.schema}
+                                    value={requestBodyValue}
+                                    onChange={updateBody}
+                                    error={requestBodyError}
+                                    required={requestBodyRequired}
+                                />
+                            ) : null}
+                        </section>
+                    ) : null}
 
-                        {nonInteractiveParameterLimitations.length > 0 || hasUnsupportedRequestBody ? (
-                            <section aria-live="polite" className="flex flex-col gap-2">
-                                <h3 className="text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
-                                    Request limitations
-                                </h3>
-                                <ul className="flex flex-col gap-1 text-xs text-lt-danger">
-                                    {nonInteractiveParameterLimitations.map(({ key, name, message }) => (
-                                        <li key={key}>
-                                            {name}: {message}
-                                        </li>
-                                    ))}
-                                    {hasUnsupportedRequestBody ? (
-                                        <li>
-                                            {jsonContracts.length === 0
-                                                ? "Only JSON request bodies can be sent from the playground."
-                                                : requestBodySchema?.error}
-                                        </li>
-                                    ) : null}
-                                </ul>
-                            </section>
-                        ) : null}
+                    {buildResult.errors?.request ? (
+                        <p className="text-sm text-lt-danger">{buildResult.errors.request}</p>
+                    ) : null}
 
-                        {jsonContracts.length > 0 ? (
-                            <section className="flex flex-col gap-3">
-                                {jsonContracts.length > 1 ? (
-                                    <FormFieldFrame
-                                        id={`${idPrefix}-request-media-type`}
-                                        label="Content type"
-                                        className="min-w-0 basis-full flex-1 sm:basis-48"
-                                    >
-                                        {(controlProps) => (
-                                            <NativeSelect
-                                                {...controlProps}
-                                                value={values.mediaType ?? ""}
-                                                onChange={(event) => updateMediaType(event.target.value)}
-                                            >
-                                                {jsonContracts.map((contract) => (
-                                                    <option key={contract.mediaType} value={contract.mediaType ?? ""}>
-                                                        {contract.mediaType}
-                                                    </option>
-                                                ))}
-                                            </NativeSelect>
-                                        )}
-                                    </FormFieldFrame>
-                                ) : null}
-                                {requestBodySchema?.schema !== null && requestBodySchema !== null ? (
-                                    <RequestBodyEditor
-                                        idPrefix={`${idPrefix}-request-body`}
-                                        schema={requestBodySchema.schema}
-                                        value={requestBodyValue}
-                                        onChange={updateBody}
-                                        error={requestBodyError}
-                                        required={requestBodyRequired}
-                                    />
-                                ) : null}
-                            </section>
-                        ) : null}
-
-                        {buildResult.errors?.request ? (
-                            <p className="text-sm text-lt-danger">{buildResult.errors.request}</p>
-                        ) : null}
-
-                        <form onSubmit={tryRequest} className="flex flex-wrap items-center gap-3">
-                            <Button
-                                type="submit"
-                                disabled={
-                                    isLoading || hasUnsupportedRequestBody || requestBodyValidationError !== null
-                                }
+                    <form onSubmit={tryRequest} className="flex flex-wrap items-center gap-3">
+                        <Button
+                            type="submit"
+                            disabled={
+                                isLoading || hasUnsupportedRequestBody || requestBodyValidationError !== null
+                            }
+                        >
+                            {isLoading ? <Spinner className="size-lt-icon-sm" /> : null}
+                            Execute
+                        </Button>
+                        {showMarkdownCopy ? (
+                            <CopyButton
+                                value={markdown}
+                                label="as Markdown"
+                                testId="copy-operation-markdown"
+                                className="ml-auto"
                             >
-                                {isLoading ? <Spinner className="size-lt-icon-sm" /> : null}
-                                Execute
-                            </Button>
-                        </form>
+                                Copy as Markdown
+                            </CopyButton>
+                        ) : null}
+                    </form>
 
-                        <LiveResponsePanel result={liveResult} />
-                    </CardContent>
-                </Card>
+                    <LiveResponsePanel result={liveResult} />
+                </div>
             </aside>
             <aside
                 aria-label="Reference"
