@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Badge, CodeBlock, NativeSelect, SegmentedPills } from "@lattice-php/lattice/ui";
+import { jsonWithLineNumbers } from "./code-block-languages";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
 import { OperationHeader } from "./OperationHeader";
@@ -151,7 +152,7 @@ function SchemaExampleView({
                         </a>
                     ) : null}
                     {current?.value !== undefined ? (
-                        <CodeBlock aria-label={exampleLabel} copyable language="json">
+                        <CodeBlock aria-label={exampleLabel} copyable language={jsonWithLineNumbers}>
                             {JSON.stringify(current.value, null, 2)}
                         </CodeBlock>
                     ) : null}

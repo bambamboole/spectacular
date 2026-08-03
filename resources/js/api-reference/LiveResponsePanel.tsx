@@ -48,6 +48,7 @@ export function LiveResponsePanel({ result }: LiveResponsePanelProps): React.Rea
             ) : null}
             <CodeBlock
                 aria-label="Live response body"
+                className="[&_.cm-scroller]:max-h-[150lh] [&_.cm-scroller]:overflow-auto [&>pre]:max-h-[150lh] [&>pre]:overflow-auto"
                 copyable
                 language={result.contentType?.toLowerCase().includes("json") ? "json" : "text"}
                 wrap

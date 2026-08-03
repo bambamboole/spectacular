@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import type { Node } from "@lattice-php/lattice";
 import ApiReference from "./ApiReference";
@@ -119,6 +118,7 @@ describe("RequestPlayground", () => {
         await expect.element(screen.getByRole("radio", { name: "cURL" })).toHaveAttribute("aria-checked", "true");
         await expect.element(snippet).toHaveAttribute("data-slot", "code-block");
         await expect.poll(() => document.querySelector(".cm-content")?.getAttribute("contenteditable")).toBe("false");
+        await expect.poll(() => snippet.element().querySelector(".cm-lineNumbers")).not.toBeNull();
         await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
 
@@ -134,12 +134,13 @@ describe("RequestPlayground", () => {
         await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
 
-        const selectedSnippet = await snippet.element();
+        const selectedSnippet = snippet.element().querySelector<HTMLElement>(".cm-content")?.innerText;
+        expect(selectedSnippet).not.toBeNull();
+        const clipboardWrite = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
         await screen.getByRole("button", { name: "Copy Request snippet" }).click();
-        await body.fill("");
-        await body.click();
-        await userEvent.paste();
-        await expect.element(body).toHaveValue(selectedSnippet.textContent);
+        await expect.poll(() => clipboardWrite.mock.calls.length).toBe(1);
+        expect(clipboardWrite).toHaveBeenCalledWith(selectedSnippet);
+        await expect.element(screen.getByRole("button", { name: "Copied Request snippet" })).toBeVisible();
         await body.fill('{"name":"Lamp"}');
 
         await screen.getByRole("button", { name: "Execute" }).click();
