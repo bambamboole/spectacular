@@ -31,8 +31,10 @@
         "laravel/pint": "^1.29",
         "lattice-php/lattice": "^0.36",
         "pestphp/pest": "^5.0",
+        "pestphp/pest-plugin-browser": "^5.0",
         "pestphp/pest-plugin-laravel": "^5.0",
-        "pestphp/pest-plugin-phpstan": "^5.0"
+        "pestphp/pest-plugin-phpstan": "^5.0",
+        "rector/rector": "^2.0"
     },
     "suggest": {
         "lattice-php/lattice": "Render the generated OpenAPI/AsyncAPI documents as a UI with the Spectacular Lattice viewer (^0.36)."
@@ -76,7 +78,12 @@
             "Composer\\Config::disableProcessTimeout",
             "@build",
             "@php vendor/bin/testbench serve --ansi"
-        ]
+        ],
+        "test:browser": [
+            "npm run build",
+            "pest --testsuite=Browser"
+        ],
+        "refactor": "rector"
     },
     "extra": {
         "lattice": {

@@ -8,7 +8,9 @@
     "mcp": true,
     "nightwatch": false,
     "packages": [
-        "bambamboole/extended-testbench"
+        "bambamboole/extended-testbench",
+        "lattice-php/lattice",
+        "spatie/laravel-query-builder"
     ],
     "sail": false,
     "skills": [
@@ -17,6 +19,10 @@
         "inertia-react-development",
         "echo-react-development",
         "tailwindcss-development",
+        "laravel-query-builder",
+        "lattice-actions",
+        "lattice-forms",
+        "lattice-tables",
         "pr-review",
         "worktrees"
     ]
