@@ -19,10 +19,15 @@ import {
     Input,
     NativeSelect,
     Spinner,
-    Textarea,
 } from "@lattice-php/lattice/ui";
 import { executeRequest, type ExecutedResponse, type ExecutionError } from "./execute-request";
 import { LiveResponsePanel } from "./LiveResponsePanel";
+import { RequestBodyEditor } from "./RequestBodyEditor";
+import {
+    defaultRequestBodyValue,
+    resolveRequestBodySchema,
+    validateRequestBodyValue,
+} from "./request-body-schema";
 import {
     buildRequest,
     parameterLimitation,
@@ -36,6 +41,7 @@ import {
     type RequestValues,
 } from "./request-state";
 import { SnippetPanel, type SnippetLanguage } from "./SnippetPanel";
+import { initialRequestExample } from "./schema-example";
 import { curlSnippet } from "./snippets/curl";
 import { javascriptSnippet } from "./snippets/javascript";
 import type { Operation, Param } from "./types";
@@ -80,14 +86,33 @@ export function RequestPlayground({
     const isEnabled = controlledEnabled ?? internalEnabled;
     const setIsEnabled = onEnabledChange ?? setInternalEnabled;
     const jsonContracts = jsonRequestContracts(operation);
+    const selectedContract = jsonContracts.find((contract) => contract.mediaType === values.mediaType) ?? null;
+    const requestBodySchema = useMemo(
+        () => selectedContract === null
+            ? null
+            : resolveRequestBodySchema(selectedContract.schema, components),
+        [selectedContract, components],
+    );
     const buildResult = useMemo(
         () => buildRequest({ operation, baseUrl, values, token }),
         [operation, baseUrl, values, token],
     );
     const nonInteractiveParameterLimitations = parameterLimitationsWithoutControls(operation);
-    const hasUnsupportedRequestBody = operation.requests.length > 0 && jsonContracts.length === 0;
-    const requestBodyRequired =
-        jsonContracts.find((contract) => contract.mediaType === values.mediaType)?.required ?? false;
+    const hasUnsupportedRequestBody = operation.requests.length > 0
+        && (jsonContracts.length === 0 || requestBodySchema?.schema === null);
+    const requestBodyRequired = selectedContract?.required ?? false;
+    const requestBodyValue = requestBodySchema?.schema === undefined || requestBodySchema.schema === null
+        ? null
+        : parseBody(values.body, requestBodySchema.schema);
+    const requestBodyValidationError = requestBodySchema?.schema === undefined
+        || requestBodySchema.schema === null
+        || (!requestBodyRequired && values.body.trim() === "")
+        ? null
+        : validateRequestBodyValue(requestBodySchema.schema, requestBodyValue);
+    const requestBodyError = buildResult.errors?.body
+        ?? (requestBodyValidationError === null
+            ? null
+            : `${requestBodyValidationError.path}: ${requestBodyValidationError.message}`);
     const snippet = useMemo(() => {
         if (buildResult.request === null) {
             return "";
@@ -117,12 +142,18 @@ export function RequestPlayground({
         }));
     }
 
-    function updateBody(body: string): void {
-        setValues((current) => ({ ...current, body }));
+    function updateBody(body: unknown): void {
+        setValues((current) => ({ ...current, body: prettyJson(body) }));
     }
 
     function updateMediaType(mediaType: string): void {
-        setValues((current) => ({ ...current, mediaType }));
+        const contract = jsonContracts.find((candidate) => candidate.mediaType === mediaType);
+
+        setValues((current) => ({
+            ...current,
+            mediaType,
+            body: contract === undefined ? "" : prettyJson(initialRequestExample(contract, components)),
+        }));
     }
 
     function cancelTryOut(): void {
@@ -234,7 +265,11 @@ export function RequestPlayground({
                                 </li>
                             ))}
                             {hasUnsupportedRequestBody ? (
-                                <li>Only JSON request bodies can be sent from the playground.</li>
+                                <li>
+                                    {jsonContracts.length === 0
+                                        ? "Only JSON request bodies can be sent from the playground."
+                                        : requestBodySchema?.error}
+                                </li>
                             ) : null}
                         </ul>
                     </section>
@@ -263,23 +298,16 @@ export function RequestPlayground({
                                 )}
                             </FormFieldFrame>
                         ) : null}
-                        <FormFieldFrame
-                            id={`${idPrefix}-request-body`}
-                            label="JSON body"
-                            required={requestBodyRequired}
-                            error={buildResult.errors?.body ?? undefined}
-                        >
-                            {(controlProps) => (
-                                <Textarea
-                                    {...controlProps}
-                                    value={values.body}
-                                    required={requestBodyRequired}
-                                    data-field-key="body"
-                                    onChange={(event) => updateBody(event.target.value)}
-                                    className="min-h-40 font-mono text-sm"
-                                />
-                            )}
-                        </FormFieldFrame>
+                        {requestBodySchema?.schema !== null && requestBodySchema !== null ? (
+                            <RequestBodyEditor
+                                idPrefix={`${idPrefix}-request-body`}
+                                schema={requestBodySchema.schema}
+                                value={requestBodyValue}
+                                onChange={updateBody}
+                                error={requestBodyError}
+                                required={requestBodyRequired}
+                            />
+                        ) : null}
                     </section>
                 ) : null}
 
@@ -295,7 +323,10 @@ export function RequestPlayground({
                 ) : null}
 
                 <form onSubmit={tryRequest} className="flex flex-wrap items-center gap-3">
-                    <Button type="submit" disabled={isLoading || hasUnsupportedRequestBody}>
+                    <Button
+                        type="submit"
+                        disabled={isLoading || hasUnsupportedRequestBody || requestBodyValidationError !== null}
+                    >
                         {isLoading ? <Spinner className="size-lt-icon-sm" /> : null}
                         Execute
                     </Button>
@@ -524,6 +555,22 @@ function parameterStep(schema: Record<string, unknown>): number | "any" | undefi
 
 function numberValue(value: unknown): number | undefined {
     return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function parseBody(body: string, schema: Parameters<typeof defaultRequestBodyValue>[0]): unknown {
+    if (body.trim() === "") {
+        return defaultRequestBodyValue(schema);
+    }
+
+    try {
+        return JSON.parse(body);
+    } catch {
+        return defaultRequestBodyValue(schema);
+    }
+}
+
+function prettyJson(value: unknown): string {
+    return JSON.stringify(value, null, 2) ?? "";
 }
 
 function fieldId(key: string): string {
