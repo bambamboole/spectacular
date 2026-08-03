@@ -33,6 +33,8 @@ jobs:
 
       - name: Vitest
         run: npm test
+        env:
+          LARAVEL_BYPASS_ENV_CHECK: 1
 
       - name: Build
         run: npm run build
