@@ -6,9 +6,16 @@ providers:
   - Bambamboole\Spectacular\SpectacularServiceProvider
   - Workbench\App\Providers\WorkbenchServiceProvider
 
+migrations:
+  - workbench/database/migrations
+
+seeders:
+  - Workbench\Database\Seeders\DatabaseSeeder
+
 workbench:
   start: '/'
   welcome: false
+  install: true
   discovers:
     web: true
     api: true
@@ -16,5 +23,6 @@ workbench:
     components: false
     views: true
   build:
+    - create-sqlite-db
     - migrate:fresh:
         --force: true
