@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
-import { Badge, SegmentedPills } from "@lattice-php/lattice/ui";
-import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
+import { Badge, CodeBlock, NativeSelect, SegmentedPills } from "@lattice-php/lattice/ui";
+import { jsonWithLineNumbers } from "./code-block-languages";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
 import { OperationHeader } from "./OperationHeader";
 import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
 import { parseOperation } from "./parse";
 import { RequestPlayground } from "./RequestPlayground";
+import { exampleFromSchema } from "./schema-example";
 import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
 
 type OperationViewProps = {
@@ -84,6 +85,9 @@ function SchemaExampleView({
     components,
     noSchemaMessage,
     expandDepth,
+    exampleLabel,
+    defaultTab = "schema",
+    generateExample = false,
 }: {
     name: string;
     schema: unknown;
@@ -91,15 +95,33 @@ function SchemaExampleView({
     components: unknown;
     noSchemaMessage: string;
     expandDepth: number;
+    exampleLabel: string;
+    defaultTab?: SchemaTab;
+    generateExample?: boolean;
 }): React.ReactNode {
-    const [tab, setTab] = useState<SchemaTab>("schema");
+    const [tab, setTab] = useState<SchemaTab>(defaultTab);
     const [selected, setSelected] = useState(0);
+    const displayedExamples = useMemo<ContractExample[]>(
+        () =>
+            examples.length > 0 || !generateExample
+                ? examples
+                : [
+                      {
+                          name: null,
+                          summary: null,
+                          description: null,
+                          value: exampleFromSchema(schema, components),
+                      },
+                  ],
+        [components, examples, generateExample, schema],
+    );
+    const isGenerated = generateExample && examples.length === 0;
 
-    if (examples.length === 0) {
+    if (displayedExamples.length === 0) {
         return <SchemaView schema={schema} components={components} expandDepth={expandDepth} />;
     }
 
-    const current = examples[selected] ?? examples[0];
+    const current = displayedExamples[selected] ?? displayedExamples[0];
 
     return (
         <div>
@@ -120,13 +142,13 @@ function SchemaExampleView({
                 )
             ) : (
                 <div>
-                    {examples.length > 1 ? (
+                    {displayedExamples.length > 1 ? (
                         <NativeSelect
                             value={selected}
                             onChange={(event) => setSelected(Number(event.target.value))}
                             className="mb-2"
                         >
-                            {examples.map((example, index) => (
+                            {displayedExamples.map((example, index) => (
                                 <option key={example.name ?? index} value={index}>
                                     {example.name ?? `Example ${index + 1}`}
                                     {example.summary ? ` — ${example.summary}` : ""}
@@ -136,6 +158,7 @@ function SchemaExampleView({
                     ) : current?.summary ? (
                         <p className="mb-1 text-xs text-lt-muted-fg">{current.summary}</p>
                     ) : null}
+                    {isGenerated ? <p className="mb-1 text-xs text-lt-muted-fg">Generated from schema</p> : null}
                     {current?.description ? (
                         <p className="mb-1 text-xs text-lt-muted-fg">{current.description}</p>
                     ) : null}
@@ -150,9 +173,9 @@ function SchemaExampleView({
                         </a>
                     ) : null}
                     {current?.value !== undefined ? (
-                        <pre className="overflow-x-auto rounded-lt-sm bg-lt-muted p-3 text-xs text-lt-fg">
+                        <CodeBlock aria-label={exampleLabel} copyable language={jsonWithLineNumbers}>
                             {JSON.stringify(current.value, null, 2)}
-                        </pre>
+                        </CodeBlock>
                     ) : null}
                 </div>
             )}
@@ -188,6 +211,7 @@ function RequestBodySection({
                             components={components}
                             noSchemaMessage="No request body schema."
                             expandDepth={expandDepth}
+                            exampleLabel="Request body example"
                         />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No request body schema.</p>
@@ -254,6 +278,9 @@ function ResponsesSection({
                             components={components}
                             noSchemaMessage="No response body."
                             expandDepth={expandDepth}
+                            exampleLabel="Response example"
+                            defaultTab="example"
+                            generateExample
                         />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No response body.</p>

@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import type { Node } from "@lattice-php/lattice";
 import ApiReference from "./ApiReference";
@@ -117,6 +116,9 @@ describe("RequestPlayground", () => {
         await expect.element(screen.getByLabelText("X-Debug")).toBeVisible();
         await expect.element(body).toBeVisible();
         await expect.element(screen.getByRole("radio", { name: "cURL" })).toHaveAttribute("aria-checked", "true");
+        await expect.element(snippet).toHaveAttribute("data-slot", "code-block");
+        await expect.poll(() => document.querySelector(".cm-content")?.getAttribute("contenteditable")).toBe("false");
+        await expect.poll(() => snippet.element().querySelector(".cm-lineNumbers")).not.toBeNull();
         await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
 
@@ -132,12 +134,13 @@ describe("RequestPlayground", () => {
         await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
 
-        const selectedSnippet = await snippet.element();
-        await screen.getByRole("button", { name: "Copy request snippet" }).click();
-        await body.fill("");
-        await body.click();
-        await userEvent.paste();
-        await expect.element(body).toHaveValue(selectedSnippet.textContent);
+        const selectedSnippet = snippet.element().querySelector<HTMLElement>(".cm-content")?.innerText;
+        expect(selectedSnippet).not.toBeNull();
+        const clipboardWrite = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+        await screen.getByRole("button", { name: "Copy Request snippet" }).click();
+        await expect.poll(() => clipboardWrite.mock.calls.length).toBe(1);
+        expect(clipboardWrite).toHaveBeenCalledWith(selectedSnippet);
+        await expect.element(screen.getByRole("button", { name: "Copied Request snippet" })).toBeVisible();
         await body.fill('{"name":"Lamp"}');
 
         await screen.getByRole("button", { name: "Execute" }).click();
@@ -146,7 +149,9 @@ describe("RequestPlayground", () => {
         expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.example.test/v1/widgets/a%2Fb?status=archived");
         expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Authorization")).toBe(`Bearer ${REAL_TOKEN}`);
         await expect.element(screen.getByText("201 Created")).toBeVisible();
-        await expect.element(screen.getByLabelText("Live response body")).toHaveTextContent('"ok": true');
+        const responseBody = screen.getByRole("region", { name: "Live response body" });
+        await expect.element(responseBody).toHaveAttribute("data-slot", "code-block");
+        await expect.element(responseBody).toHaveTextContent('"ok": true');
         await expect.element(screen.locator).not.toHaveTextContent(REAL_TOKEN);
     });
 
@@ -237,6 +242,8 @@ describe("RequestPlayground", () => {
         await expect.element(screen.getByText("This header parameter is required.")).toBeVisible();
         await expect.element(idField).toHaveAttribute("aria-describedby");
         await expect.element(traceField).toHaveAttribute("aria-describedby");
+        await expect.element(idField).toHaveAttribute("aria-labelledby");
+        await expect.element(traceField).toHaveAttribute("aria-labelledby");
         await expect.element(idField).toHaveFocus();
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -364,7 +371,7 @@ describe("RequestPlayground", () => {
         await expect.poll(() => fetchMock.mock.calls.length).toBe(2);
         expect(firstSignal.aborted).toBe(true);
         await expect.element(screen.getByText("200 OK")).toBeVisible();
-        await expect.element(screen.getByLabelText("Live response body")).toHaveTextContent("second response");
+        await expect.element(screen.getByRole("region", { name: "Live response body" })).toHaveTextContent("second response");
     });
 
     it("aborts the active request when unmounted", async () => {

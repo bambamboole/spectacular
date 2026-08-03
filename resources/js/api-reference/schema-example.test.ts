@@ -49,6 +49,78 @@ describe("exampleFromSchema", () => {
             manager: null,
         });
     });
+
+    it("merges object examples from allOf schemas", () => {
+        const components = {
+            schemas: {
+                ProductReference: {
+                    type: "object",
+                    properties: {
+                        id: { type: "string", example: "product-1" },
+                    },
+                },
+            },
+        };
+
+        expect(
+            exampleFromSchema(
+                {
+                    allOf: [
+                        { $ref: "#/components/schemas/ProductReference" },
+                        {
+                            type: "object",
+                            properties: {
+                                name: { type: "string", example: "Desk" },
+                            },
+                        },
+                    ],
+                },
+                components,
+            ),
+        ).toEqual({ id: "product-1", name: "Desk" });
+    });
+
+    it("selects useful non-null variants from union schemas", () => {
+        expect(
+            exampleFromSchema({
+                type: "object",
+                properties: {
+                    status: { anyOf: [{ type: "null" }, { type: "string", enum: ["active"] }] },
+                    owner: { oneOf: [{ type: "null" }, { type: "string", example: "Ada" }] },
+                    updatedAt: { type: ["null", "string"], format: "date-time" },
+                },
+            }),
+        ).toEqual({
+            status: "active",
+            owner: "Ada",
+            updatedAt: "1970-01-01T00:00:00Z",
+        });
+    });
+
+    it("combines local references with sibling object properties", () => {
+        const components = {
+            schemas: {
+                Product: {
+                    type: "object",
+                    properties: {
+                        id: { type: "integer", example: 42 },
+                    },
+                },
+            },
+        };
+
+        expect(
+            exampleFromSchema(
+                {
+                    $ref: "#/components/schemas/Product",
+                    properties: {
+                        name: { type: "string", example: "Desk" },
+                    },
+                },
+                components,
+            ),
+        ).toEqual({ id: 42, name: "Desk" });
+    });
 });
 
 describe("initialContractExample", () => {
