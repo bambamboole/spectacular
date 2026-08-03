@@ -91,6 +91,12 @@ it('documents spatie query builder parameters from the route action', function (
         ]);
 });
 
+it('documents an example for the required user path parameter', function (): void {
+    $parameters = generatedOperationParametersForUri('api/users/{user}');
+
+    expect($parameters['user']['example'])->toBe(1);
+});
+
 it('matches the workbench OpenAPI fixture', function (): void {
     app()->register(WorkbenchServiceProvider::class);
     Scramble::configure()->useConfig(config('scramble'));

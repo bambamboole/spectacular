@@ -6,8 +6,11 @@ namespace Workbench\App\Providers;
 
 use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy;
+use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 use Inertia\Middleware as InertiaMiddleware;
 
@@ -28,6 +31,9 @@ final class WorkbenchServiceProvider extends ServiceProvider
 
         config(['scramble.security_strategy' => MiddlewareAuthSecurityStrategy::class]);
 
+        config()->set('auth.defaults.guard', 'workbench');
+        config()->set('auth.guards.workbench', ['driver' => 'workbench-token']);
+
         config()->set('webhooks.scan_paths', [
             dirname(__DIR__, 2).'/app/Events',
         ]);
@@ -36,6 +42,14 @@ final class WorkbenchServiceProvider extends ServiceProvider
 
     public function boot(Kernel $kernel): void
     {
+        Auth::viaRequest('workbench-token', function (Request $request): ?GenericUser {
+            $token = (string) config('services.spectacular.demo_token', 'workbench-token');
+
+            return $request->bearerToken() === $token
+                ? new GenericUser(['id' => 1])
+                : null;
+        });
+
         if ($kernel instanceof HttpKernel) {
             $kernel->appendMiddlewareToGroup('web', InertiaMiddleware::class);
         }
