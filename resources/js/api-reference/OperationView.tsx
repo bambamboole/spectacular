@@ -460,12 +460,11 @@ function OperationContent({
     const [requestValues, setRequestValues] = useState<RequestValues>(() =>
         initialPlaygroundValues(operation, components),
     );
-    const [isTryOutEnabled, setIsTryOutEnabled] = useState(false);
     const buildResult = useMemo(
         () => buildRequest({ operation, baseUrl: operation.serverUrl, values: requestValues, token }),
         [operation, requestValues, token],
     );
-    const parameterErrors = isTryOutEnabled ? (buildResult.errors?.parameters ?? {}) : {};
+    const parameterErrors = buildResult.errors?.parameters ?? {};
 
     function updateParameter(param: Param, value: string): void {
         const key = parameterKey(param);
@@ -521,8 +520,6 @@ function OperationContent({
                         components={components}
                         values={requestValues}
                         onValuesChange={setRequestValues}
-                        enabled={isTryOutEnabled}
-                        onEnabledChange={setIsTryOutEnabled}
                         hideInlineParameters
                         onValidationError={focusRequestField}
                     />

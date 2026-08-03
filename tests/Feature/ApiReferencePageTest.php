@@ -7,11 +7,16 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Lattice\Lattice\Core\PageSchema;
+use Lattice\Lattice\Ui\Enums\PageContainer;
 use Workbench\App\Models\User;
 use Workbench\App\Pages\ApiReferencePage;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
 uses(LazilyRefreshDatabase::class);
+
+it('uses the full-width page container', function (): void {
+    expect(app(ApiReferencePage::class)->container())->toBe(PageContainer::Default);
+});
 
 it('uses the current workbench origin for API requests', function (): void {
     $schema = app(ApiReferencePage::class)->render(PageSchema::make(), app(Request::class));

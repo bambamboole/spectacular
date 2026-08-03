@@ -105,8 +105,6 @@ describe("RequestPlayground", () => {
                 components={null}
             />,
         );
-        await expect.element(screen.getByLabelText("id")).not.toBeInTheDocument();
-        await screen.getByRole("button", { name: "Try it out" }).click();
 
         const id = screen.getByLabelText("id");
         const body = screen.getByLabelText("name");
@@ -207,8 +205,6 @@ describe("RequestPlayground", () => {
             />,
         );
 
-        await screen.getByRole("button", { name: "Try it out" }).click();
-
         await expect.element(screen.getByLabelText("JSON body")).not.toBeInTheDocument();
         await expect.element(screen.getByLabelText("name")).toHaveValue("Desk");
         await expect.element(screen.getByLabelText("active")).toHaveValue("false");
@@ -263,8 +259,6 @@ describe("RequestPlayground", () => {
             />,
         );
 
-        await screen.getByRole("button", { name: "Try it out" }).click();
-
         await expect.element(screen.getByText("oneOf request body schemas are not supported.")).toBeVisible();
         await expect.element(screen.getByLabelText("JSON body")).not.toBeInTheDocument();
         await expect.element(screen.getByRole("button", { name: "Execute" })).toBeDisabled();
@@ -315,9 +309,6 @@ describe("RequestPlayground", () => {
             />,
         );
 
-        await expect.element(screen.getByRole("button", { name: "fields[users]" })).not.toBeInTheDocument();
-        await screen.getByRole("button", { name: "Try it out" }).click();
-
         const filterField = screen.getByLabelText("filter[name]");
         const sortField = screen.getByRole("button", { name: "sort" });
         const includeField = screen.getByRole("button", { name: "include" });
@@ -343,16 +334,6 @@ describe("RequestPlayground", () => {
                 "https://api.example.test/users?filter%5Bname%5D=Taylor&sort=-created_at&include=roles%2CrolesCount&fields%5Busers%5D=id%2Cemail",
             );
 
-        await screen.getByRole("button", { name: "Cancel" }).click();
-
-        await expect.element(fieldsField).not.toBeInTheDocument();
-        await expect.element(screen.getByRole("button", { name: "Execute" })).not.toBeInTheDocument();
-        await screen.getByRole("button", { name: "Try it out" }).click();
-        await expect.element(screen.getByLabelText("filter[name]")).toHaveValue("");
-        await expect.element(screen.getByRole("button", { name: "sort" })).toHaveTextContent("Not set");
-        await expect.element(screen.getByRole("button", { name: "include" })).toHaveTextContent("Not set");
-        await expect.element(screen.getByRole("button", { name: "fields[users]" })).toHaveTextContent("Not set");
-        await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toHaveTextContent("filter");
     });
 
     it("shows stable required errors without fetching and focuses the first invalid field", async () => {
@@ -380,7 +361,6 @@ describe("RequestPlayground", () => {
             />,
         );
 
-        await screen.getByRole("button", { name: "Try it out" }).click();
         await screen.getByRole("button", { name: "Execute" }).click();
 
         const idField = screen.getByLabelText("id");
@@ -425,8 +405,6 @@ describe("RequestPlayground", () => {
             />,
         );
 
-        await screen.getByRole("button", { name: "Try it out" }).click();
-
         await expect.element(screen.getByLabelText("email")).toHaveAttribute("type", "email");
         await expect.element(screen.getByLabelText("email")).toHaveAttribute("minlength", "5");
         await expect.element(screen.getByLabelText("email")).toHaveAttribute("maxlength", "64");
@@ -466,7 +444,6 @@ describe("RequestPlayground", () => {
             </ApiReference>,
         );
         const serverPicker = screen.getByLabelText("Select server");
-        await screen.getByRole("button", { name: "Try it out" }).click();
         const snippet = screen.getByLabelText("Request snippet", { exact: true });
 
         await expect.element(serverPicker).toHaveValue("https://canary.operation.example");
@@ -503,7 +480,6 @@ describe("RequestPlayground", () => {
                 components={null}
             />,
         );
-        await screen.getByRole("button", { name: "Try it out" }).click();
         const executeButton = screen.getByRole("button", { name: "Execute" });
 
         await executeButton.click();
@@ -545,7 +521,6 @@ describe("RequestPlayground", () => {
             />,
         );
 
-        await screen.getByRole("button", { name: "Try it out" }).click();
         await screen.getByRole("button", { name: "Execute" }).click();
         await screen.unmount();
 

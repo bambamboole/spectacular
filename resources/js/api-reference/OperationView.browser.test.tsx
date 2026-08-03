@@ -3,7 +3,7 @@ import { render } from "vitest-browser-react";
 import { OperationView } from "./OperationView";
 
 describe("OperationView", () => {
-    it("shows path and query controls inline before the right request panel is enabled", async () => {
+    it("shows path and query controls with an always-active request panel", async () => {
         const screen = await render(
             <OperationView
                 operationId="get-products-id"
@@ -47,11 +47,13 @@ describe("OperationView", () => {
         await expect.element(id).toBeVisible();
         await expect.element(id).toHaveValue("product-1");
         await expect.element(screen.getByRole("button", { name: "include" })).toBeVisible();
-        await expect.element(requestPanel.getByRole("button", { name: "Try it out" })).toBeVisible();
-        await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toBeInTheDocument();
+        await expect.element(requestPanel.getByRole("button", { name: "Try it out" })).not.toBeInTheDocument();
+        await expect.element(requestPanel.getByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+        await expect
+            .element(screen.getByLabelText("Request snippet", { exact: true }))
+            .toHaveTextContent("https://api.example.test/products/product-1");
 
         await id.fill("product/2");
-        await requestPanel.getByRole("button", { name: "Try it out" }).click();
         await expect
             .element(screen.getByLabelText("Request snippet", { exact: true }))
             .toHaveTextContent("https://api.example.test/products/product%2F2");
@@ -60,10 +62,6 @@ describe("OperationView", () => {
         await requestPanel.getByRole("button", { name: "Execute" }).click();
         await expect.element(screen.getByText("This path parameter is required.")).toBeVisible();
         await expect.element(id).toHaveFocus();
-
-        await requestPanel.getByRole("button", { name: "Cancel" }).click();
-        await expect.element(id).toHaveValue("product-1");
-        await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toBeInTheDocument();
     });
 
     it("resets request state when the selected operation changes", async () => {
@@ -107,14 +105,17 @@ describe("OperationView", () => {
         );
 
         await screen.getByLabelText("id").fill("changed");
-        await screen.getByRole("button", { name: "Try it out" }).click();
-        await expect.element(screen.getByRole("button", { name: "Cancel" })).toBeVisible();
+        await expect
+            .element(screen.getByLabelText("Request snippet", { exact: true }))
+            .toHaveTextContent("/products/changed");
 
         await screen.rerender(<OperationView operationId="get-orders-order" spec={spec} />);
 
         await expect.element(screen.getByLabelText("id")).not.toBeInTheDocument();
         await expect.element(screen.getByLabelText("order")).toHaveValue("order-1");
-        await expect.element(screen.getByRole("button", { name: "Try it out" })).toBeVisible();
+        await expect
+            .element(screen.getByLabelText("Request snippet", { exact: true }))
+            .toHaveTextContent("/orders/order-1");
     });
 
     it("shows a generated example by default for schema-only responses", async () => {

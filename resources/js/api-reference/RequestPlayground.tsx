@@ -53,8 +53,6 @@ export type RequestPlaygroundProps = {
     components: unknown;
     values?: RequestValues;
     onValuesChange?: Dispatch<SetStateAction<RequestValues>>;
-    enabled?: boolean;
-    onEnabledChange?: Dispatch<SetStateAction<boolean>>;
     hideInlineParameters?: boolean;
     onValidationError?: (fieldKey: string | null) => void;
 };
@@ -66,8 +64,6 @@ export function RequestPlayground({
     components,
     values: controlledValues,
     onValuesChange,
-    enabled: controlledEnabled,
-    onEnabledChange,
     hideInlineParameters = false,
     onValidationError,
 }: RequestPlaygroundProps): React.ReactNode {
@@ -78,13 +74,10 @@ export function RequestPlayground({
         initialPlaygroundValues(operation, components),
     );
     const [snippetLanguage, setSnippetLanguage] = useState<SnippetLanguage>("curl");
-    const [internalEnabled, setInternalEnabled] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [liveResult, setLiveResult] = useState<ExecutedResponse | ExecutionError | null>(null);
     const values = controlledValues ?? internalValues;
     const setValues = onValuesChange ?? setInternalValues;
-    const isEnabled = controlledEnabled ?? internalEnabled;
-    const setIsEnabled = onEnabledChange ?? setInternalEnabled;
     const jsonContracts = jsonRequestContracts(operation);
     const selectedContract = jsonContracts.find((contract) => contract.mediaType === values.mediaType) ?? null;
     const requestBodySchema = useMemo(
@@ -156,16 +149,6 @@ export function RequestPlayground({
         }));
     }
 
-    function cancelTryOut(): void {
-        activeControllerRef.current?.abort();
-        activeControllerRef.current = null;
-        setValues(initialPlaygroundValues(operation, components));
-        setSnippetLanguage("curl");
-        setIsLoading(false);
-        setLiveResult(null);
-        setIsEnabled(false);
-    }
-
     async function tryRequest(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
 
@@ -210,17 +193,10 @@ export function RequestPlayground({
 
     return (
         <Card ref={playgroundRef} className="mb-6">
-            <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardHeader>
                 <CardTitle>Try it out</CardTitle>
-                <Button
-                    type="button"
-                    emphasis={isEnabled ? "outline" : "solid"}
-                    onClick={() => (isEnabled ? cancelTryOut() : setIsEnabled(true))}
-                >
-                    {isEnabled ? "Cancel" : "Try it out"}
-                </Button>
             </CardHeader>
-            {isEnabled ? <CardContent className="flex flex-col gap-6">
+            <CardContent className="flex flex-col gap-6">
                 {operation.paramGroups
                     .filter((group) => !hideInlineParameters || !isInlineParameterGroup(group.location))
                     .map((group) => {
@@ -333,7 +309,7 @@ export function RequestPlayground({
                 </form>
 
                 <LiveResponsePanel result={liveResult} />
-            </CardContent> : null}
+            </CardContent>
         </Card>
     );
 }

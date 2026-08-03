@@ -9,10 +9,16 @@ use Illuminate\Http\Request;
 use Lattice\Lattice\Attributes\AsPage;
 use Lattice\Lattice\Core\PageSchema;
 use Lattice\Lattice\Http\Page;
+use Lattice\Lattice\Ui\Enums\PageContainer;
 
 #[AsPage(route: 'docs', name: 'docs')]
 final class ApiReferencePage extends Page
 {
+    public function container(): PageContainer
+    {
+        return PageContainer::Default;
+    }
+
     public function render(PageSchema $schema, Request $request): PageSchema
     {
         /** @var array<string, mixed> $document */
