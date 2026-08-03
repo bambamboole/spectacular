@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RendererComponent } from "@lattice-php/lattice";
+import { Badge } from "@lattice-php/lattice/ui";
 import { ApiReferenceNav, ServerPicker } from "./ApiReferenceNav";
+import { httpMethodColor } from "./http-method-color";
 import { OperationView } from "./OperationView";
 import { buildNavigation, filterNavigationByTags, parseOperation } from "./parse";
 import type { ApiInfo, Navigation } from "./types";
@@ -69,6 +71,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     const [loading, setLoading] = useState<boolean>(Boolean(url));
     const [error, setError] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(() => currentHashId());
+    const [selectedStackedGroupId, setSelectedStackedGroupId] = useState<string | null>(null);
     const [selectedRootServerUrl, setSelectedRootServerUrl] = useState<string | null>(null);
     const [selectedOperationServerUrls, setSelectedOperationServerUrls] = useState<Record<string, string>>({});
 
@@ -108,6 +111,10 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         [rawNavigation, tags],
     );
     const activeOperationId = operation ?? selectedId;
+    const activeStackedGroupId =
+        navigation?.groups.find(
+            (group) => group.id === selectedStackedGroupId && selectedId && group.operationIds.includes(selectedId),
+        )?.id ?? navigation?.groups.find((group) => selectedId && group.operationIds.includes(selectedId))?.id;
     const activeOperation = useMemo(() => {
         if (!spec || !activeOperationId) return null;
 
@@ -150,8 +157,9 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         window.location.hash = id;
     }
 
-    function selectStackedOperation(id: string): void {
-        window.location.hash = id;
+    function selectStackedOperation(groupId: string, id: string): void {
+        setSelectedStackedGroupId(groupId);
+        selectOperation(id);
     }
 
     function selectServer(url: string): void {
@@ -215,31 +223,72 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     }
 
     if (layout === "stacked") {
-        const operationIds = Array.from(new Set(navigation.groups.flatMap((group) => group.operationIds)));
-
         return (
-            <div className="flex w-full">
-                {!hideNav ? (
-                    <ApiReferenceNav
-                        navigation={navigation}
-                        selectedId={selectedId}
-                        onSelect={selectStackedOperation}
-                        servers={activeOperation?.servers ?? navigation.servers}
-                        selectedServerUrl={activeOperation?.serverUrl ?? selectedRootServerUrl}
-                        onServerChange={selectServer}
-                    />
+            <div className="flex min-w-0 w-full flex-col">
+                {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
+                {activeOperation ? (
+                    <div className="border-b border-lt-border p-3">
+                        <ServerPicker
+                            servers={activeOperation.servers}
+                            selectedServerUrl={activeOperation.serverUrl}
+                            onServerChange={selectServer}
+                        />
+                    </div>
                 ) : null}
-                <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-                    {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
-                    {operationIds.map((id) => (
-                        <section id={id} key={id}>
-                            <OperationView
-                                spec={spec}
-                                operationId={id}
-                                baseUrl={selectedServerUrlFor(id)}
-                                token={token}
-                                expandDepth={expandDepth}
-                            />
+                <div className="flex flex-col gap-8 p-6">
+                    {navigation.groups.map((group) => (
+                        <section key={group.id} aria-labelledby={`api-reference-tag-${group.id}`}>
+                            <h2
+                                id={`api-reference-tag-${group.id}`}
+                                className="mb-3 text-sm font-semibold text-lt-fg"
+                            >
+                                {group.title}
+                            </h2>
+                            <div className="overflow-hidden rounded-lt border border-lt-border">
+                                {group.operationIds.map((id) => {
+                                    const summary = navigation.summaries[id];
+                                    if (!summary) return null;
+
+                                    const isOpen = id === selectedId && group.id === activeStackedGroupId;
+                                    const contentId = `api-reference-operation-${group.id}-${id}`;
+
+                                    return (
+                                        <div key={id} className="border-b border-lt-border last:border-b-0">
+                                            <button
+                                                type="button"
+                                                aria-expanded={isOpen}
+                                                aria-controls={contentId}
+                                                onClick={() => selectStackedOperation(group.id, id)}
+                                                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-lt-muted"
+                                            >
+                                                <Badge color={httpMethodColor(summary.method)} className="text-xs">
+                                                    {summary.method}
+                                                </Badge>
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block text-sm font-medium text-lt-fg">
+                                                        {summary.title}
+                                                    </span>
+                                                    <span className="block truncate font-mono text-xs text-lt-muted-fg">
+                                                        {summary.path}
+                                                    </span>
+                                                </span>
+                                            </button>
+                                            {isOpen ? (
+                                                <div id={contentId}>
+                                                    <OperationView
+                                                        key={id}
+                                                        spec={spec}
+                                                        operationId={id}
+                                                        baseUrl={selectedServerUrlFor(id)}
+                                                        token={token}
+                                                        expandDepth={expandDepth}
+                                                    />
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </section>
                     ))}
                 </div>
