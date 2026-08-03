@@ -71,7 +71,7 @@ jobs:
         run: composer test:lint
 
       - name: PHPStan
-        run: composer analyse
+        run: composer stan
 
       - name: Pest
         run: composer test

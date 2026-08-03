@@ -49,18 +49,18 @@
         }
     },
     "scripts": {
-        "analyse": "./vendor/bin/phpstan analyse",
         "check": [
-            "@test:lint",
-            "@analyse",
+            "pint --test",
+            "phpstan analyse",
             "@test"
         ],
-        "lint": "./vendor/bin/pint",
+        "lint": "pint --format agent",
+        "stan": "phpstan analyse",
         "test:lint": "./vendor/bin/pint --test",
-        "test": "./vendor/bin/pest",
+        "test": "pest",
         "post-autoload-dump": [
-            "@clear",
-            "@prepare"
+            "@php vendor/bin/testbench package:purge-skeleton --ansi",
+            "@php vendor/bin/testbench package:discover --ansi"
         ],
         "post-install-cmd": [
             "@boost:refresh"
@@ -88,15 +88,6 @@
         "laravel": {
             "providers": [
                 "Bambamboole\\Spectacular\\SpectacularServiceProvider"
-            ]
-        },
-        "extended-testbench": {
-            "check-ignore": [
-                "composer script: test",
-                "composer script: stan",
-                "composer script: lint",
-                "composer script: check",
-                "composer script: post-autoload-dump"
             ]
         }
     },

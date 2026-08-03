@@ -14,7 +14,7 @@
 ## Verification
 
 - Before pushing or opening a PR, run `composer check` (Pint, PHPStan, Pest) — it mirrors CI. Never push on red.
-  `composer test` alone is not enough; PHPStan (`composer analyse`) and Pint (`composer test:lint`) run in CI too.
+  `composer test` alone is not enough; PHPStan (`composer stan`) and Pint (`composer test:lint`) run in CI too.
 - Generation output is verified against committed fixtures in `workbench/fixtures/` (`openapi.json`, `asyncapi.json`)
   and `tests/Fixtures/`. When a change intentionally alters generated output, regenerate and commit the updated fixture
   in the same change; when it does not, a fixture diff is a regression to investigate, not to overwrite.
