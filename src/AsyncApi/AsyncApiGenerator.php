@@ -21,14 +21,11 @@ final readonly class AsyncApiGenerator
         private WebhookEventRegistry $webhooks,
     ) {}
 
-    /**
-     * @param  array<string, mixed>|null  $settings
-     * @return array<string, mixed>
-     */
-    public function generate(?array $settings = null): array
+    /** @return array<string, mixed> */
+    public function generate(): array
     {
-        $overrides = $settings ?? [];
-        $settings = $this->resolveSettings($overrides);
+        /** @var array<string, mixed> $settings */
+        $settings = config('spectacular.asyncapi', []);
         $definitions = $this->messageDefinitions($settings);
 
         $channels = [];
@@ -137,15 +134,6 @@ final readonly class AsyncApiGenerator
         }
 
         return $messageDefinitions;
-    }
-
-    /**
-     * @param  array<string, mixed>  $overrides
-     * @return array<string, mixed>
-     */
-    private function resolveSettings(array $overrides): array
-    {
-        return array_replace_recursive(config('spectacular.asyncapi', []), $overrides);
     }
 
     /**

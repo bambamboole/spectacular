@@ -224,7 +224,7 @@ Validation failed
 | filter\\|status | query | string[] | no | One<br>two\\|three<br>Available values: \`roles\`, \`rolesCount\` |`);
     });
 
-    it("serializes resolved schemas separately from named and derived examples", () => {
+    it("serializes schema references separately from named and derived examples", () => {
         const components = {
             schemas: {
                 WidgetInput: {
@@ -261,16 +261,14 @@ Validation failed
         );
 
         expect(markdown).toContain("### Schema");
-        expect(markdown).toContain('"required": [\n    "name"\n  ]');
-        expect(markdown).toContain('"minLength": 2');
+        expect(markdown).toContain('"$ref": "#/components/schemas/WidgetInput"');
         expect(markdown).toContain("### Example: desk");
         expect(markdown).toContain("A desk widget");
         expect(markdown).toContain('"name": "Desk"');
         expect(markdown).toContain("#### Schema");
-        expect(markdown).toContain('"pattern": "^widget_"');
+        expect(markdown).toContain('"$ref": "#/components/schemas/Widget"');
         expect(markdown).toContain("#### Example");
         expect(markdown).toContain('"id": "widget_123"');
-        expect(markdown).not.toContain("#/components/schemas/");
     });
 
     it("serializes example descriptions and external values", () => {
@@ -336,7 +334,7 @@ Validation failed
         );
     });
 
-    it("keeps direct recursive schemas finite and self-contained", () => {
+    it("preserves component references in schemas", () => {
         const markdown = operationToMarkdown(
             {
                 ...operation,
@@ -362,123 +360,8 @@ Validation failed
             },
         );
 
-        expect(markdown).toContain('"$ref": "#/$defs/Node"');
-        expect(markdown).toContain('"$defs": {');
-        expect(markdown).toContain('"Node": {');
-        expect(markdown).not.toContain("#/components/schemas/");
+        expect(markdown).toContain('"$ref": "#/components/schemas/Node"');
+        expect(markdown).not.toContain('"$defs": {');
         expect(markdown).toContain("#### Example");
-    });
-
-    it("keeps indirect recursive schemas finite and self-contained", () => {
-        const markdown = operationToMarkdown(
-            {
-                ...operation,
-                requests: [
-                    {
-                        ...operation.requests[0]!,
-                        schema: { $ref: "#/components/schemas/Parent" },
-                        examples: [],
-                    },
-                ],
-                responses: [],
-            },
-            {
-                schemas: {
-                    Parent: {
-                        $id: "https://schemas.example.test/parent",
-                        type: "object",
-                        properties: { child: { $ref: "#/components/schemas/Child" } },
-                    },
-                    Child: {
-                        $id: "https://schemas.example.test/child",
-                        type: "object",
-                        properties: { parent: { $ref: "#/components/schemas/Parent" } },
-                    },
-                },
-            },
-        );
-
-        expect(markdown).toContain('"$ref": "#/$defs/Parent"');
-        expect(markdown).toContain('"$defs": {');
-        expect(markdown).toContain('"Parent": {');
-        expect(markdown).toContain('"Child": {');
-        expect(markdown).not.toContain("#/components/schemas/");
-        expect(markdown).not.toContain('"$id"');
-        expect(markdown).toContain("### Example");
-    });
-
-    it("preserves existing definitions when packaging recursive component schemas", () => {
-        const markdown = operationToMarkdown(
-            {
-                ...operation,
-                requests: [
-                    {
-                        ...operation.requests[0]!,
-                        schema: { $ref: "#/components/schemas/Node" },
-                        examples: [],
-                    },
-                ],
-                responses: [],
-            },
-            {
-                schemas: {
-                    Node: {
-                        type: "object",
-                        $defs: { Node: { type: "string", pattern: "^existing$" } },
-                        properties: {
-                            existing: { $ref: "#/$defs/Node" },
-                            child: { $ref: "#/components/schemas/Node" },
-                        },
-                    },
-                },
-            },
-        );
-
-        expect(markdown).toContain('"Node": {\n      "type": "string",\n      "pattern": "^existing$"');
-        expect(markdown).toContain('"NodeComponent": {');
-        expect(markdown).toMatch(/"existing": \{\s+"\$ref": "#\/\$defs\/Node"\s+\}/);
-        expect(markdown).toMatch(/"child": \{\s+"\$ref": "#\/\$defs\/NodeComponent"\s+\}/);
-        expect(markdown).not.toContain("#/components/schemas/");
-    });
-
-    it("normalizes existing definitions that participate in component recursion", () => {
-        const markdown = operationToMarkdown(
-            {
-                ...operation,
-                requests: [
-                    {
-                        ...operation.requests[0]!,
-                        schema: { $ref: "#/components/schemas/Node" },
-                        examples: [],
-                    },
-                ],
-                responses: [],
-            },
-            {
-                schemas: {
-                    Node: {
-                        type: "object",
-                        $defs: {
-                            Node: { type: "string" },
-                            Envelope: {
-                                $id: "https://schemas.example.test/envelope",
-                                type: "object",
-                                properties: { node: { $ref: "#/components/schemas/Node" } },
-                            },
-                        },
-                        properties: {
-                            envelope: { $ref: "#/$defs/Envelope" },
-                            child: { $ref: "#/components/schemas/Node" },
-                        },
-                    },
-                },
-            },
-        );
-
-        expect(markdown).toContain('"$ref": "#/$defs/Envelope"');
-        expect(markdown).toContain('"$ref": "#/$defs/NodeComponent"');
-        expect(markdown).not.toContain("spectacular-internal://schema/");
-        expect(markdown).not.toContain("#/components/schemas/");
-        expect(markdown).not.toContain('"$id"');
     });
 });

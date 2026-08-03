@@ -14,7 +14,10 @@ export function OperationHeader({
 }): React.ReactNode {
     if (hideIdentity) {
         return operation.description ? (
-            <p className="mb-2 whitespace-pre-line text-sm text-lt-muted-fg">{operation.description}</p>
+            <>
+                <p className="whitespace-pre-line text-lt-muted-fg">{operation.description}</p>
+                <hr className="my-8 border-lt-border" />
+            </>
         ) : null;
     }
 
@@ -27,14 +30,17 @@ export function OperationHeader({
                     {operation.summary.method}
                 </Badge>
                 <div className="inline-flex min-w-0 items-center gap-1">
-                    <span className="font-mono text-sm text-lt-muted-fg">{url}</span>
+                    <span className="font-mono text-lt-muted-fg">{url}</span>
                     <CopyButton value={url} label="operation URL" iconOnly className="size-7" />
                 </div>
                 {operation.summary.deprecated ? <Badge color="danger">deprecated</Badge> : null}
             </div>
             <h1 className="mt-2 text-lg font-semibold text-lt-fg">{operation.summary.title}</h1>
             {operation.description ? (
-                <p className="mt-1 whitespace-pre-line text-sm text-lt-muted-fg">{operation.description}</p>
+                <>
+                    <p className="mt-1 whitespace-pre-line text-lt-muted-fg">{operation.description}</p>
+                    <hr className="my-8 border-lt-border" />
+                </>
             ) : null}
         </header>
     );

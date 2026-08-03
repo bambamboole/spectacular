@@ -107,7 +107,7 @@ describe("RequestPlayground", () => {
         );
 
         const id = screen.getByLabelText("id");
-        const body = screen.getByLabelText("name");
+        const body = screen.getByLabelText("JSON body");
         const snippet = screen.getByLabelText("Request snippet", { exact: true });
         const requestPanel = screen.getByRole("complementary", { name: "Request" });
         const execute = requestPanel.getByRole("button", { name: "Execute" });
@@ -130,13 +130,13 @@ describe("RequestPlayground", () => {
 
         await id.fill("a/b");
         await screen.getByLabelText("status").selectOptions("archived");
-        await body.fill("Lamp");
+        await body.fill('{"name":"Lamp"}');
         await screen.getByRole("radio", { name: "JavaScript" }).click();
 
         await expect.element(snippet).toHaveTextContent(
             'fetch("https://api.example.test/v1/widgets/a%2Fb?status=archived"',
         );
-        await expect.element(snippet).toHaveTextContent('\\"name\\": \\"Lamp\\"');
+        await expect.element(snippet).toHaveTextContent('\\"name\\":\\"Lamp\\"');
         await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
 
@@ -161,7 +161,7 @@ describe("RequestPlayground", () => {
         await expect.element(screen.locator).not.toHaveTextContent(REAL_TOKEN);
     });
 
-    it("edits typed nested JSON bodies without a raw JSON fallback", async () => {
+    it("edits JSON request bodies as text", async () => {
         const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200, statusText: "OK" }));
         vi.stubGlobal("fetch", fetchMock);
         const screen = await render(
@@ -214,63 +214,34 @@ describe("RequestPlayground", () => {
             />,
         );
 
-        await expect.element(screen.getByLabelText("JSON body")).not.toBeInTheDocument();
-        await expect.element(screen.getByLabelText("name")).toHaveValue("Desk");
-        await expect.element(screen.getByLabelText("active")).toHaveValue("false");
-        await expect.element(screen.getByLabelText("launchDate")).toHaveAttribute("type", "date");
-        await expect.element(screen.getByLabelText("address.city")).toHaveValue("Berlin");
-        await expect.element(screen.getByLabelText("items[0].quantity")).toHaveAttribute("type", "number");
+        const body = screen.getByLabelText("JSON body");
+        await expect.element(body).toHaveValue(
+            JSON.stringify(
+                {
+                    name: "Desk",
+                    active: false,
+                    launchDate: "2026-08-03",
+                    address: { city: "Berlin" },
+                    items: [{ sku: "SKU-1", quantity: 1 }],
+                },
+                null,
+                2,
+            ),
+        );
 
-        await screen.getByRole("button", { name: "Add status" }).click();
-        await screen.getByLabelText("status").selectOptions("confirmed");
-        await screen.getByLabelText("name").fill("");
-        await expect.element(screen.getByText("name: This field is required.")).toBeVisible();
-        await expect.element(screen.getByRole("button", { name: "Execute" })).toBeDisabled();
-        await screen.getByLabelText("name").fill("Lamp");
-        await screen.getByLabelText("active").selectOptions("true");
-        await screen.getByRole("button", { name: "Add items item" }).click();
-        await screen.getByLabelText("items[1].sku").fill("SKU-2");
-        await screen.getByLabelText("items[1].quantity").fill("3");
+        await body.fill("{");
+        await expect.element(screen.getByText("Enter a valid JSON request body.")).toBeVisible();
+        await screen.getByRole("button", { name: "Execute" }).click();
+        expect(fetchMock).not.toHaveBeenCalled();
+        await body.fill('{"name":"Lamp","active":true,"items":[{"sku":"SKU-2","quantity":3}]}');
         await screen.getByRole("button", { name: "Execute" }).click();
 
         await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
         expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
             name: "Lamp",
-            status: "confirmed",
             active: true,
-            launchDate: "2026-08-03",
-            address: { city: "Berlin" },
-            items: [
-                { sku: "SKU-1", quantity: 1 },
-                { sku: "SKU-2", quantity: 3 },
-            ],
+            items: [{ sku: "SKU-2", quantity: 3 }],
         });
-    });
-
-    it("shows an explicit error for request body schemas it cannot edit", async () => {
-        const screen = await render(
-            <RequestPlayground
-                operation={playgroundOperation({
-                    requests: [
-                        requestContract({
-                            schema: {
-                                oneOf: [
-                                    { type: "object", properties: { name: { type: "string" } } },
-                                    { type: "object", properties: { title: { type: "string" } } },
-                                ],
-                            },
-                        }),
-                    ],
-                })}
-                baseUrl="https://api.example.test"
-                token={null}
-                components={null}
-            />,
-        );
-
-        await expect.element(screen.getByText("oneOf request body schemas are not supported.")).toBeVisible();
-        await expect.element(screen.getByLabelText("JSON body")).not.toBeInTheDocument();
-        await expect.element(screen.getByRole("button", { name: "Execute" })).toBeDisabled();
     });
 
     it("builds Laravel Query Builder filters, sorts, includes, and fields", async () => {
@@ -326,13 +297,19 @@ describe("RequestPlayground", () => {
 
         await filterField.fill("Taylor");
         await sortField.click();
-        await screen.getByRole("option", { name: "-created_at" }).click();
+        const sortOption = screen.getByRole("option", { name: "-created_at" });
+        await sortOption.click();
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
         await includeField.click();
         await screen.getByRole("option", { name: "roles", exact: true }).click();
-        await screen.getByRole("option", { name: "rolesCount" }).click();
+        const rolesCountOption = screen.getByRole("option", { name: "rolesCount" });
+        await rolesCountOption.click();
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
         await fieldsField.click();
         await screen.getByRole("option", { name: "id" }).click();
-        await screen.getByRole("option", { name: "email" }).click();
+        const emailOption = screen.getByRole("option", { name: "email" });
+        await emailOption.click();
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
         await expect.element(sortField).toHaveTextContent("-created_at");
         await expect.element(includeField).toHaveTextContent("roles, rolesCount");
@@ -463,6 +440,28 @@ describe("RequestPlayground", () => {
 
         await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
         expect(fetchMock.mock.calls[0]?.[0]).toBe("https://sandbox.operation.example/widgets");
+    });
+
+    it("switches response contracts with a select", async () => {
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    responses: [
+                        requestContract({ role: "response", status: "200", title: "Successful response" }),
+                        requestContract({ role: "response", status: "422", title: "Validation response" }),
+                    ],
+                })}
+                baseUrl="https://api.example.test"
+                token={null}
+                components={null}
+            />,
+        );
+        const responseStatus = screen.getByRole("combobox", { name: "Response status" });
+
+        await expect.element(responseStatus).toHaveValue("200 application/json");
+        await expect.element(screen.getByText("Successful response")).toBeVisible();
+        await responseStatus.selectOptions("422 application/json");
+        await expect.element(screen.getByText("Validation response")).toBeVisible();
     });
 
     it("aborts the active request before starting another", async () => {

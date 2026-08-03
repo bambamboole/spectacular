@@ -137,17 +137,14 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
         ->and($immediateMessage['x-laravel-broadcast-now'])->toBeTrue();
 });
 
-it('applies per-call webhook channel overrides', function (): void {
+it('applies configured webhook channels', function (): void {
     configureFixtureAsyncApi();
-
-    $document = app(AsyncApiGenerator::class)->generate([
-        'webhooks' => [
-            'channel' => [
-                'key' => 'tenant-webhooks',
-                'address' => '{tenantWebhookUrl}',
-            ],
-        ],
+    config()->set('spectacular.asyncapi.webhooks.channel', [
+        'key' => 'tenant-webhooks',
+        'address' => '{tenantWebhookUrl}',
     ]);
+
+    $document = app(AsyncApiGenerator::class)->generate();
 
     expect($document['channels'])->toHaveKey('tenant-webhooks')
         ->and($document['channels']['tenant-webhooks']['address'])->toBe('{tenantWebhookUrl}')
@@ -158,15 +155,12 @@ it('applies per-call webhook channel overrides', function (): void {
 
 it('rejects a channel key reused for a different address or kind', function (string $address): void {
     configureFixtureAsyncApi();
-
-    app(AsyncApiGenerator::class)->generate([
-        'webhooks' => [
-            'channel' => [
-                'key' => 'orders',
-                'address' => $address,
-            ],
-        ],
+    config()->set('spectacular.asyncapi.webhooks.channel', [
+        'key' => 'orders',
+        'address' => $address,
     ]);
+
+    app(AsyncApiGenerator::class)->generate();
 })->with([
     'different address and kind' => '{webhookUrl}',
     'different kind' => 'orders',

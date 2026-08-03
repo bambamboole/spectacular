@@ -14,10 +14,10 @@ export function LiveResponsePanel({ result }: LiveResponsePanelProps): React.Rea
         return (
             <section aria-live="polite" className="flex flex-col gap-3 border-t border-lt-border pt-6">
                 <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold text-lt-fg">Live response</h3>
+                    <h3 className="font-semibold text-lt-fg">Live response</h3>
                     <Badge color="danger">Error</Badge>
                 </div>
-                <p className="text-sm text-lt-danger">{result.message}</p>
+                <p className="text-lt-danger">{result.message}</p>
             </section>
         );
     }
@@ -25,7 +25,7 @@ export function LiveResponsePanel({ result }: LiveResponsePanelProps): React.Rea
     return (
         <section aria-live="polite" className="flex flex-col gap-4 border-t border-lt-border pt-6">
             <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-semibold text-lt-fg">Live response</h3>
+                <h3 className="font-semibold text-lt-fg">Live response</h3>
                 <Badge color={responseBadgeColor(result.status)}>
                     {result.status} {result.statusText}
                 </Badge>
