@@ -22,7 +22,13 @@ export type Param = {
     style?: string | null;
     explode?: boolean | null;
 };
-export type ContractExample = { name: string | null; summary: string | null; value: unknown };
+export type ContractExample = {
+    name: string | null;
+    summary: string | null;
+    description?: string | null;
+    externalValue?: string | null;
+    value: unknown;
+};
 export type Contract = {
     role: "request" | "response";
     status: string | null;

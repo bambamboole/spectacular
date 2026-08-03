@@ -29,7 +29,12 @@ function Row({ row, depth, expandDepth }: { row: SchemaRow; depth: number; expan
                 {row.required ? <span className="text-lt-danger">*</span> : null}
                 {row.isRecursive ? <span className="text-xs text-lt-muted-fg">↩ recursive</span> : null}
             </div>
-            {open && row.description ? <p className="pl-5 text-xs text-lt-muted-fg">{row.description}</p> : null}
+            {(!hasChildren || open) && row.description ? (
+                <p className="pl-5 text-xs text-lt-muted-fg">{row.description}</p>
+            ) : null}
+            {row.details.length > 0 ? (
+                <p className="pl-5 font-mono text-xs text-lt-muted-fg">{row.details.join(" · ")}</p>
+            ) : null}
             {open && !row.isRecursive
                 ? row.children.map((c) => <Row key={c.id} row={c} depth={depth + 1} expandDepth={expandDepth} />)
                 : null}

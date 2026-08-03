@@ -7,6 +7,7 @@ export type SchemaRow = {
     typeLabel: string;
     required: boolean;
     description: string | null;
+    details: string[];
     children: SchemaRow[];
     isRecursive: boolean;
 };
@@ -38,9 +39,54 @@ function toRow(node: SchemaNode, name: string | null, required: Set<string>): Sc
         typeLabel: typeLabel(node),
         required: name !== null && required.has(name),
         description: (withData?.annotations?.description as string | undefined) ?? null,
+        details: withData === null ? [] : schemaDetails(withData),
         children: recursive ? [] : childRows(node),
         isRecursive: recursive,
     };
+}
+
+function schemaDetails(node: RegularLikeNode): string[] {
+    const details: string[] = [];
+    const fragment = node.originalFragment;
+
+    if (node.format !== null) {
+        details.push(`format: ${node.format}`);
+    }
+
+    if ("const" in fragment) {
+        details.push(`const: ${schemaValue(fragment.const)}`);
+    } else if (node.enum !== null) {
+        details.push(`enum: ${schemaValue(node.enum)}`);
+    }
+
+    if (node.annotations.default !== undefined) {
+        details.push(`default: ${schemaValue(node.annotations.default)}`);
+    }
+    if (node.annotations.examples !== undefined) {
+        details.push(`examples: ${schemaValue(node.annotations.examples)}`);
+    }
+
+    for (const [name, value] of Object.entries(node.validations)) {
+        if (!["readOnly", "writeOnly", "style"].includes(name)) {
+            details.push(`${name}: ${schemaValue(value)}`);
+        }
+    }
+
+    if (node.deprecated) {
+        details.push("deprecated");
+    }
+    if (node.validations.readOnly === true) {
+        details.push("readOnly");
+    }
+    if (node.validations.writeOnly === true) {
+        details.push("writeOnly");
+    }
+
+    return details;
+}
+
+function schemaValue(value: unknown): string {
+    return JSON.stringify(value) ?? String(value);
 }
 
 function childRows(node: SchemaNode): SchemaRow[] {

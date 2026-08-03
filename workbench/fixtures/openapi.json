@@ -209,7 +209,8 @@
                         "description": "The user ID",
                         "schema": {
                             "type": "integer"
-                        }
+                        },
+                        "example": 1
                     },
                     {
                         "name": "include",
@@ -363,6 +364,9 @@
                                         "type": "string",
                                         "format": "email"
                                     },
+                                    "password": {
+                                        "type": "string"
+                                    },
                                     "roles": {
                                         "type": "array",
                                         "items": {
@@ -372,7 +376,8 @@
                                 },
                                 "required": [
                                     "name",
-                                    "email"
+                                    "email",
+                                    "password"
                                 ]
                             }
                         }

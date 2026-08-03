@@ -7,8 +7,9 @@ export function exampleFromSchema(schema: unknown, components?: unknown): unknow
 }
 
 export function initialContractExample(contract: Contract, components?: unknown): unknown {
-    if (contract.examples.length > 0) {
-        return contract.examples[0].value;
+    const explicitExample = contract.examples.find((example) => example.value !== undefined);
+    if (explicitExample !== undefined) {
+        return explicitExample.value;
     }
 
     return exampleFromSchema(contract.schema, components);
@@ -42,9 +43,17 @@ function schemaExample(schema: unknown, components: unknown, visitedRefs: Set<st
         return example;
     }
 
+    if (Array.isArray(schema.examples) && schema.examples.length > 0) {
+        return schema.examples[0];
+    }
+
     const defaultValue = schema.default;
     if (defaultValue !== undefined) {
         return defaultValue;
+    }
+
+    if (schema.const !== undefined) {
+        return schema.const;
     }
 
     if (Array.isArray(schema.enum) && schema.enum.length > 0) {
@@ -60,7 +69,7 @@ function schemaExample(schema: unknown, components: unknown, visitedRefs: Set<st
     }
 
     if (schema.type === "string") {
-        return "string";
+        return stringExample(schema.format);
     }
 
     if (schema.type === "integer" || schema.type === "number") {
@@ -72,6 +81,24 @@ function schemaExample(schema: unknown, components: unknown, visitedRefs: Set<st
     }
 
     return null;
+}
+
+function stringExample(format: unknown): string {
+    switch (format) {
+        case "email":
+            return "user@example.com";
+        case "uri":
+        case "url":
+            return "https://example.com";
+        case "uuid":
+            return "00000000-0000-4000-8000-000000000000";
+        case "date":
+            return "1970-01-01";
+        case "date-time":
+            return "1970-01-01T00:00:00Z";
+        default:
+            return "string";
+    }
 }
 
 function localSchemaRef(schema: Record<string, unknown>): string | null {

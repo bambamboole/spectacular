@@ -152,7 +152,7 @@ describe("buildNavigation", () => {
             id: "get-users-id",
             method: "GET",
             path: "/users/{id}",
-            title: "getUser",
+            title: "Get user",
             deprecated: false,
         });
 
@@ -223,7 +223,7 @@ describe("parseOperation", () => {
             id: "get-users-id",
             method: "GET",
             path: "/users/{id}",
-            title: "getUser",
+            title: "Get user",
             deprecated: false,
         });
         expect(op.description).toBe("Fetches a single user by id.");
@@ -256,6 +256,36 @@ describe("parseOperation", () => {
         )!;
 
         expect(operation.paramGroups[0].params[0].example).toBe("active");
+    });
+
+    it("uses the first parameter examples value when example is absent", () => {
+        const operation = parseOperation(
+            {
+                openapi: "3.1.0",
+                info: { title: "Examples API", version: "1.0.0" },
+                paths: {
+                    "/widgets/{widget}": {
+                        get: {
+                            parameters: [
+                                {
+                                    name: "widget",
+                                    in: "path",
+                                    required: true,
+                                    examples: {
+                                        default: { value: "widget_123" },
+                                    },
+                                    schema: { type: "string" },
+                                },
+                            ],
+                            responses: { "200": { description: "OK" } },
+                        },
+                    },
+                },
+            },
+            "get-widgets-widget",
+        )!;
+
+        expect(operation.paramGroups[0].params[0].example).toBe("widget_123");
     });
 
     it("builds the request Contract from requestBody", () => {
@@ -475,6 +505,51 @@ describe("buildExamples", () => {
         )!;
 
         expect(op.responses[0].examples).toEqual([{ name: "shared", summary: "Shared widget example", value: { id: 3 } }]);
+    });
+
+    it("preserves example descriptions and external values", () => {
+        const op = parseOperation(
+            {
+                openapi: "3.1.0",
+                info: { title: "Examples API", version: "1.0.0" },
+                paths: {
+                    "/widgets": {
+                        get: {
+                            responses: {
+                                "200": {
+                                    description: "OK",
+                                    content: {
+                                        "application/json": {
+                                            examples: {
+                                                inline: {
+                                                    description: "A complete inline example.",
+                                                    value: { id: 1 },
+                                                },
+                                                external: {
+                                                    summary: "Large payload",
+                                                    externalValue: "https://example.test/widgets.json",
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            "get-widgets",
+        )!;
+
+        expect(op.responses[0].examples).toEqual([
+            { name: "inline", summary: null, description: "A complete inline example.", value: { id: 1 } },
+            {
+                name: "external",
+                summary: "Large payload",
+                externalValue: "https://example.test/widgets.json",
+                value: undefined,
+            },
+        ]);
     });
 
     it("prefers a non-empty `examples` map over `example` when both are present", () => {

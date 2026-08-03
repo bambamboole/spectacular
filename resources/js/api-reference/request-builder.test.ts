@@ -68,6 +68,30 @@ function values(parameters: Array<[Param, string]>, overrides: Partial<RequestVa
 }
 
 describe("buildRequest", () => {
+    it("adds a default JSON Accept header", () => {
+        const result = buildRequest({
+            operation: operation(),
+            baseUrl: "https://api.example.test",
+            values: values([]),
+            token: null,
+        });
+
+        expect(result).toMatchObject({ request: { headers: { Accept: "application/json" } } });
+    });
+
+    it("preserves an explicit Accept header", () => {
+        const accept = parameter({ name: "accept", location: "header" });
+        const result = buildRequest({
+            operation: operation([accept]),
+            baseUrl: "https://api.example.test",
+            values: values([[accept, "application/problem+json"]]),
+            token: null,
+        });
+
+        expect(result).toMatchObject({ request: { headers: { accept: "application/problem+json" } } });
+        expect(result.request && Object.keys(result.request.headers)).toEqual(["accept"]);
+    });
+
     it("encodes path and query parameters and builds scalar headers, JSON, and authorization", () => {
         const id = parameter({ name: "id", location: "path", required: true });
         const search = parameter({ name: "search", location: "query", required: true });
@@ -93,6 +117,7 @@ describe("buildRequest", () => {
                 method: "POST",
                 url: "https://api.example.test/v1/widgets/a%2Fb%20c?search=desk%20%26%20chair&page=2",
                 headers: {
+                    Accept: "application/json",
                     "X-Trace": "false",
                     "Content-Type": "application/problem+json",
                     Authorization: "Bearer real-secret-token",
@@ -123,7 +148,7 @@ describe("buildRequest", () => {
             request: {
                 method: "POST",
                 url: "https://api.example.test/widgets/{id}?fields%5Busers%5D=name%2Cemail",
-                headers: {},
+                headers: { Accept: "application/json" },
                 body: null,
             },
             errors: null,
@@ -147,7 +172,12 @@ describe("buildRequest", () => {
                 token: null,
             }),
         ).toEqual({
-            request: { method: "POST", url: "https://api.example.test/widgets/7", headers: {}, body: null },
+            request: {
+                method: "POST",
+                url: "https://api.example.test/widgets/7",
+                headers: { Accept: "application/json" },
+                body: null,
+            },
             errors: null,
         });
     });
@@ -167,7 +197,12 @@ describe("buildRequest", () => {
                 token: null,
             }),
         ).toEqual({
-            request: { method: "POST", url: "https://api.example.test/widgets/7", headers: {}, body: null },
+            request: {
+                method: "POST",
+                url: "https://api.example.test/widgets/7",
+                headers: { Accept: "application/json" },
+                body: null,
+            },
             errors: null,
         });
     });
@@ -184,7 +219,12 @@ describe("buildRequest", () => {
                 token: null,
             }),
         ).toEqual({
-            request: { method: "POST", url: "https://api.example.test/widgets/{id}", headers: {}, body: null },
+            request: {
+                method: "POST",
+                url: "https://api.example.test/widgets/{id}",
+                headers: { Accept: "application/json" },
+                body: null,
+            },
             errors: null,
         });
     });
@@ -266,6 +306,7 @@ describe("buildRequest", () => {
                 method: "POST",
                 url: "https://api.example.test/widgets/7",
                 headers: {
+                    Accept: "application/json",
                     "Content-Type": "application/json",
                     Authorization: "Bearer real-secret-token",
                 },
@@ -314,6 +355,37 @@ describe("buildRequest", () => {
                     "query:filter": "This query parameter is required.",
                     "header:X-Trace": "This header parameter is required.",
                 },
+                body: null,
+                request: null,
+            },
+        });
+    });
+
+    it.each([
+        [{ type: "number" }, "not-a-number", "Enter a number."],
+        [{ type: "integer" }, "1.5", "Enter an integer."],
+        [{ type: "number", minimum: 1 }, "0", "Enter a value greater than or equal to 1."],
+        [{ type: "number", exclusiveMinimum: 1 }, "1", "Enter a value greater than 1."],
+        [{ type: "number", maximum: 10 }, "11", "Enter a value less than or equal to 10."],
+        [{ type: "number", exclusiveMaximum: 10 }, "10", "Enter a value less than 10."],
+        [{ type: "number", multipleOf: 0.5 }, "1.2", "Enter a multiple of 0.5."],
+        [{ type: "string", minLength: 3 }, "ab", "Enter at least 3 characters."],
+        [{ type: "string", maxLength: 3 }, "abcd", "Enter no more than 3 characters."],
+        [{ type: "string", pattern: "^[a-z]+$" }, "ABC", "Match the required pattern."],
+    ])("validates a parameter against its schema constraints", (schema, value, message) => {
+        const constrained = parameter({ name: "constrained", schema });
+
+        expect(
+            buildRequest({
+                operation: operation([constrained]),
+                baseUrl: "https://api.example.test",
+                values: values([[constrained, value]]),
+                token: null,
+            }),
+        ).toEqual({
+            request: null,
+            errors: {
+                parameters: { "query:constrained": message },
                 body: null,
                 request: null,
             },
@@ -411,7 +483,7 @@ describe("buildRequest", () => {
                 request: {
                     method: "POST",
                     url: "https://api.example.test/widgets/{id}",
-                    headers: { [name]: "POST, PATCH" },
+                    headers: { Accept: "application/json", [name]: "POST, PATCH" },
                     body: null,
                 },
                 errors: null,
@@ -491,7 +563,12 @@ describe("buildRequest", () => {
                 token: null,
             }),
         ).toEqual({
-            request: { method: "POST", url: expectedUrl, headers: {}, body: null },
+            request: {
+                method: "POST",
+                url: expectedUrl,
+                headers: { Accept: "application/json" },
+                body: null,
+            },
             errors: null,
         });
     });

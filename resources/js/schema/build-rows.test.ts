@@ -43,4 +43,51 @@ describe("buildSchemaRows", () => {
         const rows = await buildSchemaRows(inline, components);
         expect(rows.find((r) => r.name === "data")).toBeDefined();
     });
+
+    it("extracts formats, values, validation constraints, and access metadata", async () => {
+        const rows = await buildSchemaRows(
+            {
+                type: "object",
+                properties: {
+                    id: {
+                        type: "integer",
+                        format: "int64",
+                        minimum: 1,
+                        maximum: 10,
+                        default: 5,
+                        examples: [7],
+                        deprecated: true,
+                        readOnly: true,
+                    },
+                    status: {
+                        type: "string",
+                        enum: ["active", "archived"],
+                        minLength: 3,
+                        maxLength: 8,
+                        pattern: "^[a-z]+$",
+                    },
+                    kind: { type: "string", const: "widget", writeOnly: true },
+                },
+            },
+            {},
+        );
+        const byName = Object.fromEntries(rows.map((row) => [row.name, row]));
+
+        expect(byName.id.details).toEqual([
+            "format: int64",
+            "default: 5",
+            "examples: [7]",
+            "minimum: 1",
+            "maximum: 10",
+            "deprecated",
+            "readOnly",
+        ]);
+        expect(byName.status.details).toEqual([
+            'enum: ["active","archived"]',
+            "minLength: 3",
+            "maxLength: 8",
+            'pattern: "^[a-z]+$"',
+        ]);
+        expect(byName.kind.details).toEqual(['const: "widget"', "writeOnly"]);
+    });
 });

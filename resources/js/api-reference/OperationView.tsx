@@ -136,9 +136,24 @@ function SchemaExampleView({
                     ) : current?.summary ? (
                         <p className="mb-1 text-xs text-lt-muted-fg">{current.summary}</p>
                     ) : null}
-                    <pre className="overflow-x-auto rounded-lt-sm bg-lt-muted p-3 text-xs text-lt-fg">
-                        {JSON.stringify(current?.value, null, 2)}
-                    </pre>
+                    {current?.description ? (
+                        <p className="mb-1 text-xs text-lt-muted-fg">{current.description}</p>
+                    ) : null}
+                    {current?.externalValue ? (
+                        <a
+                            href={current.externalValue}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mb-2 block text-xs text-lt-primary underline underline-offset-2"
+                        >
+                            Open external example
+                        </a>
+                    ) : null}
+                    {current?.value !== undefined ? (
+                        <pre className="overflow-x-auto rounded-lt-sm bg-lt-muted p-3 text-xs text-lt-fg">
+                            {JSON.stringify(current.value, null, 2)}
+                        </pre>
+                    ) : null}
                 </div>
             )}
         </div>
