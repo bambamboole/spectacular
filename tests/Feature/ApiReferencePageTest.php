@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Lattice\Lattice\Core\PageSchema;
 use Lattice\Lattice\Ui\Enums\PageContainer;
+use Workbench\App\Models\Category;
 use Workbench\App\Models\User;
 use Workbench\App\Pages\ApiReferencePage;
 use Workbench\App\Providers\WorkbenchServiceProvider;
@@ -51,4 +52,19 @@ it('stores users from the API reference', function (): void {
     $user = User::query()->where('email', 'taylor@example.com')->firstOrFail();
 
     expect(Hash::check('secret-password', (string) $user->getAttribute('password')))->toBeTrue();
+});
+
+it('paginates categories without a redundant total header', function (): void {
+    app()->register(WorkbenchServiceProvider::class);
+
+    foreach (range(1, 3) as $category) {
+        Category::query()->create(['name' => "Category {$category}"]);
+    }
+
+    $this->getJson('/api/categories?per_page=2')
+        ->assertSuccessful()
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('meta.per_page', 2)
+        ->assertJsonPath('meta.total', 3)
+        ->assertHeaderMissing('X-Total-Count');
 });
