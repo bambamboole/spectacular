@@ -364,6 +364,9 @@
                                         "type": "string",
                                         "format": "email"
                                     },
+                                    "password": {
+                                        "type": "string"
+                                    },
                                     "roles": {
                                         "type": "array",
                                         "items": {
@@ -373,7 +376,8 @@
                                 },
                                 "required": [
                                     "name",
-                                    "email"
+                                    "email",
+                                    "password"
                                 ]
                             }
                         }
