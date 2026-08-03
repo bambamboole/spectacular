@@ -12,6 +12,13 @@ use Workbench\App\Models\Category;
 
 class CategoriesController
 {
+    /**
+     * List product categories.
+     *
+     * Browse the category hierarchy used to organize products. Each category includes its parent and direct children so clients can build navigation without follow-up requests.
+     *
+     * Results are paginated so clients can request a predictable slice of the collection. Use `per_page` and `page` to move through the result set.
+     */
     public function __invoke(Request $request): AnonymousResourceCollection
     {
         $categories = QueryBuilder::for(Category::class)

@@ -18,6 +18,8 @@
         "/categories": {
             "get": {
                 "operationId": "categories.index",
+                "description": "Browse the category hierarchy used to organize products. Each category includes its parent and direct children so clients can build navigation without follow-up requests.\n\nResults are paginated so clients can request a predictable slice of the collection. Use `per_page` and `page` to move through the result set.",
+                "summary": "List product categories",
                 "tags": [
                     "Categories"
                 ],
