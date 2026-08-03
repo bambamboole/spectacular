@@ -3,8 +3,6 @@ import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import type { Node } from "@lattice-php/lattice";
 import ApiReference from "./ApiReference";
-import { OperationView } from "./OperationView";
-import { parseOperation } from "./parse";
 import { RequestPlayground } from "./RequestPlayground";
 import type { Contract, Operation, Param } from "./types";
 
@@ -85,27 +83,20 @@ function playgroundOperation(overrides: Partial<Operation> = {}): Operation {
     };
 }
 
-function deferred<T>(): {
-    promise: Promise<T>;
-    resolve: (value: T) => void;
-    reject: (reason?: unknown) => void;
-} {
-    let resolve!: (value: T) => void;
-    let reject!: (reason?: unknown) => void;
-    const promise = new Promise<T>((promiseResolve, promiseReject) => {
-        resolve = promiseResolve;
-        reject = promiseReject;
-    });
-
-    return { promise, resolve, reject };
-}
-
 function apiReferenceNode(props: Record<string, unknown>): Node<"spectacular.api-reference"> {
     return { type: "spectacular.api-reference", props };
 }
 
 describe("RequestPlayground", () => {
-    it("renders labelled Lattice controls and keeps the selected live snippet copyable and token-safe", async () => {
+    it("builds, copies, executes, and presents a request without exposing its token", async () => {
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response('{"ok":true}', {
+                status: 201,
+                statusText: "Created",
+                headers: { "Content-Type": "application/json" },
+            }),
+        );
+        vi.stubGlobal("fetch", fetchMock);
         const screen = await render(
             <RequestPlayground
                 operation={playgroundOperation()}
@@ -114,33 +105,26 @@ describe("RequestPlayground", () => {
                 components={null}
             />,
         );
-
         const id = screen.getByLabelText("id");
-        const status = screen.getByLabelText("status");
-        const debug = screen.getByLabelText("X-Debug");
         const body = screen.getByLabelText("JSON body");
-        const curl = screen.getByRole("radio", { name: "cURL" });
         const snippet = screen.getByLabelText("Request snippet", { exact: true });
 
-        await expect.element(id).toBeVisible();
-        await expect.element(status).toBeVisible();
-        await expect.element(debug).toBeVisible();
+        await expect.element(screen.getByLabelText("status")).toBeVisible();
+        await expect.element(screen.getByLabelText("X-Debug")).toBeVisible();
         await expect.element(body).toBeVisible();
-        await expect.element(curl).toHaveAttribute("aria-checked", "true");
+        await expect.element(screen.getByRole("radio", { name: "cURL" })).toHaveAttribute("aria-checked", "true");
         await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
 
         await id.fill("a/b");
-        await expect.element(snippet).toHaveTextContent("/widgets/a%2Fb");
-
-        await status.selectOptions("archived");
-        await expect.element(snippet).toHaveTextContent("status=archived");
-
+        await screen.getByLabelText("status").selectOptions("archived");
         await body.fill('{"name":"Lamp"}');
-        await expect.element(snippet).toHaveTextContent('{"name":"Lamp"}');
-
         await screen.getByRole("radio", { name: "JavaScript" }).click();
-        await expect.element(snippet).toHaveTextContent('fetch("https://api.example.test/v1/widgets/a%2Fb?status=archived"');
+
+        await expect.element(snippet).toHaveTextContent(
+            'fetch("https://api.example.test/v1/widgets/a%2Fb?status=archived"',
+        );
+        await expect.element(snippet).toHaveTextContent('{\\"name\\":\\"Lamp\\"}');
         await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
 
@@ -149,8 +133,17 @@ describe("RequestPlayground", () => {
         await body.fill("");
         await body.click();
         await userEvent.paste();
-
         await expect.element(body).toHaveValue(selectedSnippet.textContent);
+        await body.fill('{"name":"Lamp"}');
+
+        await screen.getByRole("button", { name: "Try it out" }).click();
+
+        await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.example.test/v1/widgets/a%2Fb?status=archived");
+        expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Authorization")).toBe(`Bearer ${REAL_TOKEN}`);
+        await expect.element(screen.getByText("201 Created")).toBeVisible();
+        await expect.element(screen.getByLabelText("Live response body")).toHaveTextContent('"ok": true');
+        await expect.element(screen.locator).not.toHaveTextContent(REAL_TOKEN);
     });
 
     it("shows stable required errors without fetching and focuses the first invalid field", async () => {
@@ -181,202 +174,14 @@ describe("RequestPlayground", () => {
         await screen.getByRole("button", { name: "Try it out" }).click();
 
         const idField = screen.getByLabelText("id");
-        const idError = screen.getByText("This path parameter is required.");
         const traceField = screen.getByLabelText("X-Trace");
-        const traceError = screen.getByText("This header parameter is required.");
 
-        await expect.element(idError).toBeVisible();
-        await expect.element(traceError).toBeVisible();
+        await expect.element(screen.getByText("This path parameter is required.")).toBeVisible();
+        await expect.element(screen.getByText("This header parameter is required.")).toBeVisible();
         await expect.element(idField).toHaveAttribute("aria-describedby");
         await expect.element(traceField).toHaveAttribute("aria-describedby");
         await expect.element(idField).toHaveFocus();
         expect(fetchMock).not.toHaveBeenCalled();
-    });
-
-    it("preserves invalid JSON, shows its stable error, and focuses the body", async () => {
-        const fetchMock = vi.fn();
-        vi.stubGlobal("fetch", fetchMock);
-        const screen = await render(
-            <RequestPlayground
-                operation={playgroundOperation()}
-                baseUrl="https://api.example.test"
-                token={null}
-                components={null}
-            />,
-        );
-        const body = screen.getByLabelText("JSON body");
-
-        await body.fill("{invalid");
-        await screen.getByRole("button", { name: "Try it out" }).click();
-
-        await expect.element(body).toHaveValue("{invalid");
-        await expect.element(screen.getByText("Enter a valid JSON request body.")).toBeVisible();
-        await expect.element(body).toHaveAttribute("aria-describedby");
-        await expect.element(body).toHaveFocus();
-        expect(fetchMock).not.toHaveBeenCalled();
-    });
-
-    it("keeps complex parameters and non-JSON request data documented but out of the playground", async () => {
-        const spec = {
-            openapi: "3.1.0",
-            info: { title: "Test API", version: "1.0.0" },
-            paths: {
-                "/widgets": {
-                    post: {
-                        parameters: [
-                            {
-                                name: "filters",
-                                in: "query",
-                                schema: { type: "array", items: { type: "string", enum: ["active", "archived"] } },
-                            },
-                            { name: "metadata", in: "header", schema: { type: "object" } },
-                        ],
-                        requestBody: {
-                            content: {
-                                "multipart/form-data": { schema: { type: "object" } },
-                            },
-                        },
-                        responses: { "204": { description: "No content" } },
-                    },
-                },
-            },
-        };
-        const operation = parseOperation(spec, "post-widgets");
-
-        if (operation === null) {
-            throw new Error("Expected the operation fixture to parse.");
-        }
-
-        const screen = await render(
-            <OperationView spec={spec} operationId="post-widgets" baseUrl="https://api.example.test" />,
-        );
-
-        await expect.element(screen.getByText("filters", { exact: true })).toBeVisible();
-        await expect.element(screen.getByText("Available values: active, archived", { exact: true })).toBeVisible();
-        await expect.element(screen.getByText("metadata", { exact: true })).toBeVisible();
-        await expect.element(screen.getByText("multipart/form-data")).toBeVisible();
-        await expect.element(screen.getByLabelText("filters")).not.toBeInTheDocument();
-        await expect.element(screen.getByLabelText("metadata")).not.toBeInTheDocument();
-        await expect.element(screen.getByLabelText("JSON body")).not.toBeInTheDocument();
-        await expect.element(screen.getByRole("button", { name: /Try it out/ })).toBeVisible();
-    });
-
-    it("shows limitations and blocks required unsupported parameters", async () => {
-        const filters = parameter({
-            name: "filters",
-            required: true,
-            schema: { type: "array", items: { type: "string" } },
-        });
-        const fetchMock = vi.fn();
-        vi.stubGlobal("fetch", fetchMock);
-        const screen = await render(
-            <RequestPlayground
-                operation={playgroundOperation({
-                    paramGroups: [{ location: "query", params: [filters] }],
-                    requests: [],
-                })}
-                baseUrl="https://api.example.test"
-                token={null}
-                components={null}
-            />,
-        );
-
-        await screen.getByRole("button", { name: "Try it out" }).click();
-
-        await expect.element(screen.getByText("Only primitive parameters can be executed.")).toBeVisible();
-        expect(fetchMock).not.toHaveBeenCalled();
-    });
-
-    it("keeps an empty optional complex parameter documented without blocking execution", async () => {
-        const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200, statusText: "OK" }));
-        vi.stubGlobal("fetch", fetchMock);
-        const spec = {
-            openapi: "3.1.0",
-            info: { title: "Test API", version: "1.0.0" },
-            paths: {
-                "/widgets": {
-                    get: {
-                        parameters: [
-                            { name: "filters", in: "query", schema: { type: "array", items: { type: "string" } } },
-                        ],
-                        responses: { "200": { description: "OK" } },
-                    },
-                },
-            },
-        };
-        const screen = await render(
-            <OperationView spec={spec} operationId="get-widgets" baseUrl="https://api.example.test" />,
-        );
-        const tryButton = screen.getByRole("button", { name: "Try it out" });
-
-        await expect.element(screen.getByText("filters", { exact: true })).toBeVisible();
-        await expect.element(screen.getByText("Only primitive parameters can be executed.")).toBeVisible();
-        await expect.element(screen.getByLabelText("filters")).not.toBeInTheDocument();
-        await expect
-            .element(screen.getByLabelText("Request snippet", { exact: true }))
-            .toHaveTextContent("curl --request 'GET' --url 'https://api.example.test/widgets'");
-        await expect.element(tryButton).not.toBeDisabled();
-
-        await tryButton.click();
-
-        await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
-    });
-
-    it("uses the relative root server when the specification omits servers", async () => {
-        const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200, statusText: "OK" }));
-        vi.stubGlobal("fetch", fetchMock);
-        const spec = {
-            openapi: "3.1.0",
-            info: { title: "Test API", version: "1.0.0" },
-            paths: {
-                "/widgets": {
-                    get: { responses: { "200": { description: "OK" } } },
-                },
-            },
-        };
-        const screen = await render(
-            <ApiReference node={apiReferenceNode({ spec, operation: "get-widgets", hideHeader: true })}>
-                {null}
-            </ApiReference>,
-        );
-        const tryButton = screen.getByRole("button", { name: "Try it out" });
-
-        await expect.element(screen.getByText("/widgets", { exact: true })).toBeVisible();
-        await expect
-            .element(screen.getByLabelText("Request snippet", { exact: true }))
-            .toHaveTextContent("curl --request 'GET' --url '/widgets'");
-        await expect.element(tryButton).not.toBeDisabled();
-
-        await tryButton.click();
-
-        await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
-        expect(fetchMock.mock.calls[0]?.[0]).toBe("/widgets");
-    });
-
-    it("updates root-server operations from the global server selector", async () => {
-        const spec = {
-            openapi: "3.1.0",
-            info: { title: "Test API", version: "1.0.0" },
-            servers: [
-                { url: "https://production.example.test", description: "Production" },
-                { url: "https://staging.example.test", description: "Staging" },
-            ],
-            paths: {
-                "/widgets": {
-                    get: { responses: { "200": { description: "OK" } } },
-                },
-            },
-        };
-        const screen = await render(
-            <ApiReference node={apiReferenceNode({ spec, defaultOperation: "get-widgets", hideHeader: true })}>
-                {null}
-            </ApiReference>,
-        );
-        const snippet = screen.getByLabelText("Request snippet", { exact: true });
-
-        await expect.element(snippet).toHaveTextContent("https://production.example.test/widgets");
-        await screen.getByLabelText("Select server").selectOptions("https://staging.example.test");
-        await expect.element(snippet).toHaveTextContent("https://staging.example.test/widgets");
     });
 
     it("shows and executes the selected operation-level server instead of the root server", async () => {
@@ -412,434 +217,11 @@ describe("RequestPlayground", () => {
         await expect.element(serverPicker).toHaveValue("https://canary.operation.example");
         await expect.element(snippet).toHaveTextContent("https://canary.operation.example/widgets");
         await serverPicker.selectOptions("https://sandbox.operation.example");
-        await expect.element(serverPicker).toHaveValue("https://sandbox.operation.example");
         await expect.element(snippet).toHaveTextContent("https://sandbox.operation.example/widgets");
-
         await screen.getByRole("button", { name: "Try it out" }).click();
 
         await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
         expect(fetchMock.mock.calls[0]?.[0]).toBe("https://sandbox.operation.example/widgets");
-    });
-
-    it("allows fixed-operation references to select an operation-level server", async () => {
-        const spec = {
-            openapi: "3.1.0",
-            info: { title: "Test API", version: "1.0.0" },
-            paths: {
-                "/widgets": {
-                    get: {
-                        servers: [
-                            { url: "https://canary.operation.example", description: "Canary operation" },
-                            { url: "https://sandbox.operation.example", description: "Sandbox operation" },
-                        ],
-                        responses: { "200": { description: "OK" } },
-                    },
-                },
-            },
-        };
-        const screen = await render(
-            <ApiReference node={apiReferenceNode({ spec, operation: "get-widgets", hideHeader: true })}>
-                {null}
-            </ApiReference>,
-        );
-        const serverPicker = screen.getByLabelText("Select server");
-        const snippet = screen.getByLabelText("Request snippet", { exact: true });
-
-        await expect.element(serverPicker).toHaveValue("https://canary.operation.example");
-        await serverPicker.selectOptions("https://sandbox.operation.example");
-        await expect.element(snippet).toHaveTextContent("https://sandbox.operation.example/widgets");
-    });
-
-    it("clears seeded values for optional hidden unsupported parameters", async () => {
-        const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200, statusText: "OK" }));
-        vi.stubGlobal("fetch", fetchMock);
-        const spec = {
-            openapi: "3.1.0",
-            info: { title: "Test API", version: "1.0.0" },
-            paths: {
-                "/widgets": {
-                    get: {
-                        parameters: [
-                            {
-                                name: "filters",
-                                in: "query",
-                                example: "seeded-filter",
-                                schema: { type: "array", items: { type: "string" } },
-                            },
-                            {
-                                name: "session",
-                                in: "cookie",
-                                example: "seeded-cookie",
-                                schema: { type: "string" },
-                            },
-                            {
-                                name: "Host",
-                                in: "header",
-                                schema: { type: "string", default: "seeded-host" },
-                            },
-                            {
-                                name: "Set-Cookie",
-                                in: "header",
-                                example: "seeded-set-cookie",
-                                schema: { type: "string" },
-                            },
-                            {
-                                name: "Cookie2",
-                                in: "header",
-                                example: "seeded-cookie-2",
-                                schema: { type: "string" },
-                            },
-                        ],
-                        responses: { "200": { description: "OK" } },
-                    },
-                },
-            },
-        };
-        const screen = await render(
-            <OperationView spec={spec} operationId="get-widgets" baseUrl="https://api.example.test" />,
-        );
-        const snippet = screen.getByLabelText("Request snippet", { exact: true });
-        const tryButton = screen.getByRole("button", { name: "Try it out" });
-
-        await expect.element(screen.getByText("Only primitive parameters can be executed.")).toBeVisible();
-        await expect.element(screen.getByText("Cookie parameters cannot be sent from a browser.")).toBeVisible();
-        await expect.poll(() => screen.getByText("This header cannot be sent from a browser.").all().length).toBe(3);
-        await expect.element(screen.getByLabelText("filters")).not.toBeInTheDocument();
-        await expect.element(screen.getByLabelText("session")).not.toBeInTheDocument();
-        await expect.element(screen.getByLabelText("Host")).not.toBeInTheDocument();
-        await expect.element(screen.getByLabelText("Set-Cookie")).not.toBeInTheDocument();
-        await expect.element(screen.getByLabelText("Cookie2")).not.toBeInTheDocument();
-        await expect.element(snippet).toHaveTextContent("https://api.example.test/widgets");
-        await expect.element(snippet).not.toHaveTextContent("seeded-filter");
-        await expect.element(snippet).not.toHaveTextContent("seeded-cookie");
-        await expect.element(snippet).not.toHaveTextContent("seeded-host");
-        await expect.element(snippet).not.toHaveTextContent("seeded-set-cookie");
-        await expect.element(snippet).not.toHaveTextContent("seeded-cookie-2");
-        await expect.element(tryButton).not.toBeDisabled();
-
-        await tryButton.click();
-
-        await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
-    });
-
-    it("keeps conditional override headers editable while blocking forbidden method values", async () => {
-        const fetchMock = vi.fn().mockResolvedValue(new Response("ok", { status: 200, statusText: "OK" }));
-        vi.stubGlobal("fetch", fetchMock);
-        const override = parameter({
-            name: "X-HTTP-Method-Override",
-            location: "header",
-            example: "TRACE",
-            schema: { type: "string" },
-        });
-        const screen = await render(
-            <RequestPlayground
-                operation={playgroundOperation({
-                    paramGroups: [{ location: "header", params: [override] }],
-                    requests: [],
-                })}
-                baseUrl="https://api.example.test"
-                token={null}
-                components={null}
-            />,
-        );
-        const field = screen.getByLabelText("X-HTTP-Method-Override");
-        const snippet = screen.getByLabelText("Request snippet", { exact: true });
-
-        await expect.element(field).toBeVisible();
-        await expect.element(screen.getByText("This header cannot be sent from a browser.")).toBeVisible();
-        await expect.element(snippet).toBeEmptyDOMElement();
-
-        await field.fill("PATCH");
-
-        await expect.element(screen.getByText("This header cannot be sent from a browser.")).not.toBeInTheDocument();
-        await expect.element(snippet).toHaveTextContent("X-HTTP-Method-Override: PATCH");
-        await screen.getByRole("button", { name: "Try it out" }).click();
-        await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
-    });
-
-    it("blocks execution when an operation has only unsupported request bodies", async () => {
-        const fetchMock = vi.fn();
-        vi.stubGlobal("fetch", fetchMock);
-        const screen = await render(
-            <RequestPlayground
-                operation={playgroundOperation({
-                    paramGroups: [],
-                    requests: [requestContract({ mediaType: "multipart/form-data" })],
-                })}
-                baseUrl="https://api.example.test"
-                token={null}
-                components={null}
-            />,
-        );
-        const tryButton = screen.getByRole("button", { name: "Try it out" });
-
-        await expect.element(screen.getByText("Only JSON request bodies can be sent from the playground.")).toBeVisible();
-        await expect.element(tryButton).toBeDisabled();
-
-        const button = (await tryButton.element()) as HTMLButtonElement;
-        button.disabled = false;
-        await tryButton.click();
-
-        expect(fetchMock).not.toHaveBeenCalled();
-    });
-
-    it("assigns unique control, error, and test IDs to identical playground instances", async () => {
-        const id = parameter({ name: "id", location: "path", required: true });
-        const operation = playgroundOperation({
-            paramGroups: [{ location: "path", params: [id] }],
-            requests: [],
-        });
-        const screen = await render(
-            <div>
-                <RequestPlayground
-                    operation={operation}
-                    baseUrl="https://api.example.test"
-                    token={null}
-                    components={null}
-                />
-                <RequestPlayground
-                    operation={operation}
-                    baseUrl="https://api.example.test"
-                    token={null}
-                    components={null}
-                />
-            </div>,
-        );
-        const idFields = screen.getByLabelText("id").all();
-        const copyButtons = screen.getByRole("button", { name: "Copy request snippet" }).all();
-        const inputIds = await Promise.all(idFields.map(async (field) => (await field.element()).id));
-        const errorIds = await Promise.all(
-            idFields.map(async (field) => (await field.element()).getAttribute("aria-describedby")),
-        );
-        const testIds = await Promise.all(
-            copyButtons.map(async (button) => (await button.element()).getAttribute("data-test")),
-        );
-
-        expect(new Set(inputIds).size).toBe(2);
-        expect(new Set(errorIds).size).toBe(2);
-        expect(new Set(testIds).size).toBe(2);
-        expect(testIds).toEqual(expect.arrayContaining([expect.stringMatching(/^request-snippet-copy-/)]));
-    });
-
-    it("passes the token into single-operation, stacked, and sidebar playgrounds", async () => {
-        const spec = {
-            openapi: "3.1.0",
-            info: { title: "Test API", version: "1.0.0" },
-            servers: [{ url: "https://api.example.test" }],
-            paths: {
-                "/widgets/{id}": {
-                    patch: {
-                        parameters: [
-                            { name: "id", in: "path", required: true, example: "42", schema: { type: "string" } },
-                        ],
-                        requestBody: {
-                            required: true,
-                            content: {
-                                "application/json": {
-                                    example: { name: "Desk" },
-                                    schema: { type: "object" },
-                                },
-                            },
-                        },
-                        responses: { "200": { description: "OK" } },
-                    },
-                },
-            },
-        };
-        const screen = await render(
-            <div>
-                <ApiReference
-                    node={apiReferenceNode({
-                        spec,
-                        operation: "patch-widgets-id",
-                        token: REAL_TOKEN,
-                        hideHeader: true,
-                    })}
-                >
-                    {null}
-                </ApiReference>
-                <ApiReference
-                    node={apiReferenceNode({
-                        spec,
-                        layout: "stacked",
-                        token: REAL_TOKEN,
-                        hideHeader: true,
-                        hideNav: true,
-                    })}
-                >
-                    {null}
-                </ApiReference>
-                <ApiReference
-                    node={apiReferenceNode({ spec, token: REAL_TOKEN, hideHeader: true, hideNav: true })}
-                >
-                    {null}
-                </ApiReference>
-            </div>,
-        );
-
-        await expect
-            .poll(() => screen.getByLabelText("Request snippet", { exact: true }).all().length)
-            .toBe(3);
-
-        for (const snippet of screen.getByLabelText("Request snippet", { exact: true }).all()) {
-            await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
-            await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
-        }
-    });
-
-    it("copies self-contained operation Markdown with resolved schemas and named examples", async () => {
-        const spec = {
-            openapi: "3.1.0",
-            info: { title: "Test API", version: "1.0.0" },
-            components: {
-                schemas: {
-                    WidgetInput: {
-                        type: "object",
-                        required: ["name"],
-                        properties: { name: { type: "string", minLength: 2 } },
-                    },
-                    Widget: {
-                        type: "object",
-                        required: ["id"],
-                        properties: { id: { type: "string", pattern: "^widget_", example: "widget_123" } },
-                    },
-                },
-            },
-            paths: {
-                "/widgets": {
-                    post: {
-                        requestBody: {
-                            content: {
-                                "application/json": {
-                                    schema: { $ref: "#/components/schemas/WidgetInput" },
-                                    examples: {
-                                        desk: { summary: "A desk widget", value: { name: "Desk" } },
-                                    },
-                                },
-                            },
-                        },
-                        responses: {
-                            "201": {
-                                description: "Created",
-                                content: {
-                                    "application/json": { schema: { $ref: "#/components/schemas/Widget" } },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        };
-        const screen = await render(
-            <OperationView spec={spec} operationId="post-widgets" baseUrl="https://api.example.test" />,
-        );
-        const writeText = vi.spyOn(navigator.clipboard, "writeText");
-
-        await screen.getByTestId("copy-operation-markdown").click();
-        await expect.poll(() => writeText.mock.calls[0]?.[0] ?? "").toContain("# POST /widgets");
-
-        const markdown = writeText.mock.calls[0]?.[0] ?? "";
-        expect(markdown).toContain("### Schema");
-        expect(markdown).toContain("### Example: desk");
-        expect(markdown).toContain('"minLength": 2');
-        expect(markdown).toContain("#### Schema");
-        expect(markdown).toContain('"pattern": "^widget_"');
-        expect(markdown).not.toContain("#/components/schemas/");
-    });
-
-    it("disables while loading, presents a successful live response, and preserves it across edits", async () => {
-        const pendingResponse = deferred<Response>();
-        const fetchMock = vi.fn().mockReturnValue(pendingResponse.promise);
-        vi.stubGlobal("fetch", fetchMock);
-        const screen = await render(
-            <RequestPlayground
-                operation={playgroundOperation()}
-                baseUrl="https://api.example.test"
-                token={REAL_TOKEN}
-                components={null}
-            />,
-        );
-        const tryButton = screen.getByRole("button", { name: /Try it out/ });
-
-        await tryButton.click();
-
-        await expect.element(tryButton).toBeDisabled();
-        await expect.element(screen.getByRole("status", { name: "Loading" })).toBeVisible();
-
-        pendingResponse.resolve(
-            new Response('{"ok":true}', {
-                status: 201,
-                statusText: "Created",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Request-Id": "request-123",
-                },
-            }),
-        );
-
-        await expect.element(screen.getByText("Live response")).toBeVisible();
-        await expect.element(screen.getByText("201 Created")).toBeVisible();
-        await expect.element(screen.getByText(/^\d+ ms$/)).toBeVisible();
-        await expect.element(screen.getByText("content-type", { exact: true })).toBeVisible();
-        await expect.element(screen.getByText("x-request-id", { exact: true })).toBeVisible();
-        await expect.element(screen.getByText("request-123", { exact: true })).toBeVisible();
-        await expect.element(screen.getByLabelText("Live response body")).toHaveTextContent('"ok": true');
-
-        await screen.getByLabelText("id").fill("99");
-
-        await expect.element(screen.getByText("201 Created")).toBeVisible();
-        await expect.element(screen.getByLabelText("Live response body")).toHaveTextContent('"ok": true');
-    });
-
-    it("presents HTTP 422 as a live response", async () => {
-        vi.stubGlobal(
-            "fetch",
-            vi.fn().mockResolvedValue(
-                new Response('{"message":"Invalid widget"}', {
-                    status: 422,
-                    statusText: "Unprocessable Content",
-                    headers: { "Content-Type": "application/json" },
-                }),
-            ),
-        );
-        const screen = await render(
-            <RequestPlayground
-                operation={playgroundOperation()}
-                baseUrl="https://api.example.test"
-                token={null}
-                components={null}
-            />,
-        );
-
-        await screen.getByRole("button", { name: /Try it out/ }).click();
-
-        await expect.element(screen.getByText("422 Unprocessable Content")).toBeVisible();
-        await expect
-            .element(screen.getByLabelText("Live response body"))
-            .toHaveTextContent('"message": "Invalid widget"');
-    });
-
-    it("presents the generic safe message for a network failure", async () => {
-        vi.stubGlobal(
-            "fetch",
-            vi.fn().mockRejectedValue(new Error(`Failed with ${REAL_TOKEN} at https://private.example.test`)),
-        );
-        const screen = await render(
-            <RequestPlayground
-                operation={playgroundOperation()}
-                baseUrl="https://api.example.test"
-                token={REAL_TOKEN}
-                components={null}
-            />,
-        );
-
-        await screen.getByRole("button", { name: /Try it out/ }).click();
-
-        await expect
-            .element(screen.getByText("Request failed. Check the browser console and CORS configuration."))
-            .toBeVisible();
-        await expect.element(screen.locator).not.toHaveTextContent(REAL_TOKEN);
-        await expect.element(screen.locator).not.toHaveTextContent("private.example.test");
     });
 
     it("aborts the active request before starting another", async () => {

@@ -8,11 +8,7 @@
         "test": "vitest run",
         "test:browser": "vitest run --project browser"
     },
-    "dependencies": {
-        "buffer": "^6.0.3"
-    },
     "devDependencies": {
-        "@apidevtools/json-schema-ref-parser": "^15.0.0",
         "@inertiajs/react": "^3.0.0",
         "@laravel/echo-react": "^2.0.0",
         "@lattice-php/lattice": "^0.36.0",

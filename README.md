@@ -287,12 +287,11 @@ own app's Vite build, not a published npm package, so its runtime dependencies w
 Add them to your app's `package.json`:
 
 ```bash
-npm install @apidevtools/json-schema-ref-parser @stoplight/json-schema-tree buffer
+npm install @stoplight/json-schema-tree
 ```
 
-`@apidevtools/json-schema-ref-parser` resolves `$ref`s when rendering a schema tree, `@stoplight/json-schema-tree`
-turns the dereferenced schema into a tree the viewer renders, and `buffer` polyfills a Node global the ref-parser
-package expects in browsers. Missing any of these surfaces as a build-time "cannot resolve module" error.
+`@stoplight/json-schema-tree` resolves local `$ref`s and turns the schema into the tree the viewer renders. If it is
+missing, Vite reports a build-time "cannot resolve module" error.
 
 If your app doesn't already render Lattice icons elsewhere, you'll also need an SVG sprite for the viewer's copy
 button and expand/collapse chevrons to actually be visible (the components render without one, just with empty

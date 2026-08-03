@@ -5,17 +5,49 @@ namespace Bambamboole\Spectacular\AsyncApi\Support;
 
 use BackedEnum;
 use DateTimeInterface;
+use Dedoc\Scramble\Infer\Services\FileNameResolver;
+use Dedoc\Scramble\OpenApiContext;
+use Dedoc\Scramble\PhpDoc\PhpDocTypeHelper;
+use Dedoc\Scramble\PhpDoc\PhpDocTypeWalker;
+use Dedoc\Scramble\PhpDoc\ResolveFqnPhpDocTypeVisitor;
+use Dedoc\Scramble\Scramble;
+use Dedoc\Scramble\Support\Generator\InfoObject;
+use Dedoc\Scramble\Support\Generator\OpenApi;
+use Dedoc\Scramble\Support\Generator\TypeTransformer;
+use Dedoc\Scramble\Support\PhpDoc;
+use Dedoc\Scramble\Support\Type\ArrayItemType_;
+use Dedoc\Scramble\Support\Type\ArrayType;
+use Dedoc\Scramble\Support\Type\IntegerType;
+use Dedoc\Scramble\Support\Type\KeyedArrayType;
+use Dedoc\Scramble\Support\Type\NullType;
+use Dedoc\Scramble\Support\Type\ObjectType;
+use Dedoc\Scramble\Support\Type\Type;
+use Dedoc\Scramble\Support\Type\TypeHelper;
+use Dedoc\Scramble\Support\Type\Union;
+use PHPStan\PhpDocParser\Ast\Type\IntersectionTypeNode;
+use PHPStan\PhpDocParser\Ast\Type\ObjectShapeNode;
+use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 use ReflectionClass;
 use ReflectionMethod;
-use ReflectionNamedType;
 use ReflectionProperty;
-use ReflectionType;
-use ReflectionUnionType;
 use Throwable;
 use UnitEnum;
 
 final class PayloadSchemaFactory
 {
+    private TypeTransformer $types;
+
+    public function __construct()
+    {
+        $openApi = OpenApi::make('3.1.0')->setInfo(new InfoObject('AsyncAPI payloads'));
+        $context = new OpenApiContext(
+            $openApi,
+            Scramble::getGeneratorConfig(Scramble::DEFAULT_API),
+        );
+
+        $this->types = app()->make(TypeTransformer::class, ['context' => $context]);
+    }
+
     /**
      * @param  class-string  $eventClass
      * @return array<string, mixed>
@@ -25,7 +57,7 @@ final class PayloadSchemaFactory
         $event = new ReflectionClass($eventClass);
 
         if ($event->hasMethod('broadcastWith')) {
-            $schema = $this->schemaFromBroadcastWith($event);
+            $schema = $this->schemaFromArrayReturn($event->getMethod('broadcastWith'));
 
             if ($schema !== null) {
                 return $schema;
@@ -47,7 +79,7 @@ final class PayloadSchemaFactory
             return ['type' => 'object'];
         }
 
-        return $this->schemaFromArrayReturn($class, $class->getMethod($methodName)) ?? ['type' => 'object'];
+        return $this->schemaFromArrayReturn($class->getMethod($methodName)) ?? ['type' => 'object'];
     }
 
     /**
@@ -59,7 +91,7 @@ final class PayloadSchemaFactory
         $notification = new ReflectionClass($notificationClass);
 
         if ($notification->hasMethod('broadcastWith')) {
-            return $this->schemaFromArrayReturn($notification, $notification->getMethod('broadcastWith')) ?? ['type' => 'object'];
+            return $this->schemaFromArrayReturn($notification->getMethod('broadcastWith')) ?? ['type' => 'object'];
         }
 
         $schema = ['type' => 'object'];
@@ -69,7 +101,7 @@ final class PayloadSchemaFactory
                 continue;
             }
 
-            $schema = $this->schemaFromArrayReturn($notification, $notification->getMethod($methodName)) ?? $schema;
+            $schema = $this->schemaFromArrayReturn($notification->getMethod($methodName)) ?? $schema;
 
             break;
         }
@@ -78,48 +110,76 @@ final class PayloadSchemaFactory
     }
 
     /**
-     * @param  ReflectionClass<object>  $event
      * @return array<string, mixed>|null
      */
-    private function schemaFromBroadcastWith(ReflectionClass $event): ?array
+    private function schemaFromArrayReturn(ReflectionMethod $method): ?array
     {
-        return $this->schemaFromArrayReturn($event, $event->getMethod('broadcastWith'));
+        $type = $this->payloadType($method);
+
+        if ($type instanceof KeyedArrayType && ! $type->isList) {
+            return $this->schemaFromType($type);
+        }
+
+        if ($type instanceof ArrayType && ! $type->key instanceof IntegerType) {
+            return $this->schemaFromType($type);
+        }
+
+        return $method->hasReturnType() ? ['type' => 'object'] : null;
     }
 
-    /**
-     * @param  ReflectionClass<object>  $class
-     * @return array<string, mixed>|null
-     */
-    private function schemaFromArrayReturn(ReflectionClass $class, ReflectionMethod $method): ?array
+    private function payloadType(ReflectionMethod $method): ?Type
+    {
+        $typeNode = $this->returnTypeNode($method);
+
+        if ($typeNode === null) {
+            return null;
+        }
+
+        if ($typeNode instanceof IntersectionTypeNode) {
+            foreach ($typeNode->types as $intersectionType) {
+                if (! $intersectionType instanceof ObjectShapeNode) {
+                    continue;
+                }
+
+                foreach ($intersectionType->items as $item) {
+                    if ((string) $item->keyName === 'data') {
+                        if ($resolver = $this->nameResolver($method)) {
+                            PhpDocTypeWalker::traverse($item->valueType, [
+                                new ResolveFqnPhpDocTypeVisitor($resolver),
+                            ]);
+                        }
+
+                        return PhpDocTypeHelper::toType($item->valueType);
+                    }
+                }
+            }
+        }
+
+        return PhpDocTypeHelper::toType($typeNode);
+    }
+
+    private function returnTypeNode(ReflectionMethod $method): ?TypeNode
     {
         $doc = $method->getDocComment();
 
         if ($doc === false) {
-            return $method->hasReturnType() ? ['type' => 'object'] : null;
-        }
-
-        if (! preg_match('/@return\s+([^\n]+)/', $doc, $matches)) {
             return null;
         }
 
-        $returnType = trim(str_replace('*/', '', $matches[1]));
+        try {
+            $returnTag = array_values(PhpDoc::parse($doc, $this->nameResolver($method))->getReturnTagValues())[0] ?? null;
 
-        if (str_starts_with($returnType, 'array{') && str_ends_with($returnType, '}')) {
-            return $this->schemaFromArrayShape($class, substr($returnType, 6, -1)) ?? ['type' => 'object'];
+            return $returnTag?->type;
+        } catch (Throwable) {
+            return null;
         }
+    }
 
-        if (preg_match('/^array<string,\s*(.+)>$/', $returnType, $matches)) {
-            return [
-                'type' => 'object',
-                'additionalProperties' => $this->schemaFromDocType($matches[1], $class),
-            ];
-        }
+    private function nameResolver(ReflectionMethod $method): ?FileNameResolver
+    {
+        $file = $method->getFileName();
 
-        if (preg_match('/object\s*\{\s*data\s*:\s*array\s*\{(.+)\}\s*\}/', $returnType, $matches)) {
-            return $this->schemaFromArrayShape($class, $matches[1]) ?? ['type' => 'object'];
-        }
-
-        return ['type' => 'object'];
+        return is_string($file) ? FileNameResolver::createForFile($file) : null;
     }
 
     /**
@@ -173,39 +233,6 @@ final class PayloadSchemaFactory
 
     /**
      * @param  ReflectionClass<object>  $event
-     * @return array<string, mixed>|null
-     */
-    private function schemaFromArrayShape(ReflectionClass $event, string $shape): ?array
-    {
-        $properties = [];
-        $required = [];
-
-        foreach ($this->splitTopLevel($shape) as $entry) {
-            $parts = array_map(trim(...), explode(':', $entry, 2));
-
-            if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
-                return null;
-            }
-
-            [$key, $type] = $parts;
-            $isOptional = str_ends_with($key, '?');
-            $key = rtrim($key, '?');
-            $properties[$key] = $this->schemaFromDocType($type, $event);
-
-            if (! $isOptional) {
-                $required[] = $key;
-            }
-        }
-
-        return array_filter([
-            'type' => 'object',
-            'properties' => $properties,
-            'required' => $required,
-        ], fn (mixed $value): bool => $value !== []);
-    }
-
-    /**
-     * @param  ReflectionClass<object>  $event
      * @return array<string, mixed>
      */
     private function schemaFromPublicProperties(ReflectionClass $event): array
@@ -214,13 +241,17 @@ final class PayloadSchemaFactory
         $required = [];
 
         foreach ($event->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+            $reflectionType = $property->getType();
+
             if ($property->isStatic() || $property->getName() === 'broadcastQueue') {
                 continue;
             }
 
-            $properties[$property->getName()] = $this->schemaFromReflectionType($property->getType());
+            $properties[$property->getName()] = $reflectionType === null
+                ? []
+                : $this->schemaFromType(TypeHelper::createTypeFromReflectionType($reflectionType));
 
-            if (! $property->getType()?->allowsNull()) {
+            if (! $reflectionType?->allowsNull()) {
                 $required[] = $property->getName();
             }
         }
@@ -235,218 +266,91 @@ final class PayloadSchemaFactory
     /**
      * @return array<string, mixed>
      */
-    private function schemaFromReflectionType(?ReflectionType $type): array
+    private function schemaFromType(Type $type): array
     {
-        if ($type instanceof ReflectionUnionType) {
-            $schemas = collect($type->getTypes())
-                ->map(fn (ReflectionNamedType $namedType): array => $this->schemaFromNamedType($namedType->getName()))
-                ->all();
+        if ($type instanceof ArrayItemType_) {
+            return $this->schemaFromType($type->value);
+        }
 
-            if ($this->isNullableUnion($type) && count($schemas) === 2) {
-                $nonNullSchema = collect($schemas)
-                    ->first(fn (array $schema): bool => $schema !== ['type' => 'null']);
+        if ($type instanceof ObjectType) {
+            return $this->schemaFromObjectType($type);
+        }
 
-                return $this->nullableSchema($nonNullSchema ?? []);
+        if ($type instanceof KeyedArrayType) {
+            $schema = $this->types->transform($type)->toArray();
+
+            foreach ($type->items as $item) {
+                if ($item->key !== null) {
+                    $schema['properties'][(string) $item->key] = $this->schemaFromType($item->value);
+                }
             }
 
-            return ['oneOf' => $schemas];
+            return $schema;
         }
 
-        if ($type instanceof ReflectionNamedType) {
-            $schema = $this->schemaFromNamedType($type->getName());
+        if ($type instanceof ArrayType) {
+            $valueSchema = $this->schemaFromType($type->value);
 
-            return $type->allowsNull() && $type->getName() !== 'mixed'
-                ? $this->nullableSchema($schema)
-                : $schema;
+            return array_filter(
+                $type->key instanceof IntegerType
+                    ? ['type' => 'array', 'items' => $valueSchema]
+                    : ['type' => 'object', 'additionalProperties' => $valueSchema],
+                fn (mixed $value): bool => $value !== [],
+            );
         }
 
-        return [];
-    }
+        if ($type instanceof Union) {
+            $nonNullTypes = array_values(array_filter(
+                $type->types,
+                fn (Type $member): bool => ! $member instanceof NullType,
+            ));
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function schemaFromNamedType(string $type): array
-    {
-        return match ($type) {
-            'int' => ['type' => 'integer'],
-            'float' => ['type' => 'number'],
-            'string' => ['type' => 'string'],
-            'bool' => ['type' => 'boolean'],
-            'array' => ['type' => 'array'],
-            'mixed' => [],
-            'null' => ['type' => 'null'],
-            default => $this->schemaFromClassType($type),
-        };
-    }
+            if (count($type->types) === 2 && count($nonNullTypes) === 1) {
+                $schema = $this->schemaFromType($nonNullTypes[0]);
 
-    /**
-     * @param  ReflectionClass<object>  $event
-     * @return array<string, mixed>
-     */
-    private function schemaFromDocType(string $type, ReflectionClass $event): array
-    {
-        $type = trim($type);
-
-        if (str_starts_with($type, '?')) {
-            return $this->nullableSchema($this->schemaFromDocType(substr($type, 1), $event));
-        }
-
-        if (str_contains($type, '|')) {
-            $parts = array_map(trim(...), explode('|', $type));
-
-            if (in_array('null', $parts, true) && count($parts) === 2) {
-                $nonNullType = collect($parts)->first(fn (string $part): bool => $part !== 'null');
-
-                return $this->nullableSchema($this->schemaFromDocType($nonNullType ?? 'mixed', $event));
+                return $schema === [] ? [] : $this->nullableSchema($schema);
             }
 
-            return [
-                'oneOf' => array_map(fn (string $part): array => $this->schemaFromDocType($part, $event), $parts),
-            ];
+            return ['oneOf' => array_map($this->schemaFromType(...), $type->types)];
         }
 
-        if (preg_match('/^list<(.+)>$/', $type, $matches)) {
-            return [
-                'type' => 'array',
-                'items' => $this->schemaFromDocType($matches[1], $event),
-            ];
-        }
-
-        if (preg_match('/^array<int,\s*(.+)>$/', $type, $matches)) {
-            return [
-                'type' => 'array',
-                'items' => $this->schemaFromDocType($matches[1], $event),
-            ];
-        }
-
-        if (preg_match('/^array<string,\s*(.+)>$/', $type, $matches)) {
-            return [
-                'type' => 'object',
-                'additionalProperties' => $this->schemaFromDocType($matches[1], $event),
-            ];
-        }
-
-        return $this->schemaFromNamedType($this->resolveDocType($type, $event));
+        return (array) $this->types->transform($type)->toArray();
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function schemaFromClassType(string $type): array
+    private function schemaFromObjectType(ObjectType $type): array
     {
-        if (is_a($type, DateTimeInterface::class, true)) {
+        if ($type->name === 'mixed') {
+            return [];
+        }
+
+        if (is_a($type->name, DateTimeInterface::class, true)) {
             return [
                 'type' => 'string',
                 'format' => 'date-time',
-                'x-php-type' => $type,
+                'x-php-type' => $type->name,
             ];
         }
 
-        if (enum_exists($type)) {
-            $cases = $type::cases();
+        if (enum_exists($type->name)) {
             $values = array_map(
                 fn (UnitEnum $case): string|int => $case instanceof BackedEnum ? $case->value : $case->name,
-                $cases,
+                $type->name::cases(),
             );
 
             return [
                 'type' => is_int($values[0] ?? '') ? 'integer' : 'string',
                 'enum' => $values,
-                'x-php-type' => $type,
+                'x-php-type' => $type->name,
             ];
         }
 
         return [
             'type' => 'object',
-            'x-php-type' => $type,
+            'x-php-type' => $type->name,
         ];
-    }
-
-    /**
-     * @param  ReflectionClass<object>  $event
-     */
-    private function resolveDocType(string $type, ReflectionClass $event): string
-    {
-        $type = ltrim($type, '\\');
-
-        if (in_array($type, ['int', 'float', 'string', 'bool', 'array', 'mixed', 'null'], true)) {
-            return $type;
-        }
-
-        $uses = $this->useStatements($event);
-
-        if (isset($uses[$type])) {
-            return $uses[$type];
-        }
-
-        $sameNamespace = $event->getNamespaceName().'\\'.$type;
-
-        if (class_exists($sameNamespace) || enum_exists($sameNamespace)) {
-            return $sameNamespace;
-        }
-
-        return $type;
-    }
-
-    /**
-     * @param  ReflectionClass<object>  $event
-     * @return array<string, class-string>
-     */
-    private function useStatements(ReflectionClass $event): array
-    {
-        $file = $event->getFileName();
-
-        if (! is_string($file)) {
-            return [];
-        }
-
-        preg_match_all('/^use\s+([^;]+);/m', (string) file_get_contents($file), $matches);
-
-        return collect($matches[1])
-            ->mapWithKeys(function (string $use): array {
-                $parts = preg_split('/\s+as\s+/i', trim($use));
-                $class = ltrim($parts[0], '\\');
-                $alias = $parts[1] ?? class_basename($class);
-
-                return [$alias => $class];
-            })
-            ->all();
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function splitTopLevel(string $value): array
-    {
-        $parts = [];
-        $buffer = '';
-        $depth = 0;
-
-        foreach (str_split($value) as $character) {
-            if (in_array($character, ['<', '{', '('], true)) {
-                $depth++;
-            }
-
-            if (in_array($character, ['>', '}', ')'], true)) {
-                $depth--;
-            }
-
-            if ($character === ',' && $depth === 0) {
-                $parts[] = trim($buffer);
-                $buffer = '';
-
-                continue;
-            }
-
-            $buffer .= $character;
-        }
-
-        if (trim($buffer) !== '') {
-            $parts[] = trim($buffer);
-        }
-
-        return $parts;
     }
 
     /**
@@ -465,16 +369,5 @@ final class PayloadSchemaFactory
                 ['type' => 'null'],
             ],
         ];
-    }
-
-    private function isNullableUnion(ReflectionUnionType $type): bool
-    {
-        foreach ($type->getTypes() as $namedType) {
-            if ($namedType->getName() === 'null') {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

@@ -67,6 +67,15 @@ it('falls back to object schemas for malformed array-shape payload docs', functi
     expect($schema)->toBe(['type' => 'object']);
 });
 
+it('infers associative generic payload docs', function (): void {
+    $schema = app(PayloadSchemaFactory::class)->forMethod(AssociativePayload::class, 'webhookPayload');
+
+    expect($schema)->toBe([
+        'type' => 'object',
+        'additionalProperties' => ['type' => 'integer'],
+    ]);
+});
+
 it('does not add default notification fields when broadcastWith defines the payload', function (): void {
     $schema = app(PayloadSchemaFactory::class)->forNotification(CustomBroadcastWithNotification::class);
 
@@ -103,6 +112,13 @@ it('maps dates, enums, nullable types, and unknown objects', function (): void {
     ]);
 });
 
+it('keeps untyped public property schemas unconstrained', function (): void {
+    $schema = app(PayloadSchemaFactory::class)->forEvent(MixedPublicPropertiesBroadcast::class);
+
+    expect($schema['properties']['payload'])->toBe([])
+        ->and($schema['required'] ?? null)->toBeNull();
+});
+
 final class MalformedArrayShapePayload
 {
     /**
@@ -112,4 +128,20 @@ final class MalformedArrayShapePayload
     {
         return [123];
     }
+}
+
+final class AssociativePayload
+{
+    /**
+     * @return array<string, int>
+     */
+    public function webhookPayload(): array
+    {
+        return [];
+    }
+}
+
+final class MixedPublicPropertiesBroadcast
+{
+    public mixed $payload;
 }

@@ -4,103 +4,50 @@ declare(strict_types=1);
 
 use Bambamboole\Spectacular\Doc\Lattice\ApiReference;
 
-it('serializes to the spectacular.api-reference node with a url', function (): void {
-    $node = ApiReference::make()
-        ->url('/openapi.json')
-        ->jsonSerialize();
+it('serializes the spectacular.api-reference node', function (): void {
+    $node = ApiReference::make()->url('/openapi.json')->jsonSerialize();
 
     expect($node['type'])->toBe('spectacular.api-reference')
         ->and($node['props']['url'])->toBe('/openapi.json');
 });
 
-it('serializes to the spectacular.api-reference node with an inline spec', function (): void {
-    $node = ApiReference::make()
-        ->spec(['openapi' => '3.0.0'])
-        ->jsonSerialize();
-
-    expect($node['type'])->toBe('spectacular.api-reference')
-        ->and($node['props']['spec'])->toBe(['openapi' => '3.0.0']);
+it('defaults to the unmodified reference', function (): void {
+    expect(ApiReference::make()->jsonSerialize()['props'])->toMatchArray([
+        'operation' => null,
+        'tags' => null,
+        'hideNav' => false,
+        'layout' => 'sidebar',
+        'defaultOperation' => null,
+        'hideHeader' => false,
+        'title' => null,
+        'expandDepth' => 0,
+        'token' => null,
+    ]);
 });
 
-it('defaults to the current no-modifier behaviour', function (): void {
-    $props = ApiReference::make()->jsonSerialize()['props'];
+it('serializes fluent options', function (Closure $configure, string $property, mixed $expected): void {
+    $props = $configure(ApiReference::make())->jsonSerialize()['props'];
 
-    expect($props['operation'])->toBeNull()
-        ->and($props['tags'])->toBeNull()
-        ->and($props['hideNav'])->toBeFalse()
-        ->and($props['layout'])->toBe('sidebar')
-        ->and($props['defaultOperation'])->toBeNull()
-        ->and($props['hideHeader'])->toBeFalse()
-        ->and($props['title'])->toBeNull()
-        ->and($props['expandDepth'])->toBe(0);
-});
+    expect($props[$property])->toBe($expected);
+})->with([
+    'inline spec' => [fn (ApiReference $reference): ApiReference => $reference->spec(['openapi' => '3.0.0']), 'spec', ['openapi' => '3.0.0']],
+    'token' => [fn (ApiReference $reference): ApiReference => $reference->token('secret-token'), 'token', 'secret-token'],
+    'operation' => [fn (ApiReference $reference): ApiReference => $reference->operation('get-users-id'), 'operation', 'get-users-id'],
+    'hidden navigation' => [fn (ApiReference $reference): ApiReference => $reference->hideNav(), 'hideNav', true],
+    'stacked layout' => [fn (ApiReference $reference): ApiReference => $reference->layout('stacked'), 'layout', 'stacked'],
+    'default operation' => [fn (ApiReference $reference): ApiReference => $reference->defaultOperation('get-users-id'), 'defaultOperation', 'get-users-id'],
+    'hidden header' => [fn (ApiReference $reference): ApiReference => $reference->hideHeader(), 'hideHeader', true],
+    'title' => [fn (ApiReference $reference): ApiReference => $reference->title('My API'), 'title', 'My API'],
+    'expand depth' => [fn (ApiReference $reference): ApiReference => $reference->expandDepth(2), 'expandDepth', 2],
+]);
 
-it('defaults the request token to null', function (): void {
-    $props = ApiReference::make()->jsonSerialize()['props'];
+it('normalizes tag input', function (string|array $tags, array $expected): void {
+    expect(ApiReference::make()->tag($tags)->jsonSerialize()['props']['tags'])->toBe($expected);
+})->with([
+    'single tag' => ['Users', ['Users']],
+    'tag list' => [['A', 'B'], ['A', 'B']],
+]);
 
-    expect($props['token'])->toBeNull();
-});
-
-it('sets the bearer token used by the request playground', function (): void {
-    $props = ApiReference::make()->token('secret-token')->jsonSerialize()['props'];
-
-    expect($props['token'])->toBe('secret-token');
-});
-
-it('sets the operation prop for embedding a single endpoint', function (): void {
-    $node = ApiReference::make()->operation('get-users-id')->jsonSerialize();
-
-    expect($node['props']['operation'])->toBe('get-users-id');
-});
-
-it('normalises a single tag string into a list', function (): void {
-    $node = ApiReference::make()->tag('Users')->jsonSerialize();
-
-    expect($node['props']['tags'])->toBe(['Users']);
-});
-
-it('keeps a list of tags as given', function (): void {
-    $node = ApiReference::make()->tag(['A', 'B'])->jsonSerialize();
-
-    expect($node['props']['tags'])->toBe(['A', 'B']);
-});
-
-it('sets hideNav', function (): void {
-    $node = ApiReference::make()->hideNav()->jsonSerialize();
-
-    expect($node['props']['hideNav'])->toBeTrue();
-});
-
-it('sets the stacked layout', function (): void {
-    $node = ApiReference::make()->layout('stacked')->jsonSerialize();
-
-    expect($node['props']['layout'])->toBe('stacked');
-});
-
-it('throws for an invalid layout', function (): void {
+it('rejects an invalid layout', function (): void {
     ApiReference::make()->layout('bogus');
 })->throws(InvalidArgumentException::class);
-
-it('sets the defaultOperation prop', function (): void {
-    $node = ApiReference::make()->defaultOperation('get-users-id')->jsonSerialize();
-
-    expect($node['props']['defaultOperation'])->toBe('get-users-id');
-});
-
-it('sets hideHeader', function (): void {
-    $node = ApiReference::make()->hideHeader()->jsonSerialize();
-
-    expect($node['props']['hideHeader'])->toBeTrue();
-});
-
-it('sets the title prop', function (): void {
-    $node = ApiReference::make()->title('My API')->jsonSerialize();
-
-    expect($node['props']['title'])->toBe('My API');
-});
-
-it('sets the expandDepth prop', function (): void {
-    $node = ApiReference::make()->expandDepth(2)->jsonSerialize();
-
-    expect($node['props']['expandDepth'])->toBe(2);
-});
