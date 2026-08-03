@@ -1,0 +1,51 @@
+import { describe, expect, it } from "vitest";
+import { render } from "vitest-browser-react";
+import { OperationView } from "./OperationView";
+
+describe("OperationView", () => {
+    it("shows example descriptions and external values", async () => {
+        const screen = await render(
+            <OperationView
+                operationId="get-widgets"
+                spec={{
+                    openapi: "3.1.0",
+                    info: { title: "Widgets", version: "1.0.0" },
+                    paths: {
+                        "/widgets": {
+                            get: {
+                                responses: {
+                                    "200": {
+                                        description: "OK",
+                                        content: {
+                                            "application/json": {
+                                                examples: {
+                                                    inline: {
+                                                        description: "A complete inline example.",
+                                                        value: { id: 1 },
+                                                    },
+                                                    external: {
+                                                        summary: "Large payload",
+                                                        externalValue: "https://example.test/widgets.json",
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                }}
+            />,
+        );
+
+        await screen.getByRole("radio", { name: "Example" }).click();
+        await expect.element(screen.getByText("A complete inline example.")).toBeVisible();
+
+        await screen.getByRole("combobox").selectOptions("1");
+        await expect.element(screen.getByRole("link", { name: "Open external example" })).toHaveAttribute(
+            "href",
+            "https://example.test/widgets.json",
+        );
+    });
+});

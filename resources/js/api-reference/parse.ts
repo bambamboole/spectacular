@@ -26,15 +26,24 @@ type RawParameter = {
     description?: string | null;
     schema?: unknown;
     example?: unknown;
+    examples?: Record<string, RawExample>;
     style?: string | null;
     explode?: boolean | null;
+    $ref?: string;
+};
+
+type RawExample = {
+    summary?: string | null;
+    description?: string | null;
+    value?: unknown;
+    externalValue?: string | null;
     $ref?: string;
 };
 
 type RawMediaTypeObject = {
     schema?: unknown;
     example?: unknown;
-    examples?: Record<string, { summary?: string; description?: string; value?: unknown; $ref?: string }>;
+    examples?: Record<string, RawExample>;
 };
 
 type RawRequestBody = {
@@ -85,11 +94,11 @@ function operationId(method: string, path: string): string {
 }
 
 function operationTitle(operation: RawOperation, method: string, path: string): string {
-    if (typeof operation.operationId === "string" && operation.operationId !== "") {
-        return operation.operationId;
-    }
     if (typeof operation.summary === "string" && operation.summary !== "") {
         return operation.summary;
+    }
+    if (typeof operation.operationId === "string" && operation.operationId !== "") {
+        return operation.operationId;
     }
 
     return `${method.toUpperCase()} ${path}`;
@@ -201,7 +210,7 @@ function slugifyTag(tag: string): string {
         .replace(/^-+|-+$/g, "");
 }
 
-function buildParam(parameter: RawParameter): Param {
+function buildParam(spec: any, parameter: RawParameter): Param {
     const schema = parameter.schema ?? {};
 
     return {
@@ -211,15 +220,20 @@ function buildParam(parameter: RawParameter): Param {
         deprecated: Boolean(parameter.deprecated),
         description: parameter.description ?? null,
         schema,
-        example: parameterExample(parameter.example, schema),
+        example: parameterExample(spec, parameter, schema),
         ...(parameter.style === undefined ? {} : { style: parameter.style }),
         ...(parameter.explode === undefined ? {} : { explode: parameter.explode }),
     };
 }
 
-function parameterExample(example: unknown, schema: unknown): unknown {
-    if (example !== undefined) {
-        return example;
+function parameterExample(spec: any, parameter: RawParameter, schema: unknown): unknown {
+    if (parameter.example !== undefined) {
+        return parameter.example;
+    }
+
+    const namedExample = firstExampleValue(spec, parameter.examples);
+    if (namedExample !== undefined) {
+        return namedExample;
     }
 
     const schemaExample = schemaValue(schema, "example");
@@ -227,10 +241,29 @@ function parameterExample(example: unknown, schema: unknown): unknown {
         return schemaExample;
     }
 
+    const schemaExamples = schemaValue(schema, "examples");
+    if (Array.isArray(schemaExamples) && schemaExamples.length > 0) {
+        return schemaExamples[0];
+    }
+
     return schemaValue(schema, "default") ?? null;
 }
 
-function schemaValue(schema: unknown, key: "example" | "default"): unknown | undefined {
+function firstExampleValue(spec: any, examples: Record<string, RawExample> | undefined): unknown | undefined {
+    if (!examples) return undefined;
+
+    for (const example of Object.values(examples)) {
+        const resolved = example.$ref ? (resolveRef<RawExample>(spec, example.$ref, "examples") ?? example) : example;
+
+        if (resolved.value !== undefined) {
+            return resolved.value;
+        }
+    }
+
+    return undefined;
+}
+
+function schemaValue(schema: unknown, key: "example" | "examples" | "default"): unknown | undefined {
     if (typeof schema !== "object" || schema === null || !(key in schema)) {
         return undefined;
     }
@@ -246,7 +279,7 @@ function buildResponseHeaders(spec: any, headers: Record<string, RawParameter> |
             ? (resolveRef<RawParameter>(spec, header.$ref, "headers") ?? header)
             : header;
 
-        return buildParam({ ...resolved, name, in: "header" });
+        return buildParam(spec, { ...resolved, name, in: "header" });
     });
 }
 
@@ -265,7 +298,7 @@ function buildParamGroups(spec: any, sharedParameters: RawParameter[], operation
     const buckets = new Map<string, Param[]>();
     for (const parameter of merged.values()) {
         const bucket = buckets.get(parameter.in) ?? [];
-        bucket.push(buildParam(parameter));
+        bucket.push(buildParam(spec, parameter));
         buckets.set(parameter.in, bucket);
     }
 
@@ -289,7 +322,13 @@ function buildExamples(spec: any, mediaTypeObject: RawMediaTypeObject | undefine
             const resolved =
                 ex && typeof ex === "object" && "$ref" in ex ? (resolveRef<any>(spec, ex.$ref, "examples") ?? ex) : ex;
 
-            return { name, summary: resolved?.summary ?? null, value: resolved?.value };
+            return {
+                name,
+                summary: resolved?.summary ?? null,
+                ...(resolved?.description === undefined ? {} : { description: resolved.description }),
+                ...(resolved?.externalValue === undefined ? {} : { externalValue: resolved.externalValue }),
+                value: resolved?.value,
+            };
         });
     }
 

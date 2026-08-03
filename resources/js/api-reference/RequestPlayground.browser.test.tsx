@@ -112,6 +112,7 @@ describe("RequestPlayground", () => {
         const body = screen.getByLabelText("JSON body");
         const snippet = screen.getByLabelText("Request snippet", { exact: true });
 
+        await expect.element(id).toHaveValue("42");
         await expect.element(screen.getByLabelText("status")).toBeVisible();
         await expect.element(screen.getByLabelText("X-Debug")).toBeVisible();
         await expect.element(body).toBeVisible();
@@ -238,6 +239,48 @@ describe("RequestPlayground", () => {
         await expect.element(traceField).toHaveAttribute("aria-describedby");
         await expect.element(idField).toHaveFocus();
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("maps schema formats and constraints to native inputs", async () => {
+        const email = parameter({
+            name: "email",
+            required: true,
+            schema: {
+                type: "string",
+                format: "email",
+                minLength: 5,
+                maxLength: 64,
+                pattern: "^[^@]+@[^@]+$",
+            },
+        });
+        const rating = parameter({
+            name: "rating",
+            schema: { type: "number", minimum: 1, maximum: 10, multipleOf: 0.5 },
+        });
+        const birthday = parameter({ name: "birthday", schema: { type: "string", format: "date" } });
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    paramGroups: [{ location: "query", params: [email, rating, birthday] }],
+                    requests: [],
+                })}
+                baseUrl="https://api.example.test"
+                token={null}
+                components={null}
+            />,
+        );
+
+        await screen.getByRole("button", { name: "Try it out" }).click();
+
+        await expect.element(screen.getByLabelText("email")).toHaveAttribute("type", "email");
+        await expect.element(screen.getByLabelText("email")).toHaveAttribute("minlength", "5");
+        await expect.element(screen.getByLabelText("email")).toHaveAttribute("maxlength", "64");
+        await expect.element(screen.getByLabelText("email")).toHaveAttribute("pattern", "^[^@]+@[^@]+$");
+        await expect.element(screen.getByLabelText("rating")).toHaveAttribute("type", "number");
+        await expect.element(screen.getByLabelText("rating")).toHaveAttribute("min", "1");
+        await expect.element(screen.getByLabelText("rating")).toHaveAttribute("max", "10");
+        await expect.element(screen.getByLabelText("rating")).toHaveAttribute("step", "0.5");
+        await expect.element(screen.getByLabelText("birthday")).toHaveAttribute("type", "date");
     });
 
     it("shows and executes the selected operation-level server instead of the root server", async () => {

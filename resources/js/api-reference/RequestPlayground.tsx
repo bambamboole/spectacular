@@ -363,9 +363,15 @@ function ParameterField({
             ) : (
                 <Input
                     id={id}
-                    type={schema.type === "integer" || schema.type === "number" ? "number" : "text"}
+                    type={parameterInputType(schema)}
                     value={value}
                     required={param.required}
+                    min={parameterMinimum(schema)}
+                    max={parameterMaximum(schema)}
+                    step={parameterStep(schema)}
+                    minLength={numberValue(schema.minLength)}
+                    maxLength={numberValue(schema.maxLength)}
+                    pattern={typeof schema.pattern === "string" ? schema.pattern : undefined}
                     aria-invalid={error !== null}
                     aria-describedby={error ? `${idPrefix}-${fieldId(key)}-error` : undefined}
                     data-field-key={key}
@@ -435,6 +441,52 @@ function parameterArrayOptions(schema: Record<string, unknown>): string[] {
     }
 
     return schema.items.enum.filter((option): option is string => typeof option === "string");
+}
+
+function parameterInputType(schema: Record<string, unknown>): React.HTMLInputTypeAttribute {
+    if (schema.type === "number" || schema.type === "integer") {
+        return "number";
+    }
+
+    switch (schema.format) {
+        case "email":
+            return "email";
+        case "uri":
+        case "url":
+            return "url";
+        case "date":
+            return "date";
+        case "password":
+            return "password";
+        default:
+            return "text";
+    }
+}
+
+function parameterMinimum(schema: Record<string, unknown>): number | undefined {
+    return numberValue(schema.minimum) ?? numberValue(schema.exclusiveMinimum);
+}
+
+function parameterMaximum(schema: Record<string, unknown>): number | undefined {
+    return numberValue(schema.maximum) ?? numberValue(schema.exclusiveMaximum);
+}
+
+function parameterStep(schema: Record<string, unknown>): number | "any" | undefined {
+    const multipleOf = numberValue(schema.multipleOf);
+
+    if (multipleOf !== undefined) {
+        return multipleOf;
+    }
+
+    if (schema.type === "integer") {
+        return 1;
+    }
+
+    return schema.type === "number" ? "any" : undefined;
+}
+
+function numberValue(value: unknown): number | undefined {
+    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function fieldId(key: string): string {

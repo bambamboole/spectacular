@@ -275,6 +275,33 @@ Validation failed
         expect(markdown).not.toContain("#/components/schemas/");
     });
 
+    it("serializes example descriptions and external values", () => {
+        const markdown = operationToMarkdown({
+            ...operation,
+            requests: [],
+            responses: [
+                {
+                    ...operation.responses[0]!,
+                    schema: null,
+                    examples: [
+                        {
+                            name: "large",
+                            summary: "Large payload",
+                            description: "Stored outside the specification.",
+                            externalValue: "https://example.test/widgets.json",
+                            value: undefined,
+                        },
+                    ],
+                },
+            ],
+        });
+
+        expect(markdown).toContain("Large payload");
+        expect(markdown).toContain("Stored outside the specification.");
+        expect(markdown).toContain("[Open external example](https://example.test/widgets.json)");
+        expect(markdown).not.toContain("```json\nundefined");
+    });
+
     it("keeps direct recursive schemas finite and self-contained", () => {
         const markdown = operationToMarkdown(
             {

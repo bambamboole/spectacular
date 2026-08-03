@@ -320,6 +320,37 @@ describe("buildRequest", () => {
         });
     });
 
+    it.each([
+        [{ type: "number" }, "not-a-number", "Enter a number."],
+        [{ type: "integer" }, "1.5", "Enter an integer."],
+        [{ type: "number", minimum: 1 }, "0", "Enter a value greater than or equal to 1."],
+        [{ type: "number", exclusiveMinimum: 1 }, "1", "Enter a value greater than 1."],
+        [{ type: "number", maximum: 10 }, "11", "Enter a value less than or equal to 10."],
+        [{ type: "number", exclusiveMaximum: 10 }, "10", "Enter a value less than 10."],
+        [{ type: "number", multipleOf: 0.5 }, "1.2", "Enter a multiple of 0.5."],
+        [{ type: "string", minLength: 3 }, "ab", "Enter at least 3 characters."],
+        [{ type: "string", maxLength: 3 }, "abcd", "Enter no more than 3 characters."],
+        [{ type: "string", pattern: "^[a-z]+$" }, "ABC", "Match the required pattern."],
+    ])("validates a parameter against its schema constraints", (schema, value, message) => {
+        const constrained = parameter({ name: "constrained", schema });
+
+        expect(
+            buildRequest({
+                operation: operation([constrained]),
+                baseUrl: "https://api.example.test",
+                values: values([[constrained, value]]),
+                token: null,
+            }),
+        ).toEqual({
+            request: null,
+            errors: {
+                parameters: { "query:constrained": message },
+                body: null,
+                request: null,
+            },
+        });
+    });
+
     it("rejects missing and invalid required JSON bodies", () => {
         const requiredJson = requestContract({ required: true });
 

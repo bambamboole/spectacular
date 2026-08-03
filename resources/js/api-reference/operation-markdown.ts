@@ -140,6 +140,8 @@ function exampleSection(example: ContractExample, headingLevel: number): string 
     return [
         `${"#".repeat(headingLevel)} ${label}`,
         example.summary,
+        example.description,
+        example.externalValue ? `[Open external example](${example.externalValue})` : null,
         jsonFence(example.value),
     ]
         .filter((section): section is string => Boolean(section))

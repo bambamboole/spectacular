@@ -118,8 +118,98 @@ function validateParameters(parameters: Param[], values: RequestValues, errors: 
 
         if (param.required && value === "") {
             errors.parameters[key] = `This ${parameterLocationLabel(param.location)} parameter is required.`;
+
+            continue;
+        }
+
+        const constraintError = parameterConstraintError(param, value);
+        if (constraintError !== null) {
+            errors.parameters[key] = constraintError;
         }
     }
+}
+
+function parameterConstraintError(param: Param, value: string): string | null {
+    if (value === "" || !isRecord(param.schema)) {
+        return null;
+    }
+
+    if (param.schema.type === "number" || param.schema.type === "integer") {
+        return numericConstraintError(param.schema, value);
+    }
+
+    if (param.schema.type === "string") {
+        return stringConstraintError(param.schema, value);
+    }
+
+    return null;
+}
+
+function numericConstraintError(schema: Record<string, unknown>, value: string): string | null {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+        return "Enter a number.";
+    }
+    if (schema.type === "integer" && !Number.isInteger(number)) {
+        return "Enter an integer.";
+    }
+
+    const minimum = numberValue(schema.minimum);
+    const exclusiveMinimum = schema.exclusiveMinimum === true ? minimum : numberValue(schema.exclusiveMinimum);
+    if (exclusiveMinimum !== null && number <= exclusiveMinimum) {
+        return `Enter a value greater than ${exclusiveMinimum}.`;
+    }
+    if (minimum !== null && number < minimum) {
+        return `Enter a value greater than or equal to ${minimum}.`;
+    }
+
+    const maximum = numberValue(schema.maximum);
+    const exclusiveMaximum = schema.exclusiveMaximum === true ? maximum : numberValue(schema.exclusiveMaximum);
+    if (exclusiveMaximum !== null && number >= exclusiveMaximum) {
+        return `Enter a value less than ${exclusiveMaximum}.`;
+    }
+    if (maximum !== null && number > maximum) {
+        return `Enter a value less than or equal to ${maximum}.`;
+    }
+
+    const multipleOf = numberValue(schema.multipleOf);
+    if (multipleOf !== null && multipleOf > 0) {
+        const quotient = number / multipleOf;
+        if (Math.abs(quotient - Math.round(quotient)) > 1e-9) {
+            return `Enter a multiple of ${multipleOf}.`;
+        }
+    }
+
+    return null;
+}
+
+function stringConstraintError(schema: Record<string, unknown>, value: string): string | null {
+    const length = [...value].length;
+    const minLength = numberValue(schema.minLength);
+    if (minLength !== null && length < minLength) {
+        return `Enter at least ${minLength} characters.`;
+    }
+
+    const maxLength = numberValue(schema.maxLength);
+    if (maxLength !== null && length > maxLength) {
+        return `Enter no more than ${maxLength} characters.`;
+    }
+
+    if (typeof schema.pattern === "string") {
+        try {
+            if (!new RegExp(schema.pattern).test(value)) {
+                return "Match the required pattern.";
+            }
+        } catch {
+            return null;
+        }
+    }
+
+    return null;
+}
+
+function numberValue(value: unknown): number | null {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 export function parameterLimitation(param: Param, value?: string): string | null {
