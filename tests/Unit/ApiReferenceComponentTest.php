@@ -11,18 +11,19 @@ it('serializes the spectacular.api-reference node', function (): void {
         ->and($node['props']['url'])->toBe('/openapi.json');
 });
 
-it('defaults to the unmodified reference', function (): void {
-    expect(ApiReference::make()->jsonSerialize()['props'])->toMatchArray([
-        'operation' => null,
-        'tags' => null,
-        'hideNav' => false,
-        'layout' => 'sidebar',
-        'defaultOperation' => null,
-        'hideHeader' => false,
-        'title' => null,
-        'expandDepth' => 0,
-        'token' => null,
-    ]);
+it('defaults to the grouped API reference', function (): void {
+    $props = ApiReference::make()->jsonSerialize()['props'];
+
+    expect($props)->not->toHaveKeys(['hideNav', 'layout'])
+        ->and($props)->toMatchArray([
+            'operation' => null,
+            'tags' => null,
+            'defaultOperation' => null,
+            'hideHeader' => false,
+            'title' => null,
+            'expandDepth' => 0,
+            'token' => null,
+        ]);
 });
 
 it('serializes fluent options', function (Closure $configure, string $property, mixed $expected): void {
@@ -33,8 +34,6 @@ it('serializes fluent options', function (Closure $configure, string $property, 
     'inline spec' => [fn (ApiReference $reference): ApiReference => $reference->spec(['openapi' => '3.0.0']), 'spec', ['openapi' => '3.0.0']],
     'token' => [fn (ApiReference $reference): ApiReference => $reference->token('secret-token'), 'token', 'secret-token'],
     'operation' => [fn (ApiReference $reference): ApiReference => $reference->operation('get-users-id'), 'operation', 'get-users-id'],
-    'hidden navigation' => [fn (ApiReference $reference): ApiReference => $reference->hideNav(), 'hideNav', true],
-    'stacked layout' => [fn (ApiReference $reference): ApiReference => $reference->layout('stacked'), 'layout', 'stacked'],
     'default operation' => [fn (ApiReference $reference): ApiReference => $reference->defaultOperation('get-users-id'), 'defaultOperation', 'get-users-id'],
     'hidden header' => [fn (ApiReference $reference): ApiReference => $reference->hideHeader(), 'hideHeader', true],
     'title' => [fn (ApiReference $reference): ApiReference => $reference->title('My API'), 'title', 'My API'],
@@ -47,7 +46,3 @@ it('normalizes tag input', function (string|array $tags, array $expected): void 
     'single tag' => ['Users', ['Users']],
     'tag list' => [['A', 'B'], ['A', 'B']],
 ]);
-
-it('rejects an invalid layout', function (): void {
-    ApiReference::make()->layout('bogus');
-})->throws(InvalidArgumentException::class);

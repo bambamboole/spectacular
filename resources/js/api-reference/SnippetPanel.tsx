@@ -1,5 +1,4 @@
 import { CodeBlock, SegmentedPills } from "@lattice-php/lattice/ui";
-import { javascriptWithLineNumbers, shellWithLineNumbers } from "./code-block-languages";
 
 export type SnippetLanguage = "curl" | "javascript";
 
@@ -28,7 +27,8 @@ export function SnippetPanel({ idPrefix, language, snippet, onLanguageChange }: 
             <CodeBlock
                 aria-label="Request snippet"
                 copyable
-                language={language === "curl" ? shellWithLineNumbers : javascriptWithLineNumbers}
+                language={language === "curl" ? "shell" : "javascript"}
+                lineNumbers
             >
                 {snippet}
             </CodeBlock>

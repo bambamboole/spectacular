@@ -1,14 +1,28 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Badge, CodeBlock, NativeSelect, SegmentedPills } from "@lattice-php/lattice/ui";
-import { jsonWithLineNumbers } from "./code-block-languages";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
 import { OperationHeader } from "./OperationHeader";
 import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
 import { parseOperation } from "./parse";
-import { RequestPlayground } from "./RequestPlayground";
+import { buildRequest } from "./request-builder";
+import { parameterKey, type RequestValues } from "./request-state";
+import {
+    initialPlaygroundValues,
+    isRenderableParameter,
+    RequestParameterField,
+    RequestPlayground,
+} from "./RequestPlayground";
 import { exampleFromSchema } from "./schema-example";
-import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
+import type {
+    Contract,
+    ContractExample,
+    Operation,
+    Param,
+    ParamGroup,
+    SecurityRequirement,
+    SecuritySchemeRef,
+} from "./types";
 
 type OperationViewProps = {
     spec: unknown;
@@ -16,6 +30,7 @@ type OperationViewProps = {
     baseUrl?: string | null;
     token?: string | null;
     expandDepth?: number;
+    hideHeaderIdentity?: boolean;
 };
 
 type SecuritySchemeDefinition = {
@@ -33,30 +48,50 @@ function contractLabel(contract: Contract): string {
     return parts.length > 0 ? parts.join(" ") : "default";
 }
 
-function ParamRow({ param }: { param: Param }): React.ReactNode {
+function ParamRow({ param, control }: { param: Param; control?: React.ReactNode }): React.ReactNode {
     const allowedValues = parameterAllowedValues(param.schema);
+    const rowLayout = control
+        ? "grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-start"
+        : "py-2";
 
     return (
-        <li className="border-b border-lt-border py-2 last:border-b-0">
-            <div className="flex items-center gap-2">
-                <span className="font-mono text-sm text-lt-fg">{param.name}</span>
-                <span className="rounded-lt-xs bg-lt-muted px-1.5 py-0.5 text-xs text-lt-muted-fg">
-                    {parameterTypeLabel(param.schema)}
-                </span>
-                {param.required ? <span className="text-lt-danger">*</span> : null}
-                {param.deprecated ? <Badge color="danger">deprecated</Badge> : null}
+        <li className={`border-b border-lt-border last:border-b-0 ${rowLayout}`}>
+            <div>
+                <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm text-lt-fg">{param.name}</span>
+                    <span className="rounded-lt-xs bg-lt-muted px-1.5 py-0.5 text-xs text-lt-muted-fg">
+                        {parameterTypeLabel(param.schema)}
+                    </span>
+                    {param.required ? <span className="text-lt-danger">*</span> : null}
+                    {param.deprecated ? <Badge color="danger">deprecated</Badge> : null}
+                </div>
+                {param.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{param.description}</p> : null}
+                {allowedValues.length > 0 ? (
+                    <p className="mt-0.5 text-xs text-lt-muted-fg">
+                        Available values: {allowedValues.join(", ")}
+                    </p>
+                ) : null}
             </div>
-            {param.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{param.description}</p> : null}
-            {allowedValues.length > 0 ? (
-                <p className="mt-0.5 text-xs text-lt-muted-fg">
-                    Available values: {allowedValues.join(", ")}
-                </p>
-            ) : null}
+            {control}
         </li>
     );
 }
 
-function ParamGroupSection({ group }: { group: ParamGroup }): React.ReactNode {
+function ParamGroupSection({
+    group,
+    idPrefix,
+    values,
+    errors,
+    onChange,
+}: {
+    group: ParamGroup;
+    idPrefix: string;
+    values: RequestValues;
+    errors: Record<string, string>;
+    onChange: (param: Param, value: string) => void;
+}): React.ReactNode {
+    const isInline = group.location === "path" || group.location === "query";
+
     return (
         <div className="mb-4">
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
@@ -64,7 +99,22 @@ function ParamGroupSection({ group }: { group: ParamGroup }): React.ReactNode {
             </h3>
             <ul>
                 {group.params.map((param) => (
-                    <ParamRow key={`${param.location}-${param.name}`} param={param} />
+                    <ParamRow
+                        key={`${param.location}-${param.name}`}
+                        param={param}
+                        control={
+                            isInline && isRenderableParameter(group.location, param) ? (
+                                <RequestParameterField
+                                    inline
+                                    idPrefix={idPrefix}
+                                    param={param}
+                                    value={values.parameters[parameterKey(param)] ?? ""}
+                                    error={errors[parameterKey(param)] ?? null}
+                                    onChange={(value) => onChange(param, value)}
+                                />
+                            ) : undefined
+                        }
+                    />
                 ))}
             </ul>
         </div>
@@ -86,6 +136,7 @@ function SchemaExampleView({
     noSchemaMessage,
     expandDepth,
     exampleLabel,
+    maxHeight = 2400,
     defaultTab = "schema",
     generateExample = false,
 }: {
@@ -96,6 +147,7 @@ function SchemaExampleView({
     noSchemaMessage: string;
     expandDepth: number;
     exampleLabel: string;
+    maxHeight?: number;
     defaultTab?: SchemaTab;
     generateExample?: boolean;
 }): React.ReactNode {
@@ -173,7 +225,7 @@ function SchemaExampleView({
                         </a>
                     ) : null}
                     {current?.value !== undefined ? (
-                        <CodeBlock aria-label={exampleLabel} copyable language={jsonWithLineNumbers}>
+                        <CodeBlock aria-label={exampleLabel} copyable language="json" lineNumbers maxHeight={maxHeight}>
                             {JSON.stringify(current.value, null, 2)}
                         </CodeBlock>
                     ) : null}
@@ -279,6 +331,7 @@ function ResponsesSection({
                             noSchemaMessage="No response body."
                             expandDepth={expandDepth}
                             exampleLabel="Response example"
+                            maxHeight={800}
                             defaultTab="example"
                             generateExample
                         />
@@ -366,7 +419,14 @@ function SecuritySection({ security, components }: { security: SecurityRequireme
     );
 }
 
-export function OperationView({ spec, operationId, baseUrl, token, expandDepth = 0 }: OperationViewProps): React.ReactNode {
+export function OperationView({
+    spec,
+    operationId,
+    baseUrl,
+    token,
+    expandDepth = 0,
+    hideHeaderIdentity = false,
+}: OperationViewProps): React.ReactNode {
     const operation = useMemo(
         () => (operationId ? parseOperation(spec, operationId, baseUrl ?? null) : null),
         [spec, operationId, baseUrl],
@@ -386,28 +446,110 @@ export function OperationView({ spec, operationId, baseUrl, token, expandDepth =
     }
 
     return (
-        <div className="min-w-0 flex-1 overflow-y-auto p-6">
-            <OperationHeader operation={operation} baseUrl={operation.serverUrl} components={components} />
+        <OperationContent
+            key={operation.summary.id}
+            operation={operation}
+            components={components}
+            token={token ?? null}
+            expandDepth={expandDepth}
+            hideHeaderIdentity={hideHeaderIdentity}
+        />
+    );
+}
 
-            <SecuritySection security={operation.security} components={components} />
+function OperationContent({
+    operation,
+    components,
+    token,
+    expandDepth,
+    hideHeaderIdentity,
+}: {
+    operation: Operation;
+    components: unknown;
+    token: string | null;
+    expandDepth: number;
+    hideHeaderIdentity: boolean;
+}): React.ReactNode {
+    const requestRootRef = useRef<HTMLDivElement>(null);
+    const [requestValues, setRequestValues] = useState<RequestValues>(() =>
+        initialPlaygroundValues(operation, components),
+    );
+    const buildResult = useMemo(
+        () => buildRequest({ operation, baseUrl: operation.serverUrl, values: requestValues, token }),
+        [operation, requestValues, token],
+    );
+    const parameterErrors = buildResult.errors?.parameters ?? {};
 
-            {operation.paramGroups.length > 0 ? (
-                <section className="mb-6">
-                    <h2 className="mb-2 text-sm font-semibold text-lt-fg">Parameters</h2>
-                    {operation.paramGroups.map((group) => (
-                        <ParamGroupSection key={group.location} group={group} />
-                    ))}
-                </section>
-            ) : null}
+    function updateParameter(param: Param, value: string): void {
+        const key = parameterKey(param);
 
-            <RequestBodySection requests={operation.requests} components={components} expandDepth={expandDepth} />
-            <RequestPlayground
-                operation={operation}
-                baseUrl={operation.serverUrl}
-                token={token ?? null}
-                components={components}
-            />
-            <ResponsesSection responses={operation.responses} components={components} expandDepth={expandDepth} />
+        setRequestValues((current) => ({
+            ...current,
+            parameters: { ...current.parameters, [key]: value },
+        }));
+    }
+
+    function focusRequestField(fieldKey: string | null): void {
+        if (fieldKey === null) return;
+
+        const fields = requestRootRef.current?.querySelectorAll<HTMLElement>("[data-field-key]") ?? [];
+        Array.from(fields).find((field) => field.dataset.fieldKey === fieldKey)?.focus();
+    }
+
+    return (
+        <div ref={requestRootRef} className="min-w-0 flex-1 overflow-y-auto">
+            <div className="grid min-w-0 items-start xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
+                <RequestPlayground
+                    operation={operation}
+                    baseUrl={operation.serverUrl}
+                    token={token}
+                    components={components}
+                    values={requestValues}
+                    onValuesChange={setRequestValues}
+                    hideInlineParameters
+                    onValidationError={focusRequestField}
+                    showMarkdownCopy={!hideHeaderIdentity}
+                    requestContent={
+                        <>
+                            <OperationHeader
+                                operation={operation}
+                                baseUrl={operation.serverUrl}
+                                hideIdentity={hideHeaderIdentity}
+                            />
+                            <SecuritySection security={operation.security} components={components} />
+                            {operation.paramGroups.length > 0 ? (
+                                <section className="mb-6">
+                                    <h2 className="mb-2 text-sm font-semibold text-lt-fg">Parameters</h2>
+                                    {operation.paramGroups.map((group) => (
+                                        <ParamGroupSection
+                                            key={group.location}
+                                            group={group}
+                                            idPrefix={operation.summary.id}
+                                            values={requestValues}
+                                            errors={parameterErrors}
+                                            onChange={updateParameter}
+                                        />
+                                    ))}
+                                </section>
+                            ) : null}
+                        </>
+                    }
+                    referenceContent={
+                        <>
+                            <RequestBodySection
+                                requests={operation.requests}
+                                components={components}
+                                expandDepth={expandDepth}
+                            />
+                            <ResponsesSection
+                                responses={operation.responses}
+                                components={components}
+                                expandDepth={expandDepth}
+                            />
+                        </>
+                    }
+                />
+            </div>
         </div>
     );
 }

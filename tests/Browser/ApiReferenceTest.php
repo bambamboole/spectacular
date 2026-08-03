@@ -18,7 +18,6 @@ it('executes API requests from the workbench origin', function () {
 
     visit('/docs-browser')
         ->assertSee('/api')
-        ->click('button:has-text("Try it out")')
         ->click('button:has-text("Execute")')
         ->assertSee('200 OK')
         ->assertNoJavaScriptErrors();

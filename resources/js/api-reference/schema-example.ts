@@ -2,20 +2,35 @@ import type { Contract } from "./types";
 
 const SCHEMA_REF_PREFIX = "#/components/schemas/";
 
+type ExampleScope = "complete" | "request";
+
 export function exampleFromSchema(schema: unknown, components?: unknown): unknown {
-    return schemaExample(schema, components, new Set());
+    return schemaExample(schema, components, new Set(), "complete");
 }
 
 export function initialContractExample(contract: Contract, components?: unknown): unknown {
+    return contractExample(contract, components, "complete");
+}
+
+export function initialRequestExample(contract: Contract, components?: unknown): unknown {
+    return contractExample(contract, components, "request");
+}
+
+function contractExample(contract: Contract, components: unknown, scope: ExampleScope): unknown {
     const explicitExample = contract.examples.find((example) => example.value !== undefined);
     if (explicitExample !== undefined) {
         return explicitExample.value;
     }
 
-    return exampleFromSchema(contract.schema, components);
+    return schemaExample(contract.schema, components, new Set(), scope);
 }
 
-function schemaExample(schema: unknown, components: unknown, visitedRefs: Set<string>): unknown {
+function schemaExample(
+    schema: unknown,
+    components: unknown,
+    visitedRefs: Set<string>,
+    scope: ExampleScope,
+): unknown {
     if (!isRecord(schema)) {
         return null;
     }
@@ -43,16 +58,21 @@ function schemaExample(schema: unknown, components: unknown, visitedRefs: Set<st
     }
 
     const examples = [
-        referencedExample(schema, components, visitedRefs),
-        ...schemaListExamples(schema.allOf, components, visitedRefs),
-        unionExample(schema, components, visitedRefs),
-        typedExample(schema, components, visitedRefs),
+        referencedExample(schema, components, visitedRefs, scope),
+        ...schemaListExamples(schema.allOf, components, visitedRefs, scope),
+        unionExample(schema, components, visitedRefs, scope),
+        typedExample(schema, components, visitedRefs, scope),
     ];
 
     return combineExamples(examples);
 }
 
-function referencedExample(schema: Record<string, unknown>, components: unknown, visitedRefs: Set<string>): unknown {
+function referencedExample(
+    schema: Record<string, unknown>,
+    components: unknown,
+    visitedRefs: Set<string>,
+    scope: ExampleScope,
+): unknown {
     const ref = localSchemaRef(schema);
     if (ref === null || visitedRefs.has(ref)) {
         return null;
@@ -64,28 +84,38 @@ function referencedExample(schema: Record<string, unknown>, components: unknown,
     }
 
     visitedRefs.add(ref);
-    const example = schemaExample(referencedSchema, components, visitedRefs);
+    const example = schemaExample(referencedSchema, components, visitedRefs, scope);
     visitedRefs.delete(ref);
 
     return example;
 }
 
-function schemaListExamples(schemas: unknown, components: unknown, visitedRefs: Set<string>): unknown[] {
+function schemaListExamples(
+    schemas: unknown,
+    components: unknown,
+    visitedRefs: Set<string>,
+    scope: ExampleScope,
+): unknown[] {
     if (!Array.isArray(schemas)) {
         return [];
     }
 
-    return schemas.map((schema) => schemaExample(schema, components, visitedRefs));
+    return schemas.map((schema) => schemaExample(schema, components, visitedRefs, scope));
 }
 
-function unionExample(schema: Record<string, unknown>, components: unknown, visitedRefs: Set<string>): unknown {
+function unionExample(
+    schema: Record<string, unknown>,
+    components: unknown,
+    visitedRefs: Set<string>,
+    scope: ExampleScope,
+): unknown {
     const variants = Array.isArray(schema.oneOf) ? schema.oneOf : schema.anyOf;
     if (!Array.isArray(variants)) {
         return null;
     }
 
     for (const variant of variants) {
-        const example = schemaExample(variant, components, visitedRefs);
+        const example = schemaExample(variant, components, visitedRefs, scope);
         if (example !== null) {
             return example;
         }
@@ -94,17 +124,22 @@ function unionExample(schema: Record<string, unknown>, components: unknown, visi
     return null;
 }
 
-function typedExample(schema: Record<string, unknown>, components: unknown, visitedRefs: Set<string>): unknown {
+function typedExample(
+    schema: Record<string, unknown>,
+    components: unknown,
+    visitedRefs: Set<string>,
+    scope: ExampleScope,
+): unknown {
     const type = Array.isArray(schema.type)
         ? schema.type.find((candidate) => candidate !== "null")
         : schema.type;
 
     if (type === "object" || isRecord(schema.properties)) {
-        return objectExample(schema.properties, components, visitedRefs);
+        return objectExample(schema.properties, schema.required, components, visitedRefs, scope);
     }
 
     if (type === "array") {
-        return [schemaExample(schema.items, components, visitedRefs)];
+        return [schemaExample(schema.items, components, visitedRefs, scope)];
     }
 
     if (type === "string") {
@@ -170,13 +205,28 @@ function componentSchema(ref: string, components: unknown): unknown | null {
     return components.schemas[name];
 }
 
-function objectExample(properties: unknown, components: unknown, visitedRefs: Set<string>): Record<string, unknown> {
+function objectExample(
+    properties: unknown,
+    required: unknown,
+    components: unknown,
+    visitedRefs: Set<string>,
+    scope: ExampleScope,
+): Record<string, unknown> {
     if (!isRecord(properties)) {
         return {};
     }
 
+    const requiredProperties = new Set(
+        Array.isArray(required) ? required.filter((name): name is string => typeof name === "string") : [],
+    );
+
     return Object.fromEntries(
-        Object.entries(properties).map(([name, propertySchema]) => [name, schemaExample(propertySchema, components, visitedRefs)]),
+        Object.entries(properties)
+            .filter(([name, propertySchema]) =>
+                scope === "complete"
+                || (requiredProperties.has(name) && (!isRecord(propertySchema) || propertySchema.readOnly !== true)),
+            )
+            .map(([name, propertySchema]) => [name, schemaExample(propertySchema, components, visitedRefs, scope)]),
     );
 }
 

@@ -142,9 +142,7 @@ Creates a widget.
 ### Example
 
 \`\`\`json
-{
-  "name": "Widget"
-}
+{}
 \`\`\`
 
 ## Responses
@@ -300,6 +298,42 @@ Validation failed
         expect(markdown).toContain("Stored outside the specification.");
         expect(markdown).toContain("[Open external example](https://example.test/widgets.json)");
         expect(markdown).not.toContain("```json\nundefined");
+    });
+
+    it("derives minimal request examples while keeping response examples comprehensive", () => {
+        const markdown = operationToMarkdown({
+            ...operation,
+            requests: [
+                {
+                    ...operation.requests[0]!,
+                    schema: {
+                        type: "object",
+                        required: ["name"],
+                        properties: {
+                            name: { type: "string", example: "Widget" },
+                            note: { type: "string", example: "Optional request note" },
+                        },
+                    },
+                },
+            ],
+            responses: [
+                {
+                    ...operation.responses[0]!,
+                    schema: {
+                        type: "object",
+                        properties: {
+                            id: { type: "string", example: "widget_123" },
+                            note: { type: "string", example: "Included response note" },
+                        },
+                    },
+                },
+            ],
+        });
+
+        expect(markdown).toContain('### Example\n\n```json\n{\n  "name": "Widget"\n}\n```');
+        expect(markdown).toContain(
+            '#### Example\n\n```json\n{\n  "id": "widget_123",\n  "note": "Included response note"\n}\n```',
+        );
     });
 
     it("keeps direct recursive schemas finite and self-contained", () => {

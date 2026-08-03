@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RendererComponent } from "@lattice-php/lattice";
-import { ApiReferenceNav, ServerPicker } from "./ApiReferenceNav";
+import { Icon } from "@lattice-php/lattice/icons";
+import { Badge, CopyButton } from "@lattice-php/lattice/ui";
+import { httpMethodColor } from "./http-method-color";
+import { operationToMarkdown } from "./operation-markdown";
 import { OperationView } from "./OperationView";
 import { buildNavigation, filterNavigationByTags, parseOperation } from "./parse";
+import { operationUrl } from "./request-builder";
+import { ServerPicker } from "./ServerPicker";
 import type { ApiInfo, Navigation } from "./types";
 
 type ApiReferenceProps = {
@@ -10,8 +15,6 @@ type ApiReferenceProps = {
     url?: string;
     operation?: string | null;
     tags?: string[] | null;
-    hideNav?: boolean;
-    layout?: "sidebar" | "stacked";
     defaultOperation?: string | null;
     hideHeader?: boolean;
     title?: string | null;
@@ -56,8 +59,6 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         url,
         operation,
         tags,
-        hideNav = false,
-        layout = "sidebar",
         defaultOperation,
         hideHeader = false,
         title = null,
@@ -69,6 +70,8 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     const [loading, setLoading] = useState<boolean>(Boolean(url));
     const [error, setError] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(() => currentHashId());
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [collapsedOperationKey, setCollapsedOperationKey] = useState<string | null>(null);
     const [selectedRootServerUrl, setSelectedRootServerUrl] = useState<string | null>(null);
     const [selectedOperationServerUrls, setSelectedOperationServerUrls] = useState<Record<string, string>>({});
 
@@ -107,7 +110,12 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         () => (rawNavigation && tags?.length ? filterNavigationByTags(rawNavigation, tags) : rawNavigation),
         [rawNavigation, tags],
     );
+    const components = (spec as { components?: unknown } | null)?.components ?? null;
     const activeOperationId = operation ?? selectedId;
+    const activeGroupId =
+        navigation?.groups.find(
+            (group) => group.id === selectedGroupId && selectedId && group.operationIds.includes(selectedId),
+        )?.id ?? navigation?.groups.find((group) => selectedId && group.operationIds.includes(selectedId))?.id;
     const activeOperation = useMemo(() => {
         if (!spec || !activeOperationId) return null;
 
@@ -150,8 +158,18 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         window.location.hash = id;
     }
 
-    function selectStackedOperation(id: string): void {
-        window.location.hash = id;
+    function toggleOperation(groupId: string, id: string): void {
+        const key = `${groupId}:${id}`;
+
+        if (id === selectedId && groupId === activeGroupId && collapsedOperationKey !== key) {
+            setCollapsedOperationKey(key);
+
+            return;
+        }
+
+        setCollapsedOperationKey(null);
+        setSelectedGroupId(groupId);
+        selectOperation(id);
     }
 
     function selectServer(url: string): void {
@@ -214,61 +232,108 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         );
     }
 
-    if (layout === "stacked") {
-        const operationIds = Array.from(new Set(navigation.groups.flatMap((group) => group.operationIds)));
-
-        return (
-            <div className="flex w-full">
-                {!hideNav ? (
-                    <ApiReferenceNav
-                        navigation={navigation}
-                        selectedId={selectedId}
-                        onSelect={selectStackedOperation}
-                        servers={activeOperation?.servers ?? navigation.servers}
-                        selectedServerUrl={activeOperation?.serverUrl ?? selectedRootServerUrl}
+    return (
+        <div className="flex min-w-0 w-full flex-col">
+            {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
+            {activeOperation ? (
+                <div className="border-b border-lt-border p-3">
+                    <ServerPicker
+                        servers={activeOperation.servers}
+                        selectedServerUrl={activeOperation.serverUrl}
                         onServerChange={selectServer}
                     />
-                ) : null}
-                <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-                    {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
-                    {operationIds.map((id) => (
-                        <section id={id} key={id}>
-                            <OperationView
-                                spec={spec}
-                                operationId={id}
-                                baseUrl={selectedServerUrlFor(id)}
-                                token={token}
-                                expandDepth={expandDepth}
-                            />
-                        </section>
-                    ))}
                 </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex w-full">
-            {!hideNav ? (
-                <ApiReferenceNav
-                    navigation={navigation}
-                    selectedId={selectedId}
-                    onSelect={selectOperation}
-                    servers={activeOperation?.servers ?? navigation.servers}
-                    selectedServerUrl={activeOperation?.serverUrl ?? selectedRootServerUrl}
-                    onServerChange={selectServer}
-                />
             ) : null}
-            <div className="flex min-w-0 flex-1 flex-col">
-                {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
-                <OperationView
-                    key={selectedId}
-                    spec={spec}
-                    operationId={selectedId}
-                    baseUrl={selectedId ? selectedServerUrlFor(selectedId) : selectedRootServerUrl}
-                    token={token}
-                    expandDepth={expandDepth}
-                />
+            <div className="flex flex-col gap-8 p-6">
+                {navigation.groups.map((group) => (
+                    <section key={group.id} aria-labelledby={`api-reference-tag-${group.id}`}>
+                        <h2
+                            id={`api-reference-tag-${group.id}`}
+                            className="mb-3 text-sm font-semibold text-lt-fg"
+                        >
+                            {group.title}
+                        </h2>
+                        <div className="overflow-hidden rounded-lt border border-lt-border">
+                            {group.operationIds.map((id) => {
+                                const summary = navigation.summaries[id];
+                                if (!summary) return null;
+
+                                const operationKey = `${group.id}:${id}`;
+                                const isOpen = id === selectedId
+                                    && group.id === activeGroupId
+                                    && collapsedOperationKey !== operationKey;
+                                const contentId = `api-reference-operation-${group.id}-${id}`;
+                                const serverUrl = selectedServerUrlFor(id);
+                                const url = operationUrl(serverUrl, summary.path);
+                                const parsedOperation = parseOperation(spec, id, serverUrl);
+                                const markdown = parsedOperation
+                                    ? operationToMarkdown(parsedOperation, components)
+                                    : "";
+
+                                return (
+                                    <div key={id} className="border-b border-lt-border last:border-b-0">
+                                        <div className="relative bg-lt-muted">
+                                            <div className="pointer-events-none relative z-10 flex items-center gap-2 px-4 py-3">
+                                                <Icon
+                                                    name="chevron-down"
+                                                    className={`size-lt-icon-xs shrink-0 text-lt-muted-fg transition-transform${isOpen ? "" : " -rotate-90"}`}
+                                                />
+                                                <Badge color={httpMethodColor(summary.method)} className="text-xs">
+                                                    {summary.method}
+                                                </Badge>
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="block text-sm font-medium text-lt-fg">
+                                                        {summary.title}
+                                                    </span>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="min-w-0 break-all font-mono text-xs text-lt-muted-fg">
+                                                            {url}
+                                                        </span>
+                                                        <CopyButton
+                                                            value={url}
+                                                            label={`${summary.title} URL`}
+                                                            iconOnly
+                                                            className="pointer-events-auto size-7 shrink-0"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <CopyButton
+                                                    value={markdown}
+                                                    label={`${summary.title} as Markdown`}
+                                                    testId={`copy-${id}-markdown`}
+                                                    className="pointer-events-auto shrink-0"
+                                                >
+                                                    Copy as Markdown
+                                                </CopyButton>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                aria-label={summary.title}
+                                                aria-expanded={isOpen}
+                                                aria-controls={contentId}
+                                                onClick={() => toggleOperation(group.id, id)}
+                                                className="absolute inset-0 z-0 cursor-pointer transition-colors hover:bg-lt-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-lt-ring"
+                                            />
+                                        </div>
+                                        {isOpen ? (
+                                            <div id={contentId}>
+                                                <OperationView
+                                                    key={id}
+                                                    spec={spec}
+                                                    operationId={id}
+                                                    baseUrl={selectedServerUrlFor(id)}
+                                                    token={token}
+                                                    expandDepth={expandDepth}
+                                                    hideHeaderIdentity
+                                                />
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                ))}
             </div>
         </div>
     );

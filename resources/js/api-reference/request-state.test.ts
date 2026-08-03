@@ -127,6 +127,7 @@ describe("initialRequestValues", () => {
                 schemas: {
                     Widget: {
                         type: "object",
+                        required: ["name"],
                         properties: {
                             name: { type: "string", example: "Desk" },
                             count: { type: "integer", default: 2 },
@@ -136,7 +137,51 @@ describe("initialRequestValues", () => {
             },
         );
 
-        expect(values.body).toBe('{\n  "name": "Desk",\n  "count": 2\n}');
+        expect(values.body).toBe('{\n  "name": "Desk"\n}');
+    });
+
+    it("derives required writable fields from composed request schemas", () => {
+        const values = initialRequestValues(
+            operation({ requests: [requestContract({ schema: { $ref: "#/components/schemas/CreateOffer" } })] }),
+            {
+                schemas: {
+                    OfferState: {
+                        type: "object",
+                        required: ["status"],
+                        properties: {
+                            status: { type: "string", enum: ["draft", "sent"] },
+                            internalNote: { type: "string", example: "Not sent" },
+                        },
+                    },
+                    CreateOffer: {
+                        allOf: [
+                            { $ref: "#/components/schemas/OfferState" },
+                            {
+                                type: "object",
+                                required: ["address", "reference", "id"],
+                                properties: {
+                                    address: {
+                                        type: "object",
+                                        required: ["city"],
+                                        properties: {
+                                            city: { type: "string", example: "Berlin" },
+                                            street: { type: "string", example: "Optional street" },
+                                        },
+                                    },
+                                    reference: { type: ["string", "null"], default: null },
+                                    id: { type: "string", readOnly: true, example: "offer-1" },
+                                    tags: { type: "array", items: { type: "string" } },
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+        );
+
+        expect(values.body).toBe(
+            '{\n  "status": "draft",\n  "address": {\n    "city": "Berlin"\n  },\n  "reference": null\n}',
+        );
     });
 
     it("returns no selected body when only non-JSON contracts exist", () => {

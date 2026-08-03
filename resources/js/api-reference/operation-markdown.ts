@@ -1,4 +1,4 @@
-import { initialContractExample } from "./schema-example";
+import { initialContractExample, initialRequestExample } from "./schema-example";
 import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
 import type { Contract, ContractExample, Operation, Param, SecurityRequirement } from "./types";
 
@@ -125,7 +125,13 @@ function contractSections(contract: Contract, components: unknown, headingLevel:
         ? contract.examples
         : contract.schema === null
           ? []
-          : [{ name: null, summary: null, value: initialContractExample(contract, components) }];
+          : [{
+                name: null,
+                summary: null,
+                value: contract.role === "request"
+                    ? initialRequestExample(contract, components)
+                    : initialContractExample(contract, components),
+            }];
 
     sections.push(...examples.map((example) => exampleSection(example, headingLevel)));
 

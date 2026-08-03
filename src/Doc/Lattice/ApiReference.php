@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\Doc\Lattice;
 
-use InvalidArgumentException;
 use Lattice\Lattice\Attributes\AsComponent;
 use Lattice\Lattice\Ui\Components\Component;
 
@@ -20,10 +19,6 @@ final class ApiReference extends Component
 
     /** @var list<string>|null */
     public ?array $tags = null;
-
-    public bool $hideNav = false;
-
-    public string $layout = 'sidebar';
 
     public ?string $defaultOperation = null;
 
@@ -70,24 +65,6 @@ final class ApiReference extends Component
     public function tag(string|array $tags): static
     {
         $this->tags = is_array($tags) ? array_values($tags) : [$tags];
-
-        return $this;
-    }
-
-    public function hideNav(bool $hide = true): static
-    {
-        $this->hideNav = $hide;
-
-        return $this;
-    }
-
-    public function layout(string $layout): static
-    {
-        if (! in_array($layout, ['sidebar', 'stacked'], true)) {
-            throw new InvalidArgumentException("Invalid layout [{$layout}]. Expected one of: sidebar, stacked.");
-        }
-
-        $this->layout = $layout;
 
         return $this;
     }

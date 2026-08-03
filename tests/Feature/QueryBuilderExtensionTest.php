@@ -211,6 +211,21 @@ it('documents pagination parameters and the paginated json api resource response
         ->toBe(['data', 'links', 'meta']);
 });
 
+it('documents categories pagination without a redundant total header', function (): void {
+    $operation = generatedOperationForUri('api/categories');
+    $parameters = generatedOperationParametersForUri('api/categories');
+    $response = $operation['responses']['200'];
+    $schema = $response['content']['application/json']['schema'];
+
+    expect($parameters)
+        ->toHaveKeys(['page', 'per_page'])
+        ->and($operation['description'])->toContain('Browse the category hierarchy used to organize products.')
+        ->and($operation['description'])->toContain('Results are paginated so clients can request a predictable slice of the collection.')
+        ->and($response['headers'] ?? [])->not->toHaveKey('X-Total-Count')
+        ->and($schema['properties'])->toHaveKeys(['data', 'links', 'meta'])
+        ->and($schema['required'])->toBe(['data', 'links', 'meta']);
+});
+
 it('documents the cursor paginated roles workbench endpoint', function (): void {
     $operation = generatedRolesOperation();
     $parameters = generatedRolesOperationParameters();
