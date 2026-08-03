@@ -1,4 +1,4 @@
-import { initialContractExample } from "./schema-example";
+import { initialRequestExample } from "./schema-example";
 import type { Contract, Operation, Param } from "./types";
 
 export type RequestValues = {
@@ -40,7 +40,7 @@ export function initialRequestValues(operation: Operation, components?: unknown)
     return {
         parameters,
         mediaType: contract.mediaType,
-        body: prettyJson(initialContractExample(contract, components)),
+        body: prettyJson(initialRequestExample(contract, components)),
     };
 }
 
