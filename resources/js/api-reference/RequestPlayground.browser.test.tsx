@@ -155,13 +155,31 @@ describe("RequestPlayground", () => {
         await expect.element(screen.locator).not.toHaveTextContent(REAL_TOKEN);
     });
 
-    it("selects enum array query values and resets them when try-out mode is cancelled", async () => {
+    it("builds Laravel Query Builder filters, sorts, includes, and fields", async () => {
+        const filter = parameter({ name: "filter[name]", location: "query" });
+        const sort = parameter({
+            name: "sort",
+            location: "query",
+            style: "form",
+            explode: false,
+            schema: {
+                type: "array",
+                items: { type: "string", enum: ["name", "-name", "created_at", "-created_at"] },
+            },
+        });
+        const include = parameter({
+            name: "include",
+            location: "query",
+            style: "form",
+            explode: false,
+            schema: { type: "array", items: { type: "string", enum: ["roles", "rolesCount"] } },
+        });
         const fields = parameter({
             name: "fields[users]",
             location: "query",
             style: "form",
             explode: false,
-            schema: { type: "array", items: { type: "string", enum: ["name", "email"] } },
+            schema: { type: "array", items: { type: "string", enum: ["id", "name", "email"] } },
         });
         const screen = await render(
             <RequestPlayground
@@ -173,7 +191,7 @@ describe("RequestPlayground", () => {
                         title: "List users",
                         deprecated: false,
                     },
-                    paramGroups: [{ location: "query", params: [fields] }],
+                    paramGroups: [{ location: "query", params: [filter, sort, include, fields] }],
                     requests: [],
                 })}
                 baseUrl="https://api.example.test"
@@ -185,26 +203,41 @@ describe("RequestPlayground", () => {
         await expect.element(screen.getByRole("button", { name: "fields[users]" })).not.toBeInTheDocument();
         await screen.getByRole("button", { name: "Try it out" }).click();
 
-        const field = screen.getByRole("button", { name: "fields[users]" });
+        const filterField = screen.getByLabelText("filter[name]");
+        const sortField = screen.getByRole("button", { name: "sort" });
+        const includeField = screen.getByRole("button", { name: "include" });
+        const fieldsField = screen.getByRole("button", { name: "fields[users]" });
         const snippet = screen.getByLabelText("Request snippet", { exact: true });
 
-        await expect.element(field).toHaveTextContent("Not set");
-        await field.click();
-        await screen.getByRole("option", { name: "name" }).click();
+        await filterField.fill("Taylor");
+        await sortField.click();
+        await screen.getByRole("option", { name: "-created_at" }).click();
+        await includeField.click();
+        await screen.getByRole("option", { name: "roles", exact: true }).click();
+        await screen.getByRole("option", { name: "rolesCount" }).click();
+        await fieldsField.click();
+        await screen.getByRole("option", { name: "id" }).click();
         await screen.getByRole("option", { name: "email" }).click();
 
-        await expect.element(field).toHaveTextContent("name, email");
+        await expect.element(sortField).toHaveTextContent("-created_at");
+        await expect.element(includeField).toHaveTextContent("roles, rolesCount");
+        await expect.element(fieldsField).toHaveTextContent("id, email");
         await expect
             .element(snippet)
-            .toHaveTextContent("https://api.example.test/users?fields%5Busers%5D=name%2Cemail");
+            .toHaveTextContent(
+                "https://api.example.test/users?filter%5Bname%5D=Taylor&sort=-created_at&include=roles%2CrolesCount&fields%5Busers%5D=id%2Cemail",
+            );
 
         await screen.getByRole("button", { name: "Cancel" }).click();
 
-        await expect.element(field).not.toBeInTheDocument();
+        await expect.element(fieldsField).not.toBeInTheDocument();
         await expect.element(screen.getByRole("button", { name: "Execute" })).not.toBeInTheDocument();
         await screen.getByRole("button", { name: "Try it out" }).click();
+        await expect.element(screen.getByLabelText("filter[name]")).toHaveValue("");
+        await expect.element(screen.getByRole("button", { name: "sort" })).toHaveTextContent("Not set");
+        await expect.element(screen.getByRole("button", { name: "include" })).toHaveTextContent("Not set");
         await expect.element(screen.getByRole("button", { name: "fields[users]" })).toHaveTextContent("Not set");
-        await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toHaveTextContent("fields");
+        await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toHaveTextContent("filter");
     });
 
     it("shows stable required errors without fetching and focuses the first invalid field", async () => {
