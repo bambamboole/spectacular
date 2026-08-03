@@ -10,6 +10,7 @@
     },
     "devDependencies": {
         "@inertiajs/react": "^3.0.0",
+        "@laravel/echo-react": "^2.0.0",
         "@lattice-php/lattice": "^0.38.0",
         "@lattice-php/vite-svg-sprite": "^0.3.0",
         "@stoplight/json-schema-tree": "^4.0.0",
