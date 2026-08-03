@@ -12,7 +12,7 @@ use Lattice\Lattice\Http\Page;
 use Lattice\Lattice\Ui\Enums\PageContainer;
 
 #[AsPage(route: '/', name: 'home')]
-class ApiReferencePage extends Page
+final class ApiReferencePage extends Page
 {
     public function container(): PageContainer
     {
