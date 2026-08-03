@@ -1,15 +1,13 @@
 # Local Development
 
 - This package is developed with Orchestra Testbench, not a full Laravel app.
-- `artisan` at the repo root is a symlink to `vendor/bin/testbench`, so `php artisan <command>` boots the Testbench
-  skeleton with this package's service provider and the `workbench/` app.
+- `artisan` at the repo root is a committed Testbench shim, so `php artisan <command>` boots the Testbench skeleton with
+  this package's service provider and the `workbench/` app.
 - Run the test suite with `composer test` or `./vendor/bin/pest`.
 - Serve the workbench app with `composer serve`.
 - The two Artisan commands the package ships are `spectacular:openapi` and `spectacular:asyncapi`; run them against the
   workbench app to see generation end to end.
-- The AI tooling overrides for Boost live in `workbench/app/Support/` and are wired in
-  `Workbench\App\Providers\WorkbenchServiceProvider`. They point Boost at the package root instead of the Testbench
-  skeleton.
+- Extended Testbench points Boost at the package root instead of the Testbench skeleton.
 - Regenerate `CLAUDE.md` and `AGENTS.md` after editing files in `.ai/guidelines/` with `php artisan boost:update`
   (or `composer boost:refresh`).
 

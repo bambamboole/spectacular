@@ -18,3 +18,7 @@ CLAUDE.md
 /package-lock.json
 /workbench/public/build
 /composer.lock
+/.mcp.json
+/.junie/
+/.superpowers/
+/docs/superpowers/

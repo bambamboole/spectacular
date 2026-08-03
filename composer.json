@@ -26,13 +26,13 @@
         "spatie/laravel-query-builder": "^7.0"
     },
     "require-dev": {
+        "bambamboole/extended-testbench": "^0.6",
         "larastan/larastan": "^3.10",
-        "laravel/boost": "^2.4",
         "laravel/pint": "^1.29",
         "lattice-php/lattice": "^0.36",
-        "orchestra/testbench": "^11.0",
         "pestphp/pest": "^5.0",
-        "pestphp/pest-plugin-laravel": "^5.0"
+        "pestphp/pest-plugin-laravel": "^5.0",
+        "pestphp/pest-plugin-phpstan": "^5.0"
     },
     "suggest": {
         "lattice-php/lattice": "Render the generated OpenAPI/AsyncAPI documents as a UI with the Spectacular Lattice viewer (^0.36)."
@@ -62,16 +62,20 @@
             "@clear",
             "@prepare"
         ],
-        "post-install-cmd": "@boost:refresh",
-        "post-update-cmd": "@boost:refresh",
-        "boost:refresh": "@php vendor/bin/testbench boost:update --no-interaction",
+        "post-install-cmd": [
+            "@boost:refresh"
+        ],
+        "post-update-cmd": [
+            "@boost:refresh"
+        ],
+        "boost:refresh": "[ -n \"$CI\" ] || [ ! -f vendor/bin/testbench ] || [ ! -f boost.json ] || vendor/bin/testbench boost:update --no-interaction || true",
         "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
         "prepare": "@php vendor/bin/testbench package:discover --ansi",
         "build": "@php vendor/bin/testbench workbench:build --ansi",
         "serve": [
             "Composer\\Config::disableProcessTimeout",
             "@build",
-            "@php artisan serve --ansi"
+            "@php vendor/bin/testbench serve --ansi"
         ]
     },
     "extra": {
@@ -84,6 +88,15 @@
         "laravel": {
             "providers": [
                 "Bambamboole\\Spectacular\\SpectacularServiceProvider"
+            ]
+        },
+        "extended-testbench": {
+            "check-ignore": [
+                "composer script: test",
+                "composer script: stan",
+                "composer script: lint",
+                "composer script: check",
+                "composer script: post-autoload-dump"
             ]
         }
     },
