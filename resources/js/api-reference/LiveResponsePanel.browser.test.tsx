@@ -3,8 +3,8 @@ import { render } from "vitest-browser-react";
 import { LiveResponsePanel } from "./LiveResponsePanel";
 
 describe("LiveResponsePanel", () => {
-    it("scrolls response bodies longer than 150 lines", async () => {
-        await render(
+    it("shows line numbers and scrolls response bodies longer than 150 lines", async () => {
+        const screen = await render(
             <LiveResponsePanel
                 result={{
                     kind: "response",
@@ -17,6 +17,8 @@ describe("LiveResponsePanel", () => {
                 }}
             />,
         );
+
+        await expect.element(screen.getByLabelText("Live response body").getByText("1", { exact: true })).toBeVisible();
 
         await expect
             .poll(() => {
