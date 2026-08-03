@@ -54,6 +54,7 @@ export type RequestPlaygroundProps = {
     onValuesChange?: Dispatch<SetStateAction<RequestValues>>;
     hideInlineParameters?: boolean;
     onValidationError?: (fieldKey: string | null) => void;
+    requestContent?: ReactNode;
     referenceContent?: ReactNode;
     showMarkdownCopy?: boolean;
 };
@@ -67,6 +68,7 @@ export function RequestPlayground({
     onValuesChange,
     hideInlineParameters = false,
     onValidationError,
+    requestContent = null,
     referenceContent = null,
     showMarkdownCopy = true,
 }: RequestPlaygroundProps): React.ReactNode {
@@ -203,8 +205,9 @@ export function RequestPlayground({
             <aside
                 ref={playgroundRef}
                 aria-label="Request"
-                className="min-w-0 px-6 pb-6 xl:col-start-1 xl:row-start-2"
+                className="min-w-0 p-6 xl:col-start-1 xl:row-start-1"
             >
+                {requestContent}
                 <div className="flex flex-col gap-6">
                     {operation.paramGroups
                         .filter((group) => !hideInlineParameters || !isInlineParameterGroup(group.location))
@@ -327,7 +330,7 @@ export function RequestPlayground({
             </aside>
             <aside
                 aria-label="Reference"
-                className="min-w-0 border-t border-lt-border p-6 xl:sticky xl:top-0 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:border-t-0 xl:border-l"
+                className="min-w-0 border-t border-lt-border p-6 xl:sticky xl:top-0 xl:col-start-2 xl:row-start-1 xl:border-t-0 xl:border-l"
             >
                 <div className="flex flex-col gap-6">
                     <SnippetPanel

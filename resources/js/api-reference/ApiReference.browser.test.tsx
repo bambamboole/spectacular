@@ -12,13 +12,12 @@ afterEach(() => {
 });
 
 describe("ApiReference", () => {
-    it("groups stacked operations by tag and mounts only the selected operation", async () => {
+    it("groups operations by tag and mounts only the selected operation", async () => {
         window.history.replaceState(null, "", window.location.pathname);
 
         const screen = await render(
             <ApiReference
                 node={apiReferenceNode({
-                    layout: "stacked",
                     defaultOperation: "get-products",
                     hideHeader: true,
                     spec: {
@@ -116,5 +115,62 @@ describe("ApiReference", () => {
         await expect.element(listOrders[0]).toHaveAttribute("aria-expanded", "false");
         await expect.element(listOrders[1]).toHaveAttribute("aria-expanded", "true");
         await expect.poll(() => screen.getByRole("complementary", { name: "Request" }).all().length).toBe(1);
+    });
+
+    it("keeps Execute directly below parameters when the response reference is tall", async () => {
+        window.history.replaceState(null, "", window.location.pathname);
+
+        const responseProperties = Object.fromEntries(
+            Array.from({ length: 40 }, (_, index) => [`field_${index}`, { type: "string" }]),
+        );
+        const screen = await render(
+            <ApiReference
+                node={apiReferenceNode({
+                    defaultOperation: "get-products",
+                    hideHeader: true,
+                    spec: {
+                        openapi: "3.1.0",
+                        info: { title: "Catalog", version: "1.0.0" },
+                        paths: {
+                            "/products": {
+                                get: {
+                                    summary: "List products",
+                                    tags: ["Products"],
+                                    parameters: [
+                                        {
+                                            name: "per_page",
+                                            in: "query",
+                                            description: "The number of products per page.",
+                                            schema: { type: "integer", default: 15 },
+                                        },
+                                    ],
+                                    responses: {
+                                        "200": {
+                                            description: "OK",
+                                            content: {
+                                                "application/json": {
+                                                    schema: { type: "object", properties: responseProperties },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                })}
+            >
+                {null}
+            </ApiReference>,
+        );
+
+        const parameter = screen.getByLabelText("per_page");
+        const execute = screen.getByRole("button", { name: "Execute" });
+
+        await expect.element(parameter).toBeVisible();
+        await expect.element(execute).toBeVisible();
+        await expect.poll(
+            () => execute.element().getBoundingClientRect().top - parameter.element().getBoundingClientRect().bottom,
+        ).toBeLessThan(96);
     });
 });

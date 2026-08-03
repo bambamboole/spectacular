@@ -499,31 +499,6 @@ function OperationContent({
     return (
         <div ref={requestRootRef} className="min-w-0 flex-1 overflow-y-auto">
             <div className="grid min-w-0 items-start xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
-                <div className="min-w-0 p-6 xl:col-start-1 xl:row-start-1">
-                    <OperationHeader
-                        operation={operation}
-                        baseUrl={operation.serverUrl}
-                        hideIdentity={hideHeaderIdentity}
-                    />
-
-                    <SecuritySection security={operation.security} components={components} />
-
-                    {operation.paramGroups.length > 0 ? (
-                        <section className="mb-6">
-                            <h2 className="mb-2 text-sm font-semibold text-lt-fg">Parameters</h2>
-                            {operation.paramGroups.map((group) => (
-                                <ParamGroupSection
-                                    key={group.location}
-                                    group={group}
-                                    idPrefix={operation.summary.id}
-                                    values={requestValues}
-                                    errors={parameterErrors}
-                                    onChange={updateParameter}
-                                />
-                            ))}
-                        </section>
-                    ) : null}
-                </div>
                 <RequestPlayground
                     operation={operation}
                     baseUrl={operation.serverUrl}
@@ -534,6 +509,31 @@ function OperationContent({
                     hideInlineParameters
                     onValidationError={focusRequestField}
                     showMarkdownCopy={!hideHeaderIdentity}
+                    requestContent={
+                        <>
+                            <OperationHeader
+                                operation={operation}
+                                baseUrl={operation.serverUrl}
+                                hideIdentity={hideHeaderIdentity}
+                            />
+                            <SecuritySection security={operation.security} components={components} />
+                            {operation.paramGroups.length > 0 ? (
+                                <section className="mb-6">
+                                    <h2 className="mb-2 text-sm font-semibold text-lt-fg">Parameters</h2>
+                                    {operation.paramGroups.map((group) => (
+                                        <ParamGroupSection
+                                            key={group.location}
+                                            group={group}
+                                            idPrefix={operation.summary.id}
+                                            values={requestValues}
+                                            errors={parameterErrors}
+                                            onChange={updateParameter}
+                                        />
+                                    ))}
+                                </section>
+                            ) : null}
+                        </>
+                    }
                     referenceContent={
                         <>
                             <RequestBodySection
