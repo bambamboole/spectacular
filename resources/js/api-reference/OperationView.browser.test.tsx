@@ -66,6 +66,57 @@ describe("OperationView", () => {
         await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toBeInTheDocument();
     });
 
+    it("resets request state when the selected operation changes", async () => {
+        const spec = {
+            openapi: "3.1.0",
+            info: { title: "Products", version: "1.0.0" },
+            servers: [{ url: "https://api.example.test" }],
+            paths: {
+                "/products/{id}": {
+                    get: {
+                        parameters: [
+                            {
+                                name: "id",
+                                in: "path",
+                                required: true,
+                                example: "product-1",
+                                schema: { type: "string" },
+                            },
+                        ],
+                        responses: { "200": { description: "OK" } },
+                    },
+                },
+                "/orders/{order}": {
+                    get: {
+                        parameters: [
+                            {
+                                name: "order",
+                                in: "path",
+                                required: true,
+                                example: "order-1",
+                                schema: { type: "string" },
+                            },
+                        ],
+                        responses: { "200": { description: "OK" } },
+                    },
+                },
+            },
+        };
+        const screen = await render(
+            <OperationView operationId="get-products-id" spec={spec} />,
+        );
+
+        await screen.getByLabelText("id").fill("changed");
+        await screen.getByRole("button", { name: "Try it out" }).click();
+        await expect.element(screen.getByRole("button", { name: "Cancel" })).toBeVisible();
+
+        await screen.rerender(<OperationView operationId="get-orders-order" spec={spec} />);
+
+        await expect.element(screen.getByLabelText("id")).not.toBeInTheDocument();
+        await expect.element(screen.getByLabelText("order")).toHaveValue("order-1");
+        await expect.element(screen.getByRole("button", { name: "Try it out" })).toBeVisible();
+    });
+
     it("shows a generated example by default for schema-only responses", async () => {
         const screen = await render(
             <OperationView

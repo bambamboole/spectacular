@@ -436,6 +436,7 @@ export function OperationView({ spec, operationId, baseUrl, token, expandDepth =
 
     return (
         <OperationContent
+            key={operation.summary.id}
             operation={operation}
             components={components}
             token={token ?? null}

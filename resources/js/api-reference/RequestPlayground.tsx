@@ -108,7 +108,7 @@ export function RequestPlayground({
         || requestBodySchema.schema === null
         || (!requestBodyRequired && values.body.trim() === "")
         ? null
-        : validateRequestBodyValue(requestBodySchema.schema, requestBodyValue);
+        : validateRequestBodyValue(requestBodySchema.schema, requestBodyValue, requestBodyRequired);
     const requestBodyError = buildResult.errors?.body
         ?? (requestBodyValidationError === null
             ? null

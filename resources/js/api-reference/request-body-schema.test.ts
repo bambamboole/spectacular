@@ -108,4 +108,15 @@ describe("resolveRequestBodySchema", () => {
             message: "Enter an integer.",
         });
     });
+
+    it("allows an explicitly supplied empty string for an optional scalar body", () => {
+        const result = resolveRequestBodySchema({ type: "string" }, null);
+
+        expect(result.schema).not.toBeNull();
+        if (result.schema === null) {
+            return;
+        }
+
+        expect(validateRequestBodyValue(result.schema, "", false)).toBeNull();
+    });
 });

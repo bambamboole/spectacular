@@ -65,9 +65,10 @@ export function resolveRequestBodySchema(schema: unknown, components: unknown): 
 export function validateRequestBodyValue(
     schema: RequestBodySchema,
     value: unknown,
+    required = true,
     path = "body",
 ): RequestBodyValidationError | null {
-    return validateValue(schema, value, true, path);
+    return validateValue(schema, value, required, path);
 }
 
 export function defaultRequestBodyValue(schema: RequestBodySchema): unknown {
