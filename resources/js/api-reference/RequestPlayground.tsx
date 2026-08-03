@@ -1,4 +1,13 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+    useEffect,
+    useId,
+    useMemo,
+    useRef,
+    useState,
+    type Dispatch,
+    type FormEvent,
+    type SetStateAction,
+} from "react";
 import { FormFieldFrame } from "@lattice-php/lattice/form";
 import {
     Button,
@@ -36,6 +45,12 @@ export type RequestPlaygroundProps = {
     baseUrl: string | null;
     token: string | null;
     components: unknown;
+    values?: RequestValues;
+    onValuesChange?: Dispatch<SetStateAction<RequestValues>>;
+    enabled?: boolean;
+    onEnabledChange?: Dispatch<SetStateAction<boolean>>;
+    hideInlineParameters?: boolean;
+    onValidationError?: (fieldKey: string | null) => void;
 };
 
 export function RequestPlayground({
@@ -43,15 +58,27 @@ export function RequestPlayground({
     baseUrl,
     token,
     components,
+    values: controlledValues,
+    onValuesChange,
+    enabled: controlledEnabled,
+    onEnabledChange,
+    hideInlineParameters = false,
+    onValidationError,
 }: RequestPlaygroundProps): React.ReactNode {
     const idPrefix = `${operation.summary.id}-${useId().replaceAll(/[^a-zA-Z0-9_-]/g, "")}`;
     const playgroundRef = useRef<HTMLElement>(null);
     const activeControllerRef = useRef<AbortController | null>(null);
-    const [values, setValues] = useState<RequestValues>(() => initialPlaygroundValues(operation, components));
+    const [internalValues, setInternalValues] = useState<RequestValues>(() =>
+        initialPlaygroundValues(operation, components),
+    );
     const [snippetLanguage, setSnippetLanguage] = useState<SnippetLanguage>("curl");
-    const [isEnabled, setIsEnabled] = useState(false);
+    const [internalEnabled, setInternalEnabled] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [liveResult, setLiveResult] = useState<ExecutedResponse | ExecutionError | null>(null);
+    const values = controlledValues ?? internalValues;
+    const setValues = onValuesChange ?? setInternalValues;
+    const isEnabled = controlledEnabled ?? internalEnabled;
+    const setIsEnabled = onEnabledChange ?? setInternalEnabled;
     const jsonContracts = jsonRequestContracts(operation);
     const buildResult = useMemo(
         () => buildRequest({ operation, baseUrl, values, token }),
@@ -121,6 +148,7 @@ export function RequestPlayground({
             const fieldKey = firstErrorFieldKey(operation, result.errors);
             const fields = playgroundRef.current?.querySelectorAll<HTMLElement>("[data-field-key]") ?? [];
 
+            onValidationError?.(fieldKey);
             Array.from(fields).find((field) => field.dataset.fieldKey === fieldKey)?.focus();
 
             return;
@@ -162,33 +190,37 @@ export function RequestPlayground({
                 </Button>
             </CardHeader>
             {isEnabled ? <CardContent className="flex flex-col gap-6">
-                {operation.paramGroups.map((group) => {
-                    const supportedParams = group.params.filter((param) => isRenderableParameter(group.location, param));
+                {operation.paramGroups
+                    .filter((group) => !hideInlineParameters || !isInlineParameterGroup(group.location))
+                    .map((group) => {
+                        const supportedParams = group.params.filter((param) =>
+                            isRenderableParameter(group.location, param),
+                        );
 
-                    if (supportedParams.length === 0) {
-                        return null;
-                    }
+                        if (supportedParams.length === 0) {
+                            return null;
+                        }
 
-                    return (
-                        <section key={group.location} className="flex flex-col gap-3">
-                            <h3 className="text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
-                                {group.location} parameters
-                            </h3>
-                            <div className="flex flex-wrap gap-4">
-                                {supportedParams.map((param) => (
-                                    <ParameterField
-                                        key={parameterKey(param)}
-                                        idPrefix={idPrefix}
-                                        param={param}
-                                        value={values.parameters[parameterKey(param)] ?? ""}
-                                        error={buildResult.errors?.parameters[parameterKey(param)] ?? null}
-                                        onChange={(value) => updateParameter(param, value)}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    );
-                })}
+                        return (
+                            <section key={group.location} className="flex flex-col gap-3">
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                                    {group.location} parameters
+                                </h3>
+                                <div className="flex flex-wrap gap-4">
+                                    {supportedParams.map((param) => (
+                                        <RequestParameterField
+                                            key={parameterKey(param)}
+                                            idPrefix={idPrefix}
+                                            param={param}
+                                            value={values.parameters[parameterKey(param)] ?? ""}
+                                            error={buildResult.errors?.parameters[parameterKey(param)] ?? null}
+                                            onChange={(value) => updateParameter(param, value)}
+                                        />
+                                    ))}
+                                </div>
+                            </section>
+                        );
+                    })}
 
                 {nonInteractiveParameterLimitations.length > 0 || hasUnsupportedRequestBody ? (
                     <section aria-live="polite" className="flex flex-col gap-2">
@@ -275,18 +307,20 @@ export function RequestPlayground({
     );
 }
 
-function ParameterField({
+export function RequestParameterField({
     idPrefix,
     param,
     value,
     error,
     onChange,
+    inline = false,
 }: {
     idPrefix: string;
     param: Param;
     value: string;
     error: string | null;
     onChange: (value: string) => void;
+    inline?: boolean;
 }): React.ReactNode {
     const key = parameterKey(param);
     const id = `${idPrefix}-${fieldId(key)}`;
@@ -308,9 +342,11 @@ function ParameterField({
             id={id}
             label={param.name}
             required={param.required}
-            helperText={param.description ?? undefined}
+            helperText={inline ? undefined : (param.description ?? undefined)}
             error={error ?? undefined}
-            className="min-w-0 basis-full flex-1 sm:basis-48"
+            className={
+                inline ? "min-w-0 [&>div:first-child]:sr-only" : "min-w-0 basis-full flex-1 sm:basis-48"
+            }
         >
             {(controlProps) =>
                 arrayOptions.length > 0 ? (
@@ -411,7 +447,7 @@ function parameterLimitationsWithoutControls(
     );
 }
 
-function initialPlaygroundValues(operation: Operation, components: unknown): RequestValues {
+export function initialPlaygroundValues(operation: Operation, components: unknown): RequestValues {
     const values = initialRequestValues(operation, components);
     const parameters = { ...values.parameters };
 
@@ -424,8 +460,12 @@ function initialPlaygroundValues(operation: Operation, components: unknown): Req
     return { ...values, parameters };
 }
 
-function isRenderableParameter(location: string, param: Param): boolean {
+export function isRenderableParameter(location: string, param: Param): boolean {
     return ["path", "query", "header"].includes(location) && parameterLimitation(param) === null;
+}
+
+function isInlineParameterGroup(location: string): boolean {
+    return location === "path" || location === "query";
 }
 
 function parameterSchema(param: Param): Record<string, unknown> {

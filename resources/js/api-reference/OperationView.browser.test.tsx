@@ -3,6 +3,69 @@ import { render } from "vitest-browser-react";
 import { OperationView } from "./OperationView";
 
 describe("OperationView", () => {
+    it("shows path and query controls inline before the right request panel is enabled", async () => {
+        const screen = await render(
+            <OperationView
+                operationId="get-products-id"
+                spec={{
+                    openapi: "3.1.0",
+                    info: { title: "Products", version: "1.0.0" },
+                    servers: [{ url: "https://api.example.test" }],
+                    paths: {
+                        "/products/{id}": {
+                            get: {
+                                parameters: [
+                                    {
+                                        name: "id",
+                                        in: "path",
+                                        required: true,
+                                        example: "product-1",
+                                        schema: { type: "string" },
+                                    },
+                                    {
+                                        name: "include",
+                                        in: "query",
+                                        style: "form",
+                                        explode: false,
+                                        schema: {
+                                            type: "array",
+                                            items: { type: "string", enum: ["variants", "prices"] },
+                                        },
+                                    },
+                                ],
+                                responses: { "200": { description: "OK" } },
+                            },
+                        },
+                    },
+                }}
+            />,
+        );
+
+        const requestPanel = screen.getByRole("complementary", { name: "Request" });
+        const id = screen.getByLabelText("id");
+
+        await expect.element(id).toBeVisible();
+        await expect.element(id).toHaveValue("product-1");
+        await expect.element(screen.getByRole("button", { name: "include" })).toBeVisible();
+        await expect.element(requestPanel.getByRole("button", { name: "Try it out" })).toBeVisible();
+        await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toBeInTheDocument();
+
+        await id.fill("product/2");
+        await requestPanel.getByRole("button", { name: "Try it out" }).click();
+        await expect
+            .element(screen.getByLabelText("Request snippet", { exact: true }))
+            .toHaveTextContent("https://api.example.test/products/product%2F2");
+
+        await id.fill("");
+        await requestPanel.getByRole("button", { name: "Execute" }).click();
+        await expect.element(screen.getByText("This path parameter is required.")).toBeVisible();
+        await expect.element(id).toHaveFocus();
+
+        await requestPanel.getByRole("button", { name: "Cancel" }).click();
+        await expect.element(id).toHaveValue("product-1");
+        await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toBeInTheDocument();
+    });
+
     it("shows a generated example by default for schema-only responses", async () => {
         const screen = await render(
             <OperationView
