@@ -103,6 +103,33 @@ describe("buildRequest", () => {
         });
     });
 
+    it("serializes a form array query parameter as one comma-separated value", () => {
+        const fields = parameter({
+            name: "fields[users]",
+            location: "query",
+            style: "form",
+            explode: false,
+            schema: { type: "array", items: { type: "string", enum: ["name", "email"] } },
+        });
+
+        expect(
+            buildRequest({
+                operation: operation([fields]),
+                baseUrl: "https://api.example.test",
+                values: values([[fields, "name,email"]]),
+                token: null,
+            }),
+        ).toEqual({
+            request: {
+                method: "POST",
+                url: "https://api.example.test/widgets/{id}?fields%5Busers%5D=name%2Cemail",
+                headers: {},
+                body: null,
+            },
+            errors: null,
+        });
+    });
+
     it("omits empty optional query and header values and does not invent authorization", () => {
         const id = parameter({ name: "id", location: "path", required: true });
         const filter = parameter({ name: "filter", location: "query" });

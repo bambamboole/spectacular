@@ -26,6 +26,8 @@ type RawParameter = {
     description?: string | null;
     schema?: unknown;
     example?: unknown;
+    style?: string | null;
+    explode?: boolean | null;
     $ref?: string;
 };
 
@@ -210,6 +212,8 @@ function buildParam(parameter: RawParameter): Param {
         description: parameter.description ?? null,
         schema,
         example: parameterExample(parameter.example, schema),
+        ...(parameter.style === undefined ? {} : { style: parameter.style }),
+        ...(parameter.explode === undefined ? {} : { explode: parameter.explode }),
     };
 }
 

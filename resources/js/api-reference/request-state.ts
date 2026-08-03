@@ -45,7 +45,7 @@ export function initialRequestValues(operation: Operation, components?: unknown)
 }
 
 function initialParameterValue(param: Param): string {
-    const directExample = scalarString(param.example);
+    const directExample = parameterString(param.example);
     if (directExample !== null) {
         return directExample;
     }
@@ -55,7 +55,7 @@ function initialParameterValue(param: Param): string {
     }
 
     for (const key of ["example", "default"] as const) {
-        const value = scalarString(param.schema[key]);
+        const value = parameterString(param.schema[key]);
         if (value !== null) {
             return value;
         }
@@ -66,6 +66,16 @@ function initialParameterValue(param: Param): string {
     }
 
     return "";
+}
+
+function parameterString(value: unknown): string | null {
+    if (!Array.isArray(value)) {
+        return scalarString(value);
+    }
+
+    const items = value.map(scalarString);
+
+    return items.every((item): item is string => item !== null) ? items.join(",") : null;
 }
 
 function scalarString(value: unknown): string | null {

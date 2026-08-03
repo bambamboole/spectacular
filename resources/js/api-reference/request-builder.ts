@@ -123,7 +123,7 @@ function validateParameters(parameters: Param[], values: RequestValues, errors: 
 }
 
 export function parameterLimitation(param: Param, value?: string): string | null {
-    if (!hasPrimitiveSchema(param)) {
+    if (!hasPrimitiveSchema(param) && !hasFormArraySchema(param)) {
         return "Only primitive parameters can be executed.";
     }
 
@@ -242,6 +242,26 @@ function hasPrimitiveSchema(param: Param): boolean {
     return (
         typeof param.schema.type === "string" &&
         ["string", "number", "integer", "boolean"].includes(param.schema.type)
+    );
+}
+
+function hasFormArraySchema(param: Param): boolean {
+    if (param.location !== "query" || (param.style !== undefined && param.style !== null && param.style !== "form")) {
+        return false;
+    }
+
+    if (param.explode !== false || !isRecord(param.schema) || param.schema.type !== "array") {
+        return false;
+    }
+
+    const items = param.schema.items;
+
+    return (
+        isRecord(items) &&
+        items.type === "string" &&
+        Array.isArray(items.enum) &&
+        items.enum.length > 0 &&
+        items.enum.every((value) => typeof value === "string")
     );
 }
 
