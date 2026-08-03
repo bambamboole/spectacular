@@ -66,6 +66,7 @@ describe("ApiReference", () => {
         });
         const clipboardWrite = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
         const listProductsHeader = listProducts.element().parentElement;
+        const listProductsUrlRow = copyListProductsUrl.element().parentElement;
 
         await expect.element(screen.getByRole("navigation")).not.toBeInTheDocument();
         await expect.element(screen.getByRole("heading", { name: "Products", level: 2 })).toBeVisible();
@@ -76,6 +77,8 @@ describe("ApiReference", () => {
         await expect.element(listProductsHeader as HTMLElement).toHaveTextContent("https://api.example.test/products");
         expect(listProducts.element().className).toContain("absolute inset-0");
         expect(listProductsHeader?.className).toContain("bg-lt-muted");
+        expect(listProductsUrlRow?.previousElementSibling?.textContent).toBe("List products");
+        expect(copyListProductsMarkdown.element().parentElement).not.toBe(listProductsUrlRow);
         expect(listProductsHeader?.querySelector("svg")?.compareDocumentPosition(listProducts.element()))
             .toBe(globalThis.Node.DOCUMENT_POSITION_FOLLOWING);
         await expect.element(createProduct).toHaveAttribute("aria-expanded", "false");

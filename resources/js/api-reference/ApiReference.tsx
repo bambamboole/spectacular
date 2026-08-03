@@ -285,16 +285,18 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                                     <span className="block text-sm font-medium text-lt-fg">
                                                         {summary.title}
                                                     </span>
-                                                    <span className="block break-all font-mono text-xs text-lt-muted-fg">
-                                                        {url}
-                                                    </span>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="min-w-0 break-all font-mono text-xs text-lt-muted-fg">
+                                                            {url}
+                                                        </span>
+                                                        <CopyButton
+                                                            value={url}
+                                                            label={`${summary.title} URL`}
+                                                            iconOnly
+                                                            className="pointer-events-auto size-7 shrink-0"
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <CopyButton
-                                                    value={url}
-                                                    label={`${summary.title} URL`}
-                                                    iconOnly
-                                                    className="pointer-events-auto size-7 shrink-0"
-                                                />
                                                 <CopyButton
                                                     value={markdown}
                                                     label={`${summary.title} as Markdown`}
