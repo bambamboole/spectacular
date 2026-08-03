@@ -20,24 +20,6 @@ function schemaExample(schema: unknown, components: unknown, visitedRefs: Set<st
         return null;
     }
 
-    const ref = localSchemaRef(schema);
-    if (ref !== null) {
-        if (visitedRefs.has(ref)) {
-            return null;
-        }
-
-        const referencedSchema = componentSchema(ref, components);
-        if (referencedSchema === null) {
-            return null;
-        }
-
-        visitedRefs.add(ref);
-        const example = schemaExample(referencedSchema, components, visitedRefs);
-        visitedRefs.delete(ref);
-
-        return example;
-    }
-
     const example = schema.example;
     if (example !== undefined) {
         return example;
@@ -60,27 +42,93 @@ function schemaExample(schema: unknown, components: unknown, visitedRefs: Set<st
         return schema.enum[0];
     }
 
-    if (schema.type === "object") {
+    const examples = [
+        referencedExample(schema, components, visitedRefs),
+        ...schemaListExamples(schema.allOf, components, visitedRefs),
+        unionExample(schema, components, visitedRefs),
+        typedExample(schema, components, visitedRefs),
+    ];
+
+    return combineExamples(examples);
+}
+
+function referencedExample(schema: Record<string, unknown>, components: unknown, visitedRefs: Set<string>): unknown {
+    const ref = localSchemaRef(schema);
+    if (ref === null || visitedRefs.has(ref)) {
+        return null;
+    }
+
+    const referencedSchema = componentSchema(ref, components);
+    if (referencedSchema === null) {
+        return null;
+    }
+
+    visitedRefs.add(ref);
+    const example = schemaExample(referencedSchema, components, visitedRefs);
+    visitedRefs.delete(ref);
+
+    return example;
+}
+
+function schemaListExamples(schemas: unknown, components: unknown, visitedRefs: Set<string>): unknown[] {
+    if (!Array.isArray(schemas)) {
+        return [];
+    }
+
+    return schemas.map((schema) => schemaExample(schema, components, visitedRefs));
+}
+
+function unionExample(schema: Record<string, unknown>, components: unknown, visitedRefs: Set<string>): unknown {
+    const variants = Array.isArray(schema.oneOf) ? schema.oneOf : schema.anyOf;
+    if (!Array.isArray(variants)) {
+        return null;
+    }
+
+    for (const variant of variants) {
+        const example = schemaExample(variant, components, visitedRefs);
+        if (example !== null) {
+            return example;
+        }
+    }
+
+    return null;
+}
+
+function typedExample(schema: Record<string, unknown>, components: unknown, visitedRefs: Set<string>): unknown {
+    const type = Array.isArray(schema.type)
+        ? schema.type.find((candidate) => candidate !== "null")
+        : schema.type;
+
+    if (type === "object" || isRecord(schema.properties)) {
         return objectExample(schema.properties, components, visitedRefs);
     }
 
-    if (schema.type === "array") {
+    if (type === "array") {
         return [schemaExample(schema.items, components, visitedRefs)];
     }
 
-    if (schema.type === "string") {
+    if (type === "string") {
         return stringExample(schema.format);
     }
 
-    if (schema.type === "integer" || schema.type === "number") {
+    if (type === "integer" || type === "number") {
         return 0;
     }
 
-    if (schema.type === "boolean") {
+    if (type === "boolean") {
         return false;
     }
 
     return null;
+}
+
+function combineExamples(examples: unknown[]): unknown {
+    const objectExamples = examples.filter(isRecord);
+    if (objectExamples.length > 0) {
+        return Object.assign({}, ...objectExamples);
+    }
+
+    return examples.find((example) => example !== null) ?? null;
 }
 
 function stringExample(format: unknown): string {
