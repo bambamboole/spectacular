@@ -1,22 +1,20 @@
 # Local Development
 
 - This package is developed with Orchestra Testbench, not a full Laravel app.
-- `artisan` at the repo root is a symlink to `vendor/bin/testbench`, so `php artisan <command>` boots the Testbench
-  skeleton with this package's service provider and the `workbench/` app.
+- `artisan` at the repo root is a committed Testbench shim, so `php artisan <command>` boots the Testbench skeleton with
+  this package's service provider and the `workbench/` app.
 - Run the test suite with `composer test` or `./vendor/bin/pest`.
 - Serve the workbench app with `composer serve`.
 - The two Artisan commands the package ships are `spectacular:openapi` and `spectacular:asyncapi`; run them against the
   workbench app to see generation end to end.
-- The AI tooling overrides for Boost live in `workbench/app/Support/` and are wired in
-  `Workbench\App\Providers\WorkbenchServiceProvider`. They point Boost at the package root instead of the Testbench
-  skeleton.
+- Extended Testbench points Boost at the package root instead of the Testbench skeleton.
 - Regenerate `CLAUDE.md` and `AGENTS.md` after editing files in `.ai/guidelines/` with `php artisan boost:update`
   (or `composer boost:refresh`).
 
 ## Verification
 
 - Before pushing or opening a PR, run `composer check` (Pint, PHPStan, Pest) — it mirrors CI. Never push on red.
-  `composer test` alone is not enough; PHPStan (`composer analyse`) and Pint (`composer test:lint`) run in CI too.
+  `composer test` alone is not enough; PHPStan (`composer stan`) and Pint (`composer test:lint`) run in CI too.
 - Generation output is verified against committed fixtures in `workbench/fixtures/` (`openapi.json`, `asyncapi.json`)
   and `tests/Fixtures/`. When a change intentionally alters generated output, regenerate and commit the updated fixture
   in the same change; when it does not, a fixture diff is a regression to investigate, not to overwrite.
