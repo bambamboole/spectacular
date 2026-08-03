@@ -70,6 +70,10 @@ export function buildRequest(input: {
     const headers = buildHeaders(parameters, input.values);
     const body = input.values.body.trim() === "" ? null : input.values.body;
 
+    if (!Object.keys(headers).some((name) => name.toLowerCase() === "accept")) {
+        headers.Accept = "application/json";
+    }
+
     if (body !== null && selectedContract !== null && selectedContract.mediaType !== null) {
         upsertHeader(headers, "Content-Type", selectedContract.mediaType);
     }
