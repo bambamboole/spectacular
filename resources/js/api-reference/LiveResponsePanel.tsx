@@ -1,4 +1,4 @@
-import { Badge } from "@lattice-php/lattice/ui";
+import { Badge, CodeBlock } from "@lattice-php/lattice/ui";
 import type { ExecutedResponse, ExecutionError } from "./execute-request";
 
 type LiveResponsePanelProps = {
@@ -46,12 +46,14 @@ export function LiveResponsePanel({ result }: LiveResponsePanelProps): React.Rea
                     </dl>
                 </div>
             ) : null}
-            <pre
+            <CodeBlock
                 aria-label="Live response body"
-                className="max-w-full overflow-x-auto whitespace-pre-wrap wrap-anywhere rounded-lt-sm bg-lt-muted p-3 text-xs text-lt-fg"
+                copyable
+                language={result.contentType?.toLowerCase().includes("json") ? "json" : "text"}
+                wrap
             >
                 {result.body}
-            </pre>
+            </CodeBlock>
         </section>
     );
 }

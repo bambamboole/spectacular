@@ -41,6 +41,8 @@ describe("OperationView", () => {
 
         await screen.getByRole("radio", { name: "Example" }).click();
         await expect.element(screen.getByText("A complete inline example.")).toBeVisible();
+        await expect.element(screen.getByRole("region", { name: "Response example" })).toBeVisible();
+        await expect.poll(() => document.querySelector(".cm-content")?.getAttribute("contenteditable")).toBe("false");
 
         await screen.getByRole("combobox").selectOptions("1");
         await expect.element(screen.getByRole("link", { name: "Open external example" })).toHaveAttribute(

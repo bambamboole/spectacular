@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { FormFieldFrame } from "@lattice-php/lattice/form";
 import {
     Button,
     Card,
@@ -7,11 +8,10 @@ import {
     CardTitle,
     Combobox,
     Input,
-    Label,
+    NativeSelect,
     Spinner,
     Textarea,
 } from "@lattice-php/lattice/ui";
-import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
 import { executeRequest, type ExecutedResponse, type ExecutionError } from "./execute-request";
 import { LiveResponsePanel } from "./LiveResponsePanel";
 import {
@@ -59,6 +59,8 @@ export function RequestPlayground({
     );
     const nonInteractiveParameterLimitations = parameterLimitationsWithoutControls(operation);
     const hasUnsupportedRequestBody = operation.requests.length > 0 && jsonContracts.length === 0;
+    const requestBodyRequired =
+        jsonContracts.find((contract) => contract.mediaType === values.mediaType)?.required ?? false;
     const snippet = useMemo(() => {
         if (buildResult.request === null) {
             return "";
@@ -209,41 +211,43 @@ export function RequestPlayground({
                 {jsonContracts.length > 0 ? (
                     <section className="flex flex-col gap-3">
                         {jsonContracts.length > 1 ? (
-                            <div className="flex min-w-0 basis-full flex-1 flex-col gap-2 sm:basis-48">
-                                <Label htmlFor={`${idPrefix}-request-media-type`}>Content type</Label>
-                                <NativeSelect
-                                    id={`${idPrefix}-request-media-type`}
-                                    value={values.mediaType ?? ""}
-                                    onChange={(event) => updateMediaType(event.target.value)}
-                                >
-                                    {jsonContracts.map((contract) => (
-                                        <option key={contract.mediaType} value={contract.mediaType ?? ""}>
-                                            {contract.mediaType}
-                                        </option>
-                                    ))}
-                                </NativeSelect>
-                            </div>
+                            <FormFieldFrame
+                                id={`${idPrefix}-request-media-type`}
+                                label="Content type"
+                                className="min-w-0 basis-full flex-1 sm:basis-48"
+                            >
+                                {(controlProps) => (
+                                    <NativeSelect
+                                        {...controlProps}
+                                        value={values.mediaType ?? ""}
+                                        onChange={(event) => updateMediaType(event.target.value)}
+                                    >
+                                        {jsonContracts.map((contract) => (
+                                            <option key={contract.mediaType} value={contract.mediaType ?? ""}>
+                                                {contract.mediaType}
+                                            </option>
+                                        ))}
+                                    </NativeSelect>
+                                )}
+                            </FormFieldFrame>
                         ) : null}
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor={`${idPrefix}-request-body`}>JSON body</Label>
-                            <Textarea
-                                id={`${idPrefix}-request-body`}
-                                value={values.body}
-                                required={jsonContracts.find((contract) => contract.mediaType === values.mediaType)?.required}
-                                aria-invalid={Boolean(buildResult.errors?.body)}
-                                aria-describedby={
-                                    buildResult.errors?.body ? `${idPrefix}-body-error` : undefined
-                                }
-                                data-field-key="body"
-                                onChange={(event) => updateBody(event.target.value)}
-                                className="min-h-40 font-mono text-sm"
-                            />
-                            {buildResult.errors?.body ? (
-                                <p id={`${idPrefix}-body-error`} className="text-xs text-lt-danger">
-                                    {buildResult.errors.body}
-                                </p>
-                            ) : null}
-                        </div>
+                        <FormFieldFrame
+                            id={`${idPrefix}-request-body`}
+                            label="JSON body"
+                            required={requestBodyRequired}
+                            error={buildResult.errors?.body ?? undefined}
+                        >
+                            {(controlProps) => (
+                                <Textarea
+                                    {...controlProps}
+                                    value={values.body}
+                                    required={requestBodyRequired}
+                                    data-field-key="body"
+                                    onChange={(event) => updateBody(event.target.value)}
+                                    className="min-h-40 font-mono text-sm"
+                                />
+                            )}
+                        </FormFieldFrame>
                     </section>
                 ) : null}
 
@@ -300,90 +304,83 @@ function ParameterField({
     }
 
     return (
-        <div className="flex min-w-0 basis-full flex-1 flex-col gap-2 sm:basis-48">
-            <Label htmlFor={id}>{param.name}</Label>
-            {arrayOptions.length > 0 ? (
-                <Combobox
-                    multiple
-                    open={isArrayOptionsOpen}
-                    onOpenChange={setIsArrayOptionsOpen}
-                    options={arrayOptions.map((option) => ({ label: option, value: option, data: null }))}
-                    selected={selectedArrayOptions}
-                    onSelect={toggleArrayOption}
-                    emptyLabel="No values found."
-                    searchPlaceholder="Search values..."
-                    trigger={
-                        <span className={selectedArrayOptions.length === 0 ? "text-lt-muted-fg" : undefined}>
-                            {selectedArrayOptions.length === 0 ? "Not set" : selectedArrayOptions.join(", ")}
-                        </span>
-                    }
-                    triggerClassName="flex h-lt-control-md w-full items-center rounded-lt-sm border border-lt-input bg-transparent px-3 py-1 text-left text-sm outline-none focus-visible:border-lt-ring focus-visible:ring-[length:var(--lt-ring-width)] focus-visible:ring-lt-ring/50"
-                    triggerProps={
-                        {
-                            id,
-                            "aria-label": param.name,
-                            "aria-required": param.required,
-                            "aria-invalid": error !== null,
-                            "aria-describedby": error ? `${idPrefix}-${fieldId(key)}-error` : undefined,
-                            "data-field-key": key,
-                        } as React.ComponentProps<"button"> & { "data-field-key": string }
-                    }
-                />
-            ) : Array.isArray(schema.enum) ? (
-                <NativeSelect
-                    id={id}
-                    value={value}
-                    required={param.required}
-                    aria-invalid={error !== null}
-                    aria-describedby={error ? `${idPrefix}-${fieldId(key)}-error` : undefined}
-                    data-field-key={key}
-                    onChange={(event) => onChange(event.target.value)}
-                >
-                    {!param.required ? <option value="">Not set</option> : null}
-                    {schema.enum.map((option) => (
-                        <option key={String(option)} value={String(option)}>
-                            {String(option)}
-                        </option>
-                    ))}
-                </NativeSelect>
-            ) : schema.type === "boolean" ? (
-                <NativeSelect
-                    id={id}
-                    value={value}
-                    required={param.required}
-                    aria-invalid={error !== null}
-                    aria-describedby={error ? `${idPrefix}-${fieldId(key)}-error` : undefined}
-                    data-field-key={key}
-                    onChange={(event) => onChange(event.target.value)}
-                >
-                    {!param.required ? <option value="">Not set</option> : null}
-                    <option value="true">true</option>
-                    <option value="false">false</option>
-                </NativeSelect>
-            ) : (
-                <Input
-                    id={id}
-                    type={parameterInputType(schema)}
-                    value={value}
-                    required={param.required}
-                    min={parameterMinimum(schema)}
-                    max={parameterMaximum(schema)}
-                    step={parameterStep(schema)}
-                    minLength={numberValue(schema.minLength)}
-                    maxLength={numberValue(schema.maxLength)}
-                    pattern={typeof schema.pattern === "string" ? schema.pattern : undefined}
-                    aria-invalid={error !== null}
-                    aria-describedby={error ? `${idPrefix}-${fieldId(key)}-error` : undefined}
-                    data-field-key={key}
-                    onChange={(event) => onChange(event.target.value)}
-                />
-            )}
-            {error ? (
-                <p id={`${idPrefix}-${fieldId(key)}-error`} className="text-xs text-lt-danger">
-                    {error}
-                </p>
-            ) : null}
-        </div>
+        <FormFieldFrame
+            id={id}
+            label={param.name}
+            required={param.required}
+            helperText={param.description ?? undefined}
+            error={error ?? undefined}
+            className="min-w-0 basis-full flex-1 sm:basis-48"
+        >
+            {(controlProps) =>
+                arrayOptions.length > 0 ? (
+                    <Combobox
+                        multiple
+                        open={isArrayOptionsOpen}
+                        onOpenChange={setIsArrayOptionsOpen}
+                        options={arrayOptions.map((option) => ({ label: option, value: option, data: null }))}
+                        selected={selectedArrayOptions}
+                        onSelect={toggleArrayOption}
+                        emptyLabel="No values found."
+                        searchPlaceholder="Search values..."
+                        trigger={
+                            <span className={selectedArrayOptions.length === 0 ? "text-lt-muted-fg" : undefined}>
+                                {selectedArrayOptions.length === 0 ? "Not set" : selectedArrayOptions.join(", ")}
+                            </span>
+                        }
+                        triggerClassName="flex h-lt-control-md w-full items-center rounded-lt-sm border border-lt-input bg-transparent px-3 py-1 text-left text-sm outline-none focus-visible:border-lt-ring focus-visible:ring-[length:var(--lt-ring-width)] focus-visible:ring-lt-ring/50"
+                        triggerProps={
+                            {
+                                ...controlProps,
+                                "data-field-key": key,
+                            } as React.ComponentProps<"button"> & { "data-field-key": string }
+                        }
+                    />
+                ) : Array.isArray(schema.enum) ? (
+                    <NativeSelect
+                        {...controlProps}
+                        value={value}
+                        required={param.required}
+                        data-field-key={key}
+                        onChange={(event) => onChange(event.target.value)}
+                    >
+                        {!param.required ? <option value="">Not set</option> : null}
+                        {schema.enum.map((option) => (
+                            <option key={String(option)} value={String(option)}>
+                                {String(option)}
+                            </option>
+                        ))}
+                    </NativeSelect>
+                ) : schema.type === "boolean" ? (
+                    <NativeSelect
+                        {...controlProps}
+                        value={value}
+                        required={param.required}
+                        data-field-key={key}
+                        onChange={(event) => onChange(event.target.value)}
+                    >
+                        {!param.required ? <option value="">Not set</option> : null}
+                        <option value="true">true</option>
+                        <option value="false">false</option>
+                    </NativeSelect>
+                ) : (
+                    <Input
+                        {...controlProps}
+                        type={parameterInputType(schema)}
+                        value={value}
+                        required={param.required}
+                        min={parameterMinimum(schema)}
+                        max={parameterMaximum(schema)}
+                        step={parameterStep(schema)}
+                        minLength={numberValue(schema.minLength)}
+                        maxLength={numberValue(schema.maxLength)}
+                        pattern={typeof schema.pattern === "string" ? schema.pattern : undefined}
+                        data-field-key={key}
+                        onChange={(event) => onChange(event.target.value)}
+                    />
+                )
+            }
+        </FormFieldFrame>
     );
 }
 

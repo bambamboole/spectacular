@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { Badge, SegmentedPills } from "@lattice-php/lattice/ui";
-import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
+import { Badge, CodeBlock, NativeSelect, SegmentedPills } from "@lattice-php/lattice/ui";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
 import { OperationHeader } from "./OperationHeader";
@@ -84,6 +83,7 @@ function SchemaExampleView({
     components,
     noSchemaMessage,
     expandDepth,
+    exampleLabel,
 }: {
     name: string;
     schema: unknown;
@@ -91,6 +91,7 @@ function SchemaExampleView({
     components: unknown;
     noSchemaMessage: string;
     expandDepth: number;
+    exampleLabel: string;
 }): React.ReactNode {
     const [tab, setTab] = useState<SchemaTab>("schema");
     const [selected, setSelected] = useState(0);
@@ -150,9 +151,9 @@ function SchemaExampleView({
                         </a>
                     ) : null}
                     {current?.value !== undefined ? (
-                        <pre className="overflow-x-auto rounded-lt-sm bg-lt-muted p-3 text-xs text-lt-fg">
+                        <CodeBlock aria-label={exampleLabel} copyable language="json">
                             {JSON.stringify(current.value, null, 2)}
-                        </pre>
+                        </CodeBlock>
                     ) : null}
                 </div>
             )}
@@ -188,6 +189,7 @@ function RequestBodySection({
                             components={components}
                             noSchemaMessage="No request body schema."
                             expandDepth={expandDepth}
+                            exampleLabel="Request body example"
                         />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No request body schema.</p>
@@ -254,6 +256,7 @@ function ResponsesSection({
                             components={components}
                             noSchemaMessage="No response body."
                             expandDepth={expandDepth}
+                            exampleLabel="Response example"
                         />
                     ) : (
                         <p className="text-sm text-lt-muted-fg">No response body.</p>

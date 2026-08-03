@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { Badge, Input } from "@lattice-php/lattice/ui";
-import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
+import { Badge, Input, NativeSelect } from "@lattice-php/lattice/ui";
 import { httpMethodColor } from "./http-method-color";
 import type { Navigation, NavGroup, Server } from "./types";
 
