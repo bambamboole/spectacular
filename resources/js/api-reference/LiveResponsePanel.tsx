@@ -51,7 +51,7 @@ export function LiveResponsePanel({ result }: LiveResponsePanelProps): React.Rea
                 copyable
                 language={result.contentType?.toLowerCase().includes("json") ? "json" : "text"}
                 lineNumbers
-                maxHeight={2400}
+                maxHeight={800}
                 wrap
             >
                 {result.body}

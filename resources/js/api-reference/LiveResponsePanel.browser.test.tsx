@@ -27,5 +27,12 @@ describe("LiveResponsePanel", () => {
                 return scroller !== null && scroller.scrollHeight > scroller.clientHeight;
             })
             .toBe(true);
+        await expect
+            .poll(() => {
+                const editor = document.querySelector<HTMLElement>(".cm-editor");
+
+                return editor ? getComputedStyle(editor).maxHeight : null;
+            })
+            .toBe("800px");
     });
 });

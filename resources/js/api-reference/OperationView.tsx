@@ -135,6 +135,7 @@ function SchemaExampleView({
     noSchemaMessage,
     expandDepth,
     exampleLabel,
+    maxHeight = 2400,
     defaultTab = "schema",
     generateExample = false,
 }: {
@@ -145,6 +146,7 @@ function SchemaExampleView({
     noSchemaMessage: string;
     expandDepth: number;
     exampleLabel: string;
+    maxHeight?: number;
     defaultTab?: SchemaTab;
     generateExample?: boolean;
 }): React.ReactNode {
@@ -222,7 +224,7 @@ function SchemaExampleView({
                         </a>
                     ) : null}
                     {current?.value !== undefined ? (
-                        <CodeBlock aria-label={exampleLabel} copyable language="json" lineNumbers maxHeight={2400}>
+                        <CodeBlock aria-label={exampleLabel} copyable language="json" lineNumbers maxHeight={maxHeight}>
                             {JSON.stringify(current.value, null, 2)}
                         </CodeBlock>
                     ) : null}
@@ -328,6 +330,7 @@ function ResponsesSection({
                             noSchemaMessage="No response body."
                             expandDepth={expandDepth}
                             exampleLabel="Response example"
+                            maxHeight={800}
                             defaultTab="example"
                             generateExample
                         />
@@ -484,8 +487,8 @@ function OperationContent({
 
     return (
         <div ref={requestRootRef} className="min-w-0 flex-1 overflow-y-auto">
-            <div className="grid min-w-0 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
-                <div className="min-w-0 p-6">
+            <div className="grid min-w-0 items-start xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
+                <div className="min-w-0 p-6 xl:col-start-1 xl:row-start-1">
                     <OperationHeader operation={operation} baseUrl={operation.serverUrl} components={components} />
 
                     <SecuritySection security={operation.security} components={components} />
@@ -505,25 +508,31 @@ function OperationContent({
                             ))}
                         </section>
                     ) : null}
-
-                    <RequestBodySection requests={operation.requests} components={components} expandDepth={expandDepth} />
-                    <ResponsesSection responses={operation.responses} components={components} expandDepth={expandDepth} />
                 </div>
-                <aside
-                    aria-label="Request"
-                    className="min-w-0 border-t border-lt-border p-6 xl:sticky xl:top-0 xl:self-start xl:border-t-0 xl:border-l"
-                >
-                    <RequestPlayground
-                        operation={operation}
-                        baseUrl={operation.serverUrl}
-                        token={token}
-                        components={components}
-                        values={requestValues}
-                        onValuesChange={setRequestValues}
-                        hideInlineParameters
-                        onValidationError={focusRequestField}
-                    />
-                </aside>
+                <RequestPlayground
+                    operation={operation}
+                    baseUrl={operation.serverUrl}
+                    token={token}
+                    components={components}
+                    values={requestValues}
+                    onValuesChange={setRequestValues}
+                    hideInlineParameters
+                    onValidationError={focusRequestField}
+                    referenceContent={
+                        <>
+                            <RequestBodySection
+                                requests={operation.requests}
+                                components={components}
+                                expandDepth={expandDepth}
+                            />
+                            <ResponsesSection
+                                responses={operation.responses}
+                                components={components}
+                                expandDepth={expandDepth}
+                            />
+                        </>
+                    }
+                />
             </div>
         </div>
     );
