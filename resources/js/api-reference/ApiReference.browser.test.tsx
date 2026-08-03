@@ -65,16 +65,20 @@ describe("ApiReference", () => {
         const copyListProductsMarkdown = screen.getByRole("button", {
             name: "Copy List products as Markdown",
         });
-        const collapseListProducts = screen.getByRole("button", { name: "Collapse List products" });
         const clipboardWrite = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+        const listProductsHeader = listProducts.element().parentElement;
 
         await expect.element(screen.getByRole("navigation")).not.toBeInTheDocument();
         await expect.element(screen.getByRole("heading", { name: "Products", level: 2 })).toBeVisible();
         await expect.element(screen.getByRole("heading", { name: "Orders", level: 2 })).toBeVisible();
         await expect.element(screen.getByLabelText("Select server")).toBeVisible();
         await expect.element(listProducts).toHaveAttribute("aria-expanded", "true");
-        await expect.element(listProducts).toHaveTextContent("https://api.example.test/products");
-        expect(copyListProductsMarkdown.element().nextElementSibling).toBe(collapseListProducts.element());
+        expect(listProductsHeader).not.toBeNull();
+        await expect.element(listProductsHeader as HTMLElement).toHaveTextContent("https://api.example.test/products");
+        expect(listProducts.element().className).toContain("absolute inset-0");
+        expect(listProductsHeader?.className).toContain("bg-lt-muted");
+        expect(listProductsHeader?.querySelector("svg")?.compareDocumentPosition(listProducts.element()))
+            .toBe(globalThis.Node.DOCUMENT_POSITION_FOLLOWING);
         await expect.element(createProduct).toHaveAttribute("aria-expanded", "false");
         expect(listOrders).toHaveLength(2);
         await expect.element(listOrders[0]).toHaveAttribute("aria-expanded", "false");
@@ -91,11 +95,12 @@ describe("ApiReference", () => {
         await expect.poll(() => clipboardWrite.mock.calls[0]?.[0]).toBe("https://api.example.test/products");
         await copyListProductsMarkdown.click();
         await expect.poll(() => clipboardWrite.mock.calls[1]?.[0]).toContain("# List products");
+        await expect.element(listProducts).toHaveAttribute("aria-expanded", "true");
 
-        await collapseListProducts.click();
+        await listProducts.click();
         await expect.element(listProducts).toHaveAttribute("aria-expanded", "false");
         await expect.poll(() => screen.getByRole("complementary", { name: "Request" }).all().length).toBe(0);
-        await screen.getByRole("button", { name: "Expand List products" }).click();
+        await listProducts.click();
         await expect.element(listProducts).toHaveAttribute("aria-expanded", "true");
 
         await createProduct.click();

@@ -277,53 +277,46 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
 
                                     return (
                                         <div key={id} className="border-b border-lt-border last:border-b-0">
-                                            <div className="flex items-center gap-2 px-4 py-3 transition-colors hover:bg-lt-muted">
-                                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                            <div className="relative bg-lt-muted">
+                                                <div className="pointer-events-none relative z-10 flex items-center gap-2 px-4 py-3">
+                                                    <Icon
+                                                        name="chevron-down"
+                                                        className={`size-lt-icon-xs shrink-0 text-lt-muted-fg transition-transform${isOpen ? "" : " -rotate-90"}`}
+                                                    />
                                                     <Badge color={httpMethodColor(summary.method)} className="text-xs">
                                                         {summary.method}
                                                     </Badge>
-                                                    <button
-                                                        type="button"
-                                                        aria-expanded={isOpen}
-                                                        aria-controls={contentId}
-                                                        onClick={() => selectStackedOperation(group.id, id)}
-                                                        className="min-w-0 text-left"
-                                                    >
+                                                    <div className="min-w-0 flex-1">
                                                         <span className="block text-sm font-medium text-lt-fg">
                                                             {summary.title}
                                                         </span>
                                                         <span className="block break-all font-mono text-xs text-lt-muted-fg">
                                                             {url}
                                                         </span>
-                                                    </button>
+                                                    </div>
                                                     <CopyButton
                                                         value={url}
                                                         label={`${summary.title} URL`}
                                                         iconOnly
-                                                        className="size-7 shrink-0"
+                                                        className="pointer-events-auto size-7 shrink-0"
                                                     />
+                                                    <CopyButton
+                                                        value={markdown}
+                                                        label={`${summary.title} as Markdown`}
+                                                        testId={`copy-${id}-markdown`}
+                                                        className="pointer-events-auto shrink-0"
+                                                    >
+                                                        Copy as Markdown
+                                                    </CopyButton>
                                                 </div>
-                                                <CopyButton
-                                                    value={markdown}
-                                                    label={`${summary.title} as Markdown`}
-                                                    testId={`copy-${id}-markdown`}
-                                                    className="shrink-0"
-                                                >
-                                                    Copy as Markdown
-                                                </CopyButton>
                                                 <button
                                                     type="button"
-                                                    aria-label={`${isOpen ? "Collapse" : "Expand"} ${summary.title}`}
+                                                    aria-label={summary.title}
                                                     aria-expanded={isOpen}
                                                     aria-controls={contentId}
                                                     onClick={() => selectStackedOperation(group.id, id)}
-                                                    className="flex size-7 shrink-0 items-center justify-center rounded-lt-sm text-lt-muted-fg transition-colors hover:bg-lt-accent hover:text-lt-accent-fg"
-                                                >
-                                                    <Icon
-                                                        name="chevron-down"
-                                                        className={`size-lt-icon-xs transition-transform${isOpen ? "" : " -rotate-90"}`}
-                                                    />
-                                                </button>
+                                                    className="absolute inset-0 z-0 cursor-pointer transition-colors hover:bg-lt-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-lt-ring"
+                                                />
                                             </div>
                                             {isOpen ? (
                                                 <div id={contentId}>
