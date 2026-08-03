@@ -15,6 +15,7 @@ const spec = {
                 parameters: [{ name: "include", in: "query", required: false, schema: { type: "string" } }],
                 requestBody: {
                     description: "User payload",
+                    required: true,
                     content: {
                         "application/json": {
                             schema: { type: "object", properties: { name: { type: "string" } } },
@@ -183,6 +184,7 @@ describe("parseOperation", () => {
                         deprecated: false,
                         description: null,
                         schema: { type: "string" },
+                        example: null,
                     },
                 ],
             },
@@ -196,6 +198,7 @@ describe("parseOperation", () => {
                         deprecated: false,
                         description: null,
                         schema: { type: "string" },
+                        example: null,
                     },
                 ],
             },
@@ -216,6 +219,34 @@ describe("parseOperation", () => {
         expect(op.tags).toEqual(["Users", "Admin"]);
     });
 
+    it("carries a parameter example", () => {
+        const operation = parseOperation(
+            {
+                openapi: "3.0.0",
+                info: { title: "Examples API", version: "1.0.0", description: null },
+                paths: {
+                    "/widgets": {
+                        get: {
+                            parameters: [
+                                {
+                                    name: "status",
+                                    in: "query",
+                                    required: true,
+                                    example: "active",
+                                    schema: { type: "string", enum: ["active", "disabled"] },
+                                },
+                            ],
+                            responses: { "200": { description: "OK" } },
+                        },
+                    },
+                },
+            },
+            "get-widgets",
+        )!;
+
+        expect(operation.paramGroups[0].params[0].example).toBe("active");
+    });
+
     it("builds the request Contract from requestBody", () => {
         const op = parseOperation(spec, "get-users-id")!;
 
@@ -228,6 +259,7 @@ describe("parseOperation", () => {
                 title: "User payload",
                 examples: [],
                 headers: [],
+                required: true,
             },
         ]);
     });
@@ -244,6 +276,7 @@ describe("parseOperation", () => {
                 title: "OK",
                 examples: [],
                 headers: [],
+                required: false,
             },
             {
                 role: "response",
@@ -253,6 +286,7 @@ describe("parseOperation", () => {
                 title: "Not found",
                 examples: [],
                 headers: [],
+                required: false,
             },
         ]);
     });
@@ -269,6 +303,7 @@ describe("parseOperation", () => {
                 title: "OK",
                 examples: [],
                 headers: [],
+                required: false,
             },
         ]);
     });
@@ -287,6 +322,7 @@ describe("parseOperation", () => {
                         deprecated: false,
                         description: "Page number",
                         schema: { type: "integer" },
+                        example: null,
                     },
                 ],
             },
@@ -305,6 +341,7 @@ describe("parseOperation", () => {
                 title: "User creation payload",
                 examples: [],
                 headers: [],
+                required: false,
             },
         ]);
     });
@@ -488,10 +525,87 @@ describe("buildNavigation servers", () => {
         ]);
     });
 
-    it("returns an empty array when servers is absent", () => {
+    it("defaults to the relative root server when servers is absent", () => {
         const nav = buildNavigation(spec);
 
-        expect(nav.servers).toEqual([]);
+        expect(nav.servers).toEqual([{ url: "/", description: null }]);
+    });
+
+    it("resolves server precedence and substitutes variable defaults", () => {
+        const rootServer = {
+            url: "https://{environment}.root.example/{version}",
+            variables: {
+                environment: { default: "production" },
+                version: { default: "v1" },
+            },
+        };
+        const pathServer = {
+            url: "https://{region}.path.example",
+            variables: { region: { default: "eu" } },
+        };
+        const operationServer = {
+            url: "https://{tenant}.operation.example",
+            variables: { tenant: { default: "acme" } },
+        };
+        const operationWithServers = {
+            openapi: "3.1.0",
+            info: { title: "Test API", version: "1.0.0" },
+            servers: [rootServer],
+            paths: {
+                "/widgets": {
+                    servers: [pathServer],
+                    get: {
+                        servers: [operationServer],
+                        responses: { "200": { description: "OK" } },
+                    },
+                },
+            },
+        };
+
+        expect(buildNavigation(operationWithServers).servers[0]?.url).toBe(
+            "https://production.root.example/v1",
+        );
+        expect(parseOperation(operationWithServers, "get-widgets")?.serverUrl).toBe(
+            "https://acme.operation.example",
+        );
+        expect(parseOperation(operationWithServers, "get-widgets", "https://staging.root.example")?.serverUrl).toBe(
+            "https://acme.operation.example",
+        );
+
+        const pathOnly = {
+            ...operationWithServers,
+            paths: {
+                "/widgets": {
+                    servers: [pathServer],
+                    get: { responses: { "200": { description: "OK" } } },
+                },
+            },
+        };
+        expect(parseOperation(pathOnly, "get-widgets", "https://staging.root.example")?.serverUrl).toBe(
+            "https://eu.path.example",
+        );
+
+        const rootOnly = {
+            ...operationWithServers,
+            servers: [rootServer, { url: "https://staging.root.example/v1" }],
+            paths: {
+                "/widgets": {
+                    get: { responses: { "200": { description: "OK" } } },
+                },
+            },
+        };
+        expect(parseOperation(rootOnly, "get-widgets")?.serverUrl).toBe(
+            "https://production.root.example/v1",
+        );
+        expect(parseOperation(rootOnly, "get-widgets", "https://staging.root.example/v1")?.serverUrl).toBe(
+            "https://staging.root.example/v1",
+        );
+        expect(parseOperation(rootOnly, "get-widgets")?.usesRootServers).toBe(true);
+        expect(parseOperation(operationWithServers, "get-widgets")?.servers).toEqual([
+            { url: "https://acme.operation.example", description: null },
+        ]);
+        expect(parseOperation(operationWithServers, "get-widgets")?.usesRootServers).toBe(false);
+        expect(parseOperation({ ...rootOnly, servers: [] }, "get-widgets")?.serverUrl).toBe("/");
     });
 });
 
@@ -632,6 +746,7 @@ describe("response headers", () => {
                 deprecated: false,
                 description: "Requests allowed per window",
                 schema: { type: "integer" },
+                example: null,
             },
             {
                 name: "X-RateLimit-Remaining",
@@ -640,6 +755,7 @@ describe("response headers", () => {
                 deprecated: false,
                 description: null,
                 schema: { type: "integer" },
+                example: null,
             },
         ]);
     });
@@ -681,6 +797,7 @@ describe("response headers", () => {
                 deprecated: false,
                 description: "Correlates logs to this request",
                 schema: { type: "string" },
+                example: null,
             },
         ]);
     });

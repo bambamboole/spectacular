@@ -17,7 +17,7 @@ function serverLabel(server: Server): string {
     return server.description ? `${server.description} — ${server.url}` : server.url;
 }
 
-function ServerPicker({ servers, selectedServerUrl, onServerChange }: {
+export function ServerPicker({ servers, selectedServerUrl, onServerChange }: {
     servers: Server[];
     selectedServerUrl: string | null;
     onServerChange: (url: string) => void;

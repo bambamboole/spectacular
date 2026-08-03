@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\AsyncApi;
 
+use Bambamboole\LaravelWebhooks\Support\ClassDiscoverer;
 use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
 use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
 use Bambamboole\Spectacular\AsyncApi\Messages\AsyncMessageDefinition;
 use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
-use Bambamboole\Spectacular\AsyncApi\Support\ClassDiscoverer;
 use LogicException;
 use ReflectionAttribute;
 use ReflectionClass;

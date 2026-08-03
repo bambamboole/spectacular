@@ -11,7 +11,6 @@ final readonly class AsyncMessageDefinition
      */
     public function __construct(
         public string $key,
-        public string $name,
         public array $channels,
         public array $message,
     ) {}

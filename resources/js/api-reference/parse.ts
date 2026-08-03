@@ -25,6 +25,7 @@ type RawParameter = {
     deprecated?: boolean;
     description?: string | null;
     schema?: unknown;
+    example?: unknown;
     $ref?: string;
 };
 
@@ -34,6 +35,13 @@ type RawMediaTypeObject = {
     examples?: Record<string, { summary?: string; description?: string; value?: unknown; $ref?: string }>;
 };
 
+type RawRequestBody = {
+    $ref?: string;
+    description?: string | null;
+    required?: boolean;
+    content?: Record<string, RawMediaTypeObject>;
+};
+
 type RawOperation = {
     operationId?: string;
     summary?: string;
@@ -41,13 +49,21 @@ type RawOperation = {
     tags?: string[];
     deprecated?: boolean;
     parameters?: RawParameter[];
-    requestBody?: { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject> };
+    requestBody?: RawRequestBody;
     responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject>; headers?: Record<string, RawParameter> }>;
     security?: Array<Record<string, string[]>>;
+    servers?: RawServer[];
 };
 
 type RawPathItem = Record<string, unknown> & {
     parameters?: RawParameter[];
+    servers?: RawServer[];
+};
+
+type RawServer = {
+    url?: string;
+    description?: string | null;
+    variables?: Record<string, { default?: unknown }>;
 };
 
 /**
@@ -103,13 +119,31 @@ function findOperation(spec: any, opId: string): { path: string; method: string;
     return null;
 }
 
-function buildServers(spec: any): Server[] {
-    const servers = spec?.servers ?? [];
+function normalizeServers(servers: unknown): Server[] {
     if (!Array.isArray(servers)) return [];
 
     return servers
-        .filter((server): server is { url: string; description?: string | null } => typeof server?.url === "string")
-        .map((server) => ({ url: server.url, description: server.description ?? null }));
+        .filter((server): server is RawServer & { url: string } => typeof server?.url === "string")
+        .map((server) => ({
+            url: substituteServerVariables(server.url, server.variables),
+            description: server.description ?? null,
+        }));
+}
+
+function substituteServerVariables(url: string, variables: RawServer["variables"]): string {
+    if (!variables) return url;
+
+    return url.replaceAll(/\{([^{}]+)\}/g, (placeholder, name: string) => {
+        const defaultValue = variables[name]?.default;
+
+        return defaultValue === undefined ? placeholder : String(defaultValue);
+    });
+}
+
+function buildServers(spec: any): Server[] {
+    const servers = normalizeServers(spec?.servers);
+
+    return servers.length > 0 ? servers : [{ url: "/", description: null }];
 }
 
 export function buildNavigation(spec: any): Navigation {
@@ -166,14 +200,38 @@ function slugifyTag(tag: string): string {
 }
 
 function buildParam(parameter: RawParameter): Param {
+    const schema = parameter.schema ?? {};
+
     return {
         name: parameter.name,
         location: parameter.in,
         required: Boolean(parameter.required),
         deprecated: Boolean(parameter.deprecated),
         description: parameter.description ?? null,
-        schema: parameter.schema ?? {},
+        schema,
+        example: parameterExample(parameter.example, schema),
     };
+}
+
+function parameterExample(example: unknown, schema: unknown): unknown {
+    if (example !== undefined) {
+        return example;
+    }
+
+    const schemaExample = schemaValue(schema, "example");
+    if (schemaExample !== undefined) {
+        return schemaExample;
+    }
+
+    return schemaValue(schema, "default") ?? null;
+}
+
+function schemaValue(schema: unknown, key: "example" | "default"): unknown | undefined {
+    if (typeof schema !== "object" || schema === null || !(key in schema)) {
+        return undefined;
+    }
+
+    return (schema as Record<string, unknown>)[key];
 }
 
 function buildResponseHeaders(spec: any, headers: Record<string, RawParameter> | undefined): Param[] {
@@ -242,7 +300,7 @@ function buildRequests(spec: any, requestBody: RawOperation["requestBody"]): Con
     if (!requestBody) return [];
 
     const resolved = requestBody.$ref
-        ? (resolveRef<NonNullable<RawOperation["requestBody"]>>(spec, requestBody.$ref, "requestBodies") ?? requestBody)
+        ? (resolveRef<RawRequestBody>(spec, requestBody.$ref, "requestBodies") ?? requestBody)
         : requestBody;
 
     const content = resolved.content ?? {};
@@ -256,6 +314,7 @@ function buildRequests(spec: any, requestBody: RawOperation["requestBody"]): Con
         title,
         examples: buildExamples(spec, mediaTypeObject),
         headers: [],
+        required: Boolean(resolved.required),
     }));
 }
 
@@ -275,7 +334,7 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
         const headers = buildResponseHeaders(spec, resolved.headers);
 
         if (mediaTypes.length === 0) {
-            contracts.push({ role: "response", status, mediaType: null, schema: null, title, examples: [], headers });
+            contracts.push({ role: "response", status, mediaType: null, schema: null, title, examples: [], headers, required: false });
             continue;
         }
 
@@ -288,6 +347,7 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
                 title,
                 examples: buildExamples(spec, mediaTypeObject),
                 headers,
+                required: false,
             });
         }
     }
@@ -312,11 +372,24 @@ export function filterNavigationByTags(nav: Navigation, tags: string[]): Navigat
     return { ...nav, groups, summaries };
 }
 
-export function parseOperation(spec: any, opId: string): Operation | null {
+export function parseOperation(spec: any, opId: string, selectedServerUrl: string | null = null): Operation | null {
     const found = findOperation(spec, opId);
     if (!found) return null;
 
     const { path, method, pathItem, operation } = found;
+    const operationServers = normalizeServers(operation.servers);
+    const pathServers = normalizeServers(pathItem.servers);
+    const usesRootServers = operationServers.length === 0 && pathServers.length === 0;
+    const servers = operationServers.length > 0
+        ? operationServers
+        : pathServers.length > 0
+          ? pathServers
+          : buildServers(spec);
+    const effectiveServerUrl = usesRootServers && selectedServerUrl !== null
+        ? selectedServerUrl
+        : selectedServerUrl !== null && servers.some((server) => server.url === selectedServerUrl)
+          ? selectedServerUrl
+          : servers[0]!.url;
 
     const summary: OperationSummary = {
         id: opId,
@@ -328,6 +401,9 @@ export function parseOperation(spec: any, opId: string): Operation | null {
 
     return {
         summary,
+        serverUrl: effectiveServerUrl,
+        servers,
+        usesRootServers,
         description: operation.description ?? null,
         tags: operation.tags ?? [],
         paramGroups: buildParamGroups(spec, pathItem.parameters ?? [], operation.parameters ?? []),

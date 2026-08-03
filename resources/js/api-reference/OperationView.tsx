@@ -1,16 +1,19 @@
 import { useMemo, useState } from "react";
-import { Badge, CopyableText, SegmentedPills } from "@lattice-php/lattice/ui";
+import { Badge, SegmentedPills } from "@lattice-php/lattice/ui";
 import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
-import { httpMethodColor } from "./http-method-color";
+import { OperationHeader } from "./OperationHeader";
+import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
 import { parseOperation } from "./parse";
+import { RequestPlayground } from "./RequestPlayground";
 import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
 
 type OperationViewProps = {
     spec: unknown;
     operationId: string | null;
     baseUrl?: string | null;
+    token?: string | null;
     expandDepth?: number;
 };
 
@@ -23,26 +26,6 @@ type SecuritySchemeDefinition = {
     description?: string | null;
 };
 
-function paramTypeLabel(schema: unknown): string {
-    if (schema === null || typeof schema !== "object") return "any";
-    const node = schema as Record<string, unknown>;
-
-    if (typeof node.$ref === "string") {
-        return node.$ref.split("/").pop() ?? "ref";
-    }
-    if (Array.isArray(node.type)) {
-        return node.type.join(" | ");
-    }
-    if (typeof node.type === "string") {
-        return node.type === "array" && node.items ? `${paramTypeLabel(node.items)}[]` : node.type;
-    }
-    if (Array.isArray(node.enum)) {
-        return "enum";
-    }
-
-    return "any";
-}
-
 function contractLabel(contract: Contract): string {
     const parts = [contract.status, contract.mediaType].filter((part): part is string => Boolean(part));
 
@@ -50,17 +33,24 @@ function contractLabel(contract: Contract): string {
 }
 
 function ParamRow({ param }: { param: Param }): React.ReactNode {
+    const allowedValues = parameterAllowedValues(param.schema);
+
     return (
         <li className="border-b border-lt-border py-2 last:border-b-0">
             <div className="flex items-center gap-2">
                 <span className="font-mono text-sm text-lt-fg">{param.name}</span>
                 <span className="rounded-lt-xs bg-lt-muted px-1.5 py-0.5 text-xs text-lt-muted-fg">
-                    {paramTypeLabel(param.schema)}
+                    {parameterTypeLabel(param.schema)}
                 </span>
                 {param.required ? <span className="text-lt-danger">*</span> : null}
                 {param.deprecated ? <Badge color="danger">deprecated</Badge> : null}
             </div>
             {param.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{param.description}</p> : null}
+            {allowedValues.length > 0 ? (
+                <p className="mt-0.5 text-xs text-lt-muted-fg">
+                    Available values: {allowedValues.join(", ")}
+                </p>
+            ) : null}
         </li>
     );
 }
@@ -334,10 +324,10 @@ function SecuritySection({ security, components }: { security: SecurityRequireme
     );
 }
 
-export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: OperationViewProps): React.ReactNode {
+export function OperationView({ spec, operationId, baseUrl, token, expandDepth = 0 }: OperationViewProps): React.ReactNode {
     const operation = useMemo(
-        () => (operationId ? parseOperation(spec, operationId) : null),
-        [spec, operationId],
+        () => (operationId ? parseOperation(spec, operationId, baseUrl ?? null) : null),
+        [spec, operationId, baseUrl],
     );
     const components = (spec as { components?: unknown } | null)?.components ?? null;
 
@@ -355,24 +345,7 @@ export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: O
 
     return (
         <div className="min-w-0 flex-1 overflow-y-auto p-6">
-            <header className="mb-6">
-                <div className="flex items-center gap-2">
-                    <Badge color={httpMethodColor(operation.summary.method)} className="text-xs font-semibold uppercase">
-                        {operation.summary.method}
-                    </Badge>
-                    <CopyableText value={`${baseUrl ?? ""}${operation.summary.path}`} label="operation URL">
-                        <span className="font-mono text-sm text-lt-muted-fg">
-                            {baseUrl}
-                            {operation.summary.path}
-                        </span>
-                    </CopyableText>
-                    {operation.summary.deprecated ? <Badge color="danger">deprecated</Badge> : null}
-                </div>
-                <h1 className="mt-2 text-lg font-semibold text-lt-fg">{operation.summary.title}</h1>
-                {operation.description ? (
-                    <p className="mt-1 text-sm text-lt-muted-fg">{operation.description}</p>
-                ) : null}
-            </header>
+            <OperationHeader operation={operation} baseUrl={operation.serverUrl} components={components} />
 
             <SecuritySection security={operation.security} components={components} />
 
@@ -386,6 +359,12 @@ export function OperationView({ spec, operationId, baseUrl, expandDepth = 0 }: O
             ) : null}
 
             <RequestBodySection requests={operation.requests} components={components} expandDepth={expandDepth} />
+            <RequestPlayground
+                operation={operation}
+                baseUrl={operation.serverUrl}
+                token={token ?? null}
+                components={components}
+            />
             <ResponsesSection responses={operation.responses} components={components} expandDepth={expandDepth} />
         </div>
     );

@@ -297,6 +297,15 @@
                 ],
                 "parameters": [
                     {
+                        "name": "X-Debug-Context",
+                        "in": "header",
+                        "description": "Optional context echoed in request diagnostics.",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "docs"
+                    },
+                    {
                         "name": "include",
                         "in": "query",
                         "schema": {

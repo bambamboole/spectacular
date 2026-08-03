@@ -18,6 +18,7 @@ export type Param = {
     deprecated: boolean;
     description: string | null;
     schema: unknown;
+    example: unknown;
 };
 export type ContractExample = { name: string | null; summary: string | null; value: unknown };
 export type Contract = {
@@ -28,9 +29,13 @@ export type Contract = {
     title: string | null;
     examples: ContractExample[];
     headers: Param[];
+    required: boolean;
 };
 export type Operation = {
     summary: OperationSummary;
+    serverUrl: string;
+    servers: Server[];
+    usesRootServers: boolean;
     description: string | null;
     tags: string[];
     paramGroups: ParamGroup[];

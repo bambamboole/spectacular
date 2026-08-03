@@ -33,6 +33,8 @@ final class ApiReference extends Component
 
     public int $expandDepth = 0;
 
+    public ?string $token = null;
+
     public static function make(?string $key = null): static
     {
         return new self($key);
@@ -114,6 +116,13 @@ final class ApiReference extends Component
     public function expandDepth(int $depth): static
     {
         $this->expandDepth = $depth;
+
+        return $this;
+    }
+
+    public function token(string $token): static
+    {
+        $this->token = $token;
 
         return $this;
     }

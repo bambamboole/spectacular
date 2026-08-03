@@ -1,4 +1,3 @@
-import $RefParser from "@apidevtools/json-schema-ref-parser";
 import { SchemaTree, isMirroredNode, isReferenceNode, isRegularNode } from "@stoplight/json-schema-tree";
 import type { MirroredRegularNode, RegularNode, SchemaNode } from "@stoplight/json-schema-tree";
 
@@ -8,7 +7,6 @@ export type SchemaRow = {
     typeLabel: string;
     required: boolean;
     description: string | null;
-    enumValues: (string | number)[] | null;
     children: SchemaRow[];
     isRecursive: boolean;
 };
@@ -40,7 +38,6 @@ function toRow(node: SchemaNode, name: string | null, required: Set<string>): Sc
         typeLabel: typeLabel(node),
         required: name !== null && required.has(name),
         description: (withData?.annotations?.description as string | undefined) ?? null,
-        enumValues: (withData?.enum as (string | number)[] | undefined) ?? null,
         children: recursive ? [] : childRows(node),
         isRecursive: recursive,
     };
@@ -57,14 +54,15 @@ function childRows(node: SchemaNode): SchemaRow[] {
 }
 
 export async function buildSchemaRows(schema: unknown, components: unknown): Promise<SchemaRow[]> {
-    const wrapper = { __schema: schema, components };
-    const dereferenced = (await $RefParser.dereference(structuredClone(wrapper) as object, {
-        dereference: { circular: true },
-    })) as { __schema: object };
-
-    const tree = new SchemaTree(dereferenced.__schema, { mergeAllOf: true });
+    const tree = new SchemaTree({
+        type: "object",
+        properties: { __schema: schema },
+        components,
+    }, { mergeAllOf: true });
     tree.populate();
 
-    const [schemaNode] = tree.root.children as unknown as SchemaNode[];
-    return schemaNode ? childRows(schemaNode) : [];
+    const [wrapperNode] = tree.root.children as unknown as SchemaNode[];
+    const [schemaRow] = wrapperNode ? childRows(wrapperNode) : [];
+
+    return schemaRow?.children ?? [];
 }

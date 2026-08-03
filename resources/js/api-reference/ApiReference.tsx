@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RendererComponent } from "@lattice-php/lattice";
-import { ApiReferenceNav } from "./ApiReferenceNav";
+import { ApiReferenceNav, ServerPicker } from "./ApiReferenceNav";
 import { OperationView } from "./OperationView";
-import { buildNavigation, filterNavigationByTags } from "./parse";
+import { buildNavigation, filterNavigationByTags, parseOperation } from "./parse";
 import type { ApiInfo, Navigation } from "./types";
 
 type ApiReferenceProps = {
@@ -16,6 +16,7 @@ type ApiReferenceProps = {
     hideHeader?: boolean;
     title?: string | null;
     expandDepth?: number;
+    token?: string | null;
 };
 
 function firstSummaryId(navigation: Navigation | null): string | null {
@@ -61,13 +62,15 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         hideHeader = false,
         title = null,
         expandDepth = 0,
+        token = null,
     } = node.props as ApiReferenceProps;
 
     const [spec, setSpec] = useState<unknown>(inlineSpec ?? null);
     const [loading, setLoading] = useState<boolean>(Boolean(url));
     const [error, setError] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(() => currentHashId());
-    const [selectedServerUrl, setSelectedServerUrl] = useState<string | null>(null);
+    const [selectedRootServerUrl, setSelectedRootServerUrl] = useState<string | null>(null);
+    const [selectedOperationServerUrls, setSelectedOperationServerUrls] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (!url) return;
@@ -104,6 +107,19 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         () => (rawNavigation && tags?.length ? filterNavigationByTags(rawNavigation, tags) : rawNavigation),
         [rawNavigation, tags],
     );
+    const activeOperationId = operation ?? selectedId;
+    const activeOperation = useMemo(() => {
+        if (!spec || !activeOperationId) return null;
+
+        const parsedOperation = parseOperation(spec, activeOperationId);
+        if (!parsedOperation) return null;
+
+        const selectedServerUrl = parsedOperation.usesRootServers
+            ? selectedRootServerUrl
+            : (selectedOperationServerUrls[activeOperationId] ?? null);
+
+        return parseOperation(spec, activeOperationId, selectedServerUrl);
+    }, [spec, activeOperationId, selectedRootServerUrl, selectedOperationServerUrls]);
 
     useEffect(() => {
         if (selectedId !== null || !navigation) return;
@@ -113,11 +129,11 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     }, [navigation, selectedId, defaultOperation]);
 
     useEffect(() => {
-        if (selectedServerUrl !== null || !navigation) return;
+        if (!navigation || navigation.servers.some((server) => server.url === selectedRootServerUrl)) return;
 
         const initial = navigation.servers[0]?.url ?? null;
-        if (initial) setSelectedServerUrl(initial);
-    }, [navigation, selectedServerUrl]);
+        if (initial) setSelectedRootServerUrl(initial);
+    }, [navigation, selectedRootServerUrl]);
 
     useEffect(() => {
         function onHashChange(): void {
@@ -138,6 +154,27 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         window.location.hash = id;
     }
 
+    function selectServer(url: string): void {
+        if (!activeOperationId || activeOperation?.usesRootServers !== false) {
+            setSelectedRootServerUrl(url);
+
+            return;
+        }
+
+        setSelectedOperationServerUrls((current) => ({ ...current, [activeOperationId]: url }));
+    }
+
+    function selectedServerUrlFor(operationId: string): string | null {
+        const parsedOperation = parseOperation(spec, operationId);
+        if (!parsedOperation) return selectedRootServerUrl;
+
+        const selectedServerUrl = parsedOperation.usesRootServers
+            ? selectedRootServerUrl
+            : (selectedOperationServerUrls[operationId] ?? null);
+
+        return parseOperation(spec, operationId, selectedServerUrl)?.serverUrl ?? selectedRootServerUrl;
+    }
+
     if (loading) {
         return <div className="p-6 text-sm text-lt-muted-fg">Loading API reference…</div>;
     }
@@ -155,11 +192,21 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
             <div className="flex w-full">
                 <div className="flex min-w-0 flex-1 flex-col">
                     {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
+                    {activeOperation ? (
+                        <div className="border-b border-lt-border p-3">
+                            <ServerPicker
+                                servers={activeOperation.servers}
+                                selectedServerUrl={activeOperation.serverUrl}
+                                onServerChange={selectServer}
+                            />
+                        </div>
+                    ) : null}
                     <OperationView
                         key={operation}
                         spec={spec}
                         operationId={operation}
-                        baseUrl={selectedServerUrl}
+                        baseUrl={selectedServerUrlFor(operation)}
+                        token={token}
                         expandDepth={expandDepth}
                     />
                 </div>
@@ -177,9 +224,9 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                         navigation={navigation}
                         selectedId={selectedId}
                         onSelect={selectStackedOperation}
-                        servers={navigation.servers}
-                        selectedServerUrl={selectedServerUrl}
-                        onServerChange={setSelectedServerUrl}
+                        servers={activeOperation?.servers ?? navigation.servers}
+                        selectedServerUrl={activeOperation?.serverUrl ?? selectedRootServerUrl}
+                        onServerChange={selectServer}
                     />
                 ) : null}
                 <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
@@ -189,7 +236,8 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                             <OperationView
                                 spec={spec}
                                 operationId={id}
-                                baseUrl={selectedServerUrl}
+                                baseUrl={selectedServerUrlFor(id)}
+                                token={token}
                                 expandDepth={expandDepth}
                             />
                         </section>
@@ -206,9 +254,9 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                     navigation={navigation}
                     selectedId={selectedId}
                     onSelect={selectOperation}
-                    servers={navigation.servers}
-                    selectedServerUrl={selectedServerUrl}
-                    onServerChange={setSelectedServerUrl}
+                    servers={activeOperation?.servers ?? navigation.servers}
+                    selectedServerUrl={activeOperation?.serverUrl ?? selectedRootServerUrl}
+                    onServerChange={selectServer}
                 />
             ) : null}
             <div className="flex min-w-0 flex-1 flex-col">
@@ -217,7 +265,8 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                     key={selectedId}
                     spec={spec}
                     operationId={selectedId}
-                    baseUrl={selectedServerUrl}
+                    baseUrl={selectedId ? selectedServerUrlFor(selectedId) : selectedRootServerUrl}
+                    token={token}
                     expandDepth={expandDepth}
                 />
             </div>

@@ -58,7 +58,6 @@ final readonly class MessageDefinitionFactory
 
         return new AsyncMessageDefinition(
             key: $this->componentKey($event->getName()),
-            name: $message['name'],
             channels: array_map(fn (string $channel): AsyncChannelDefinition => new AsyncChannelDefinition(
                 key: $channel,
                 address: $channel,
@@ -101,7 +100,6 @@ final readonly class MessageDefinitionFactory
 
         return new AsyncMessageDefinition(
             key: $this->componentKey($notification->getName()),
-            name: $message['name'],
             channels: array_map(fn (string $channel): AsyncChannelDefinition => new AsyncChannelDefinition(
                 key: $channel,
                 address: $channel,
@@ -155,7 +153,6 @@ final readonly class MessageDefinitionFactory
 
         return new AsyncMessageDefinition(
             key: $definition->name,
-            name: $definition->name,
             channels: [
                 new AsyncChannelDefinition(
                     key: $channelKey,
