@@ -12,7 +12,7 @@ use Lattice\Lattice\Http\Page;
 use Lattice\Lattice\Ui\Enums\PageContainer;
 
 #[AsPage(route: 'docs', name: 'docs')]
-final class ApiReferencePage extends Page
+class ApiReferencePage extends Page
 {
     public function container(): PageContainer
     {
@@ -32,7 +32,13 @@ final class ApiReferencePage extends Page
         return $schema->schema([
             ApiReference::make()
                 ->spec($document)
+                ->layout($this->referenceLayout())
                 ->token((string) config('services.spectacular.demo_token', 'workbench-token')),
         ]);
+    }
+
+    protected function referenceLayout(): string
+    {
+        return 'sidebar';
     }
 }
