@@ -1,4 +1,5 @@
 import { initialContractExample } from "./schema-example";
+import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
 import type { Contract, ContractExample, Operation, Param, SecurityRequirement } from "./types";
 
 const SCHEMA_REF_PREFIX = "#/components/schemas/";
@@ -53,9 +54,19 @@ function parameterTable(parameters: Param[]): string {
         "| --- | --- | --- | --- | --- |",
         ...parameters.map(
             (parameter) =>
-                `| ${tableCell(parameter.name)} | ${tableCell(parameter.location)} | ${tableCell(typeLabel(parameter.schema))} | ${parameter.required ? "yes" : "no"} | ${tableCell(parameter.description)} |`,
+                `| ${tableCell(parameter.name)} | ${tableCell(parameter.location)} | ${tableCell(parameterTypeLabel(parameter.schema))} | ${parameter.required ? "yes" : "no"} | ${tableCell(parameterDescription(parameter))} |`,
         ),
     ].join("\n");
+}
+
+function parameterDescription(parameter: Param): string | null {
+    const allowedValues = parameterAllowedValues(parameter.schema);
+    const availableValues = allowedValues.length === 0
+        ? null
+        : `Available values: ${allowedValues.map((value) => `\`${value}\``).join(", ")}`;
+    const parts = [parameter.description, availableValues].filter((part): part is string => Boolean(part));
+
+    return parts.length === 0 ? null : parts.join("\n");
 }
 
 function requestSection(requests: Contract[], components: unknown): string | null {
@@ -348,29 +359,6 @@ function componentSchema(ref: string, components: unknown): unknown | null {
     const name = componentName(ref);
 
     return name === null || !(name in components.schemas) ? null : components.schemas[name];
-}
-
-function typeLabel(schema: unknown): string {
-    if (schema === null || typeof schema !== "object") {
-        return "any";
-    }
-
-    const node = schema as Record<string, unknown>;
-
-    if (typeof node.$ref === "string") {
-        return node.$ref.split("/").pop() ?? "ref";
-    }
-    if (Array.isArray(node.type)) {
-        return node.type.join(" | ");
-    }
-    if (typeof node.type === "string") {
-        return node.type === "array" && node.items ? `${typeLabel(node.items)}[]` : node.type;
-    }
-    if (Array.isArray(node.enum)) {
-        return "enum";
-    }
-
-    return "any";
 }
 
 function tableCell(value: string | null): string {

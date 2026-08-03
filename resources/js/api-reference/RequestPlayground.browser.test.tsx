@@ -224,7 +224,11 @@ describe("RequestPlayground", () => {
                 "/widgets": {
                     post: {
                         parameters: [
-                            { name: "filters", in: "query", schema: { type: "array", items: { type: "string" } } },
+                            {
+                                name: "filters",
+                                in: "query",
+                                schema: { type: "array", items: { type: "string", enum: ["active", "archived"] } },
+                            },
                             { name: "metadata", in: "header", schema: { type: "object" } },
                         ],
                         requestBody: {
@@ -248,6 +252,7 @@ describe("RequestPlayground", () => {
         );
 
         await expect.element(screen.getByText("filters", { exact: true })).toBeVisible();
+        await expect.element(screen.getByText("Available values: active, archived", { exact: true })).toBeVisible();
         await expect.element(screen.getByText("metadata", { exact: true })).toBeVisible();
         await expect.element(screen.getByText("multipart/form-data")).toBeVisible();
         await expect.element(screen.getByLabelText("filters")).not.toBeInTheDocument();

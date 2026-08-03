@@ -4,6 +4,7 @@ import { NativeSelect } from "@lattice-php/lattice/ui/native-select";
 import type { Option } from "@lattice-php/lattice/core/types";
 import { SchemaView } from "../schema/SchemaView";
 import { OperationHeader } from "./OperationHeader";
+import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
 import { parseOperation } from "./parse";
 import { RequestPlayground } from "./RequestPlayground";
 import type { Contract, ContractExample, Param, ParamGroup, SecurityRequirement, SecuritySchemeRef } from "./types";
@@ -25,26 +26,6 @@ type SecuritySchemeDefinition = {
     description?: string | null;
 };
 
-function paramTypeLabel(schema: unknown): string {
-    if (schema === null || typeof schema !== "object") return "any";
-    const node = schema as Record<string, unknown>;
-
-    if (typeof node.$ref === "string") {
-        return node.$ref.split("/").pop() ?? "ref";
-    }
-    if (Array.isArray(node.type)) {
-        return node.type.join(" | ");
-    }
-    if (typeof node.type === "string") {
-        return node.type === "array" && node.items ? `${paramTypeLabel(node.items)}[]` : node.type;
-    }
-    if (Array.isArray(node.enum)) {
-        return "enum";
-    }
-
-    return "any";
-}
-
 function contractLabel(contract: Contract): string {
     const parts = [contract.status, contract.mediaType].filter((part): part is string => Boolean(part));
 
@@ -52,17 +33,24 @@ function contractLabel(contract: Contract): string {
 }
 
 function ParamRow({ param }: { param: Param }): React.ReactNode {
+    const allowedValues = parameterAllowedValues(param.schema);
+
     return (
         <li className="border-b border-lt-border py-2 last:border-b-0">
             <div className="flex items-center gap-2">
                 <span className="font-mono text-sm text-lt-fg">{param.name}</span>
                 <span className="rounded-lt-xs bg-lt-muted px-1.5 py-0.5 text-xs text-lt-muted-fg">
-                    {paramTypeLabel(param.schema)}
+                    {parameterTypeLabel(param.schema)}
                 </span>
                 {param.required ? <span className="text-lt-danger">*</span> : null}
                 {param.deprecated ? <Badge color="danger">deprecated</Badge> : null}
             </div>
             {param.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{param.description}</p> : null}
+            {allowedValues.length > 0 ? (
+                <p className="mt-0.5 text-xs text-lt-muted-fg">
+                    Available values: {allowedValues.join(", ")}
+                </p>
+            ) : null}
         </li>
     );
 }

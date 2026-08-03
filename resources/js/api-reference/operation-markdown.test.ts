@@ -48,7 +48,7 @@ const operation: Operation = {
                     required: false,
                     deprecated: false,
                     description: null,
-                    schema: { type: "array", items: { type: "string" } },
+                    schema: { type: "array", items: { type: "string", enum: ["roles", "rolesCount"] } },
                     example: null,
                 },
             ],
@@ -119,7 +119,7 @@ Creates a widget.
 | Name | In | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | widget | path | string | yes | Widget identifier |
-| include | query | string[] | no |  |
+| include | query | string[] | no | Available values: \`roles\`, \`rolesCount\` |
 
 ## Request body
 
@@ -223,7 +223,7 @@ Validation failed
 
 | Name | In | Type | Required | Description |
 | --- | --- | --- | --- | --- |
-| filter\\|status | query | string[] | no | One<br>two\\|three |`);
+| filter\\|status | query | string[] | no | One<br>two\\|three<br>Available values: \`roles\`, \`rolesCount\` |`);
     });
 
     it("serializes resolved schemas separately from named and derived examples", () => {
