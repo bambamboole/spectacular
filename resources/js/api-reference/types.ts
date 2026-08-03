@@ -19,6 +19,8 @@ export type Param = {
     description: string | null;
     schema: unknown;
     example: unknown;
+    style?: string | null;
+    explode?: boolean | null;
 };
 export type ContractExample = { name: string | null; summary: string | null; value: unknown };
 export type Contract = {

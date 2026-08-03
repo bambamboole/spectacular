@@ -81,6 +81,11 @@ describe("initialRequestValues", () => {
             parameter({ name: "schema-example", schema: { type: "string", example: "shown" } }),
             parameter({ name: "default", schema: { type: "boolean", default: false } }),
             parameter({ name: "enum", schema: { type: "string", enum: ["active", "disabled"] } }),
+            parameter({
+                name: "array",
+                example: ["roles", "rolesCount"],
+                schema: { type: "array", items: { type: "string", enum: ["roles", "rolesCount"] } },
+            }),
             parameter({ name: "empty", schema: { type: "string" } }),
         ];
 
@@ -89,6 +94,7 @@ describe("initialRequestValues", () => {
             "query:schema-example": "shown",
             "query:default": "false",
             "query:enum": "active",
+            "query:array": "roles,rolesCount",
             "query:empty": "",
         });
     });

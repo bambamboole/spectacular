@@ -105,6 +105,9 @@ describe("RequestPlayground", () => {
                 components={null}
             />,
         );
+        await expect.element(screen.getByLabelText("id")).not.toBeInTheDocument();
+        await screen.getByRole("button", { name: "Try it out" }).click();
+
         const id = screen.getByLabelText("id");
         const body = screen.getByLabelText("JSON body");
         const snippet = screen.getByLabelText("Request snippet", { exact: true });
@@ -136,7 +139,7 @@ describe("RequestPlayground", () => {
         await expect.element(body).toHaveValue(selectedSnippet.textContent);
         await body.fill('{"name":"Lamp"}');
 
-        await screen.getByRole("button", { name: "Try it out" }).click();
+        await screen.getByRole("button", { name: "Execute" }).click();
 
         await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
         expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.example.test/v1/widgets/a%2Fb?status=archived");
@@ -144,6 +147,58 @@ describe("RequestPlayground", () => {
         await expect.element(screen.getByText("201 Created")).toBeVisible();
         await expect.element(screen.getByLabelText("Live response body")).toHaveTextContent('"ok": true');
         await expect.element(screen.locator).not.toHaveTextContent(REAL_TOKEN);
+    });
+
+    it("selects enum array query values and resets them when try-out mode is cancelled", async () => {
+        const fields = parameter({
+            name: "fields[users]",
+            location: "query",
+            style: "form",
+            explode: false,
+            schema: { type: "array", items: { type: "string", enum: ["name", "email"] } },
+        });
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    summary: {
+                        id: "list-users",
+                        method: "GET",
+                        path: "/users",
+                        title: "List users",
+                        deprecated: false,
+                    },
+                    paramGroups: [{ location: "query", params: [fields] }],
+                    requests: [],
+                })}
+                baseUrl="https://api.example.test"
+                token={null}
+                components={null}
+            />,
+        );
+
+        await expect.element(screen.getByRole("button", { name: "fields[users]" })).not.toBeInTheDocument();
+        await screen.getByRole("button", { name: "Try it out" }).click();
+
+        const field = screen.getByRole("button", { name: "fields[users]" });
+        const snippet = screen.getByLabelText("Request snippet", { exact: true });
+
+        await expect.element(field).toHaveTextContent("Not set");
+        await field.click();
+        await screen.getByRole("option", { name: "name" }).click();
+        await screen.getByRole("option", { name: "email" }).click();
+
+        await expect.element(field).toHaveTextContent("name, email");
+        await expect
+            .element(snippet)
+            .toHaveTextContent("https://api.example.test/users?fields%5Busers%5D=name%2Cemail");
+
+        await screen.getByRole("button", { name: "Cancel" }).click();
+
+        await expect.element(field).not.toBeInTheDocument();
+        await expect.element(screen.getByRole("button", { name: "Execute" })).not.toBeInTheDocument();
+        await screen.getByRole("button", { name: "Try it out" }).click();
+        await expect.element(screen.getByRole("button", { name: "fields[users]" })).toHaveTextContent("Not set");
+        await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toHaveTextContent("fields");
     });
 
     it("shows stable required errors without fetching and focuses the first invalid field", async () => {
@@ -172,6 +227,7 @@ describe("RequestPlayground", () => {
         );
 
         await screen.getByRole("button", { name: "Try it out" }).click();
+        await screen.getByRole("button", { name: "Execute" }).click();
 
         const idField = screen.getByLabelText("id");
         const traceField = screen.getByLabelText("X-Trace");
@@ -212,13 +268,14 @@ describe("RequestPlayground", () => {
             </ApiReference>,
         );
         const serverPicker = screen.getByLabelText("Select server");
+        await screen.getByRole("button", { name: "Try it out" }).click();
         const snippet = screen.getByLabelText("Request snippet", { exact: true });
 
         await expect.element(serverPicker).toHaveValue("https://canary.operation.example");
         await expect.element(snippet).toHaveTextContent("https://canary.operation.example/widgets");
         await serverPicker.selectOptions("https://sandbox.operation.example");
         await expect.element(snippet).toHaveTextContent("https://sandbox.operation.example/widgets");
-        await screen.getByRole("button", { name: "Try it out" }).click();
+        await screen.getByRole("button", { name: "Execute" }).click();
 
         await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
         expect(fetchMock.mock.calls[0]?.[0]).toBe("https://sandbox.operation.example/widgets");
@@ -248,17 +305,18 @@ describe("RequestPlayground", () => {
                 components={null}
             />,
         );
-        const tryButton = screen.getByRole("button", { name: /Try it out/ });
+        await screen.getByRole("button", { name: "Try it out" }).click();
+        const executeButton = screen.getByRole("button", { name: "Execute" });
 
-        await tryButton.click();
-        const button = (await tryButton.element()) as HTMLButtonElement;
+        await executeButton.click();
+        const button = (await executeButton.element()) as HTMLButtonElement;
 
         if (button.form === null) {
-            throw new Error("Expected the try button to submit the playground form.");
+            throw new Error("Expected the execute button to submit the playground form.");
         }
 
         button.disabled = false;
-        await tryButton.click();
+        await executeButton.click();
 
         await expect.poll(() => fetchMock.mock.calls.length).toBe(2);
         expect(firstSignal.aborted).toBe(true);
@@ -289,7 +347,8 @@ describe("RequestPlayground", () => {
             />,
         );
 
-        await screen.getByRole("button", { name: /Try it out/ }).click();
+        await screen.getByRole("button", { name: "Try it out" }).click();
+        await screen.getByRole("button", { name: "Execute" }).click();
         await screen.unmount();
 
         expect(signal.aborted).toBe(true);

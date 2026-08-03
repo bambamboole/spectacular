@@ -21,6 +21,7 @@ final class ApiReferencePage extends Page
             true,
             flags: JSON_THROW_ON_ERROR,
         );
+        $document['servers'] = [['url' => '/api']];
 
         return $schema->schema([
             ApiReference::make()

@@ -5,6 +5,7 @@ import {
     CardContent,
     CardHeader,
     CardTitle,
+    Combobox,
     Input,
     Label,
     Spinner,
@@ -48,6 +49,7 @@ export function RequestPlayground({
     const activeControllerRef = useRef<AbortController | null>(null);
     const [values, setValues] = useState<RequestValues>(() => initialPlaygroundValues(operation, components));
     const [snippetLanguage, setSnippetLanguage] = useState<SnippetLanguage>("curl");
+    const [isEnabled, setIsEnabled] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [liveResult, setLiveResult] = useState<ExecutedResponse | ExecutionError | null>(null);
     const jsonContracts = jsonRequestContracts(operation);
@@ -94,6 +96,16 @@ export function RequestPlayground({
         setValues((current) => ({ ...current, mediaType }));
     }
 
+    function cancelTryOut(): void {
+        activeControllerRef.current?.abort();
+        activeControllerRef.current = null;
+        setValues(initialPlaygroundValues(operation, components));
+        setSnippetLanguage("curl");
+        setIsLoading(false);
+        setLiveResult(null);
+        setIsEnabled(false);
+    }
+
     async function tryRequest(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
 
@@ -137,10 +149,17 @@ export function RequestPlayground({
 
     return (
         <Card ref={playgroundRef} className="mb-6">
-            <CardHeader>
+            <CardHeader className="flex-row items-center justify-between gap-3">
                 <CardTitle>Try it out</CardTitle>
+                <Button
+                    type="button"
+                    emphasis={isEnabled ? "outline" : "solid"}
+                    onClick={() => (isEnabled ? cancelTryOut() : setIsEnabled(true))}
+                >
+                    {isEnabled ? "Cancel" : "Try it out"}
+                </Button>
             </CardHeader>
-            <CardContent className="flex flex-col gap-6">
+            {isEnabled ? <CardContent className="flex flex-col gap-6">
                 {operation.paramGroups.map((group) => {
                     const supportedParams = group.params.filter((param) => isRenderableParameter(group.location, param));
 
@@ -242,12 +261,12 @@ export function RequestPlayground({
                 <form onSubmit={tryRequest} className="flex flex-wrap items-center gap-3">
                     <Button type="submit" disabled={isLoading || hasUnsupportedRequestBody}>
                         {isLoading ? <Spinner className="size-lt-icon-sm" /> : null}
-                        Try it out
+                        Execute
                     </Button>
                 </form>
 
                 <LiveResponsePanel result={liveResult} />
-            </CardContent>
+            </CardContent> : null}
         </Card>
     );
 }
@@ -268,11 +287,49 @@ function ParameterField({
     const key = parameterKey(param);
     const id = `${idPrefix}-${fieldId(key)}`;
     const schema = parameterSchema(param);
+    const arrayOptions = parameterArrayOptions(schema);
+    const selectedArrayOptions = value === "" ? [] : value.split(",");
+    const [isArrayOptionsOpen, setIsArrayOptionsOpen] = useState(false);
+
+    function toggleArrayOption(option: string): void {
+        onChange(
+            selectedArrayOptions.includes(option)
+                ? selectedArrayOptions.filter((selected) => selected !== option).join(",")
+                : [...selectedArrayOptions, option].join(","),
+        );
+    }
 
     return (
         <div className="flex min-w-0 basis-full flex-1 flex-col gap-2 sm:basis-48">
             <Label htmlFor={id}>{param.name}</Label>
-            {Array.isArray(schema.enum) ? (
+            {arrayOptions.length > 0 ? (
+                <Combobox
+                    multiple
+                    open={isArrayOptionsOpen}
+                    onOpenChange={setIsArrayOptionsOpen}
+                    options={arrayOptions.map((option) => ({ label: option, value: option, data: null }))}
+                    selected={selectedArrayOptions}
+                    onSelect={toggleArrayOption}
+                    emptyLabel="No values found."
+                    searchPlaceholder="Search values..."
+                    trigger={
+                        <span className={selectedArrayOptions.length === 0 ? "text-lt-muted-fg" : undefined}>
+                            {selectedArrayOptions.length === 0 ? "Not set" : selectedArrayOptions.join(", ")}
+                        </span>
+                    }
+                    triggerClassName="flex h-lt-control-md w-full items-center rounded-lt-sm border border-lt-input bg-transparent px-3 py-1 text-left text-sm outline-none focus-visible:border-lt-ring focus-visible:ring-[length:var(--lt-ring-width)] focus-visible:ring-lt-ring/50"
+                    triggerProps={
+                        {
+                            id,
+                            "aria-label": param.name,
+                            "aria-required": param.required,
+                            "aria-invalid": error !== null,
+                            "aria-describedby": error ? `${idPrefix}-${fieldId(key)}-error` : undefined,
+                            "data-field-key": key,
+                        } as React.ComponentProps<"button"> & { "data-field-key": string }
+                    }
+                />
+            ) : Array.isArray(schema.enum) ? (
                 <NativeSelect
                     id={id}
                     value={value}
@@ -370,6 +427,14 @@ function isRenderableParameter(location: string, param: Param): boolean {
 
 function parameterSchema(param: Param): Record<string, unknown> {
     return isRecord(param.schema) ? param.schema : {};
+}
+
+function parameterArrayOptions(schema: Record<string, unknown>): string[] {
+    if (schema.type !== "array" || !isRecord(schema.items) || !Array.isArray(schema.items.enum)) {
+        return [];
+    }
+
+    return schema.items.enum.filter((option): option is string => typeof option === "string");
 }
 
 function fieldId(key: string): string {
