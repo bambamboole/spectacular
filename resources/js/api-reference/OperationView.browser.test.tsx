@@ -311,7 +311,7 @@ describe("OperationView", () => {
         await expect.poll(() => document.querySelector(".cm-content")?.getAttribute("contenteditable")).toBe("false");
         await expect.poll(() => document.querySelector(".cm-lineNumbers")).not.toBeNull();
 
-        await screen.getByRole("combobox").selectOptions("1");
+        await screen.getByRole("combobox", { name: "Response example selection" }).selectOptions("1");
         await expect.element(screen.getByRole("link", { name: "Open external example" })).toHaveAttribute(
             "href",
             "https://example.test/widgets.json",

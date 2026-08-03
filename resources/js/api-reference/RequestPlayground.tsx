@@ -215,6 +215,7 @@ function SchemaExampleView({
                 <div>
                     {displayedExamples.length > 1 ? (
                         <NativeSelect
+                            aria-label={`${exampleLabel} selection`}
                             value={selected}
                             onChange={(event) => setSelected(Number(event.target.value))}
                             className="mb-2"
@@ -307,23 +308,23 @@ function ResponsesSection({
     if (responses.length === 0) return null;
 
     const current = responses.find((response) => contractLabel(response) === activeLabel) ?? responses[0];
-    const options: Option[] = responses.map((response) => ({
-        label: contractLabel(response),
-        value: contractLabel(response),
-        data: null,
-    }));
+    const responseLabels = responses.map(contractLabel);
 
     return (
         <section>
             <h2 className="mb-2 font-semibold text-lt-fg">Responses</h2>
             <div className="mb-3 pb-2">
-                <SegmentedPills
-                    name="response-status"
-                    ariaLabel="Response status"
-                    options={options}
-                    value={activeLabel ?? options[0]?.value ?? ""}
-                    onSelect={setActiveLabel}
-                />
+                <NativeSelect
+                    aria-label="Response status"
+                    value={activeLabel ?? responseLabels[0] ?? ""}
+                    onChange={(event) => setActiveLabel(event.target.value)}
+                >
+                    {responseLabels.map((label) => (
+                        <option key={label} value={label}>
+                            {label}
+                        </option>
+                    ))}
+                </NativeSelect>
             </div>
             {current ? (
                 <div>

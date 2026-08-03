@@ -442,6 +442,28 @@ describe("RequestPlayground", () => {
         expect(fetchMock.mock.calls[0]?.[0]).toBe("https://sandbox.operation.example/widgets");
     });
 
+    it("switches response contracts with a select", async () => {
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    responses: [
+                        requestContract({ role: "response", status: "200", title: "Successful response" }),
+                        requestContract({ role: "response", status: "422", title: "Validation response" }),
+                    ],
+                })}
+                baseUrl="https://api.example.test"
+                token={null}
+                components={null}
+            />,
+        );
+        const responseStatus = screen.getByRole("combobox", { name: "Response status" });
+
+        await expect.element(responseStatus).toHaveValue("200 application/json");
+        await expect.element(screen.getByText("Successful response")).toBeVisible();
+        await responseStatus.selectOptions("422 application/json");
+        await expect.element(screen.getByText("Validation response")).toBeVisible();
+    });
+
     it("aborts the active request before starting another", async () => {
         let firstSignal = new AbortController().signal;
         const fetchMock = vi.fn();
