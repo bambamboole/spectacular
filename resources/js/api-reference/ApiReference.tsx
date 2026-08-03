@@ -48,7 +48,7 @@ function InfoHeader({ title, info }: { title: string | null; info: ApiInfo }): R
         <header className="border-b border-lt-border p-6">
             {resolvedTitle ? <h1 className="text-lg font-semibold text-lt-fg">{resolvedTitle}</h1> : null}
             {info.version ? <p className="mt-1 text-xs text-lt-muted-fg">v{info.version}</p> : null}
-            {info.description ? <p className="mt-2 text-sm text-lt-muted-fg">{info.description}</p> : null}
+            {info.description ? <p className="mt-2 text-lt-muted-fg">{info.description}</p> : null}
         </header>
     );
 }
@@ -62,7 +62,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         defaultOperation,
         hideHeader = false,
         title = null,
-        expandDepth = 0,
+        expandDepth = 2,
         token = null,
     } = node.props as ApiReferenceProps;
 
@@ -194,20 +194,20 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     }
 
     if (loading) {
-        return <div className="p-6 text-sm text-lt-muted-fg">Loading API reference…</div>;
+        return <div className="p-6 text-base text-lt-muted-fg">Loading API reference…</div>;
     }
 
     if (error) {
-        return <div className="p-6 text-sm text-lt-danger">{error}</div>;
+        return <div className="p-6 text-base text-lt-danger">{error}</div>;
     }
 
     if (!spec || !navigation) {
-        return <div className="p-6 text-sm text-lt-muted-fg">No API specification provided.</div>;
+        return <div className="p-6 text-base text-lt-muted-fg">No API specification provided.</div>;
     }
 
     if (operation) {
         return (
-            <div className="flex w-full">
+            <div className="flex w-full text-base">
                 <div className="flex min-w-0 flex-1 flex-col">
                     {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
                     {activeOperation ? (
@@ -233,7 +233,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     }
 
     return (
-        <div className="flex min-w-0 w-full flex-col">
+        <div className="flex min-w-0 w-full flex-col text-base">
             {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
             {activeOperation ? (
                 <div className="border-b border-lt-border p-3">
@@ -249,7 +249,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                     <section key={group.id} aria-labelledby={`api-reference-tag-${group.id}`}>
                         <h2
                             id={`api-reference-tag-${group.id}`}
-                            className="mb-3 text-sm font-semibold text-lt-fg"
+                            className="mb-3 font-semibold text-lt-fg"
                         >
                             {group.title}
                         </h2>
@@ -282,7 +282,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                                     {summary.method}
                                                 </Badge>
                                                 <div className="min-w-0 flex-1">
-                                                    <span className="block text-sm font-medium text-lt-fg">
+                                                    <span className="block font-medium text-lt-fg">
                                                         {summary.title}
                                                     </span>
                                                     <div className="flex items-center gap-1">

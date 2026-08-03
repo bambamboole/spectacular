@@ -26,7 +26,7 @@ final class ApiReference extends Component
 
     public ?string $title = null;
 
-    public int $expandDepth = 0;
+    public int $expandDepth = 2;
 
     public ?string $token = null;
 

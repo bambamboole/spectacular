@@ -89,6 +89,11 @@ describe("ApiReference", () => {
         const description = screen.getByText(/Browse the product catalog/);
         await expect.element(description).toBeVisible();
         expect(getComputedStyle(description.element()).whiteSpace).toBe("pre-line");
+        const separator = screen.getByRole("separator");
+        await expect.element(separator).toBeVisible();
+        expect(getComputedStyle(separator.element()).marginTop).toBe("32px");
+        expect(getComputedStyle(separator.element()).marginBottom).toBe("32px");
+        expect(getComputedStyle(description.element()).fontSize).toBe("14px");
         const requestPanel = screen.getByRole("complementary", { name: "Request" });
         await expect.element(requestPanel).toBeVisible();
         await expect.element(requestPanel.getByRole("button", { name: "Copy as Markdown" })).not.toBeInTheDocument();
@@ -109,6 +114,7 @@ describe("ApiReference", () => {
 
         await expect.element(listProducts).toHaveAttribute("aria-expanded", "false");
         await expect.element(createProduct).toHaveAttribute("aria-expanded", "true");
+        await expect.element(screen.getByRole("separator")).not.toBeInTheDocument();
         expect(document.querySelector("h1")).toBeNull();
         await expect.poll(() => screen.getByRole("complementary", { name: "Request" }).all().length).toBe(1);
         expect(window.location.hash).toBe("#post-products");

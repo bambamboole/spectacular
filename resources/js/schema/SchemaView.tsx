@@ -45,7 +45,7 @@ function Row({ row, depth, expandDepth }: { row: SchemaRow; depth: number; expan
 export function SchemaView({
     schema,
     components,
-    expandDepth = 0,
+    expandDepth = 2,
 }: {
     schema: unknown;
     components: unknown;
@@ -69,7 +69,7 @@ export function SchemaView({
     }
 
     return (
-        <div className="text-sm">
+        <div className="text-base">
             {rows.map((row) => (
                 <Row key={row.id} row={row} depth={0} expandDepth={expandDepth} />
             ))}

@@ -21,7 +21,7 @@ it('defaults to the grouped API reference', function (): void {
             'defaultOperation' => null,
             'hideHeader' => false,
             'title' => null,
-            'expandDepth' => 0,
+            'expandDepth' => 2,
             'token' => null,
         ]);
 });

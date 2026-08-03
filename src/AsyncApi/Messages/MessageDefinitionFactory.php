@@ -170,37 +170,16 @@ final readonly class MessageDefinitionFactory
      */
     private function webhookHeaders(array $webhooks): array
     {
-        $headers = $this->normalizeHeaders(
+        $headers = array_filter(
             is_array($webhooks['headers'] ?? null) ? $webhooks['headers'] : [],
+            fn (mixed $schema, mixed $name): bool => is_string($name) && is_array($schema),
+            ARRAY_FILTER_USE_BOTH,
         );
 
         return array_filter([
             'type' => 'object',
             'properties' => $headers,
         ], fn (mixed $value): bool => $value !== []);
-    }
-
-    /**
-     * @param  array<mixed>  $headers
-     * @return array<string, mixed>
-     */
-    private function normalizeHeaders(array $headers): array
-    {
-        $normalized = [];
-
-        foreach ($headers as $name => $schema) {
-            if (is_int($name) && is_string($schema)) {
-                $normalized[$schema] = ['type' => 'string'];
-
-                continue;
-            }
-
-            if (is_string($name) && is_array($schema)) {
-                $normalized[$name] = $schema;
-            }
-        }
-
-        return $normalized;
     }
 
     /**

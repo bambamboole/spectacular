@@ -216,6 +216,59 @@ describe("OperationView", () => {
             .toBe("800px");
     });
 
+    it("opens schema trees two levels deep by default", async () => {
+        const screen = await render(
+            <OperationView
+                operationId="post-products"
+                spec={{
+                    openapi: "3.1.0",
+                    info: { title: "Products", version: "1.0.0" },
+                    paths: {
+                        "/products": {
+                            post: {
+                                requestBody: {
+                                    content: {
+                                        "application/json": {
+                                            schema: {
+                                                type: "object",
+                                                properties: {
+                                                    outer: {
+                                                        type: "object",
+                                                        properties: {
+                                                            middle: {
+                                                                type: "object",
+                                                                properties: {
+                                                                    inner: {
+                                                                        type: "object",
+                                                                        properties: {
+                                                                            value: { type: "string" },
+                                                                        },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                                responses: { "204": { description: "No content" } },
+                            },
+                        },
+                    },
+                }}
+            />,
+        );
+        const reference = screen.getByRole("complementary", { name: "Reference" });
+
+        await expect.poll(() =>
+            Array.from(reference.element().querySelectorAll("[aria-expanded]"), (element) =>
+                element.getAttribute("aria-expanded"),
+            ),
+        ).toEqual(["true", "true", "false"]);
+    });
+
     it("shows example descriptions and external values", async () => {
         const screen = await render(
             <OperationView

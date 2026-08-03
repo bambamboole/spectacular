@@ -4,29 +4,28 @@ import {
     useMemo,
     useRef,
     useState,
-    type Dispatch,
     type FormEvent,
-    type ReactNode,
-    type SetStateAction,
 } from "react";
+import type { Option } from "@lattice-php/lattice/core/types";
 import { FormFieldFrame } from "@lattice-php/lattice/form";
 import {
+    Badge,
     Button,
+    CodeBlock,
     Combobox,
     CopyButton,
     Input,
     NativeSelect,
+    SegmentedPills,
     Spinner,
+    Textarea,
 } from "@lattice-php/lattice/ui";
+import { SchemaView } from "../schema/SchemaView";
 import { executeRequest, type ExecutedResponse, type ExecutionError } from "./execute-request";
 import { LiveResponsePanel } from "./LiveResponsePanel";
+import { OperationHeader } from "./OperationHeader";
 import { operationToMarkdown } from "./operation-markdown";
-import { RequestBodyEditor } from "./RequestBodyEditor";
-import {
-    defaultRequestBodyValue,
-    resolveRequestBodySchema,
-    validateRequestBodyValue,
-} from "./request-body-schema";
+import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
 import {
     buildRequest,
     parameterLimitation,
@@ -40,23 +39,412 @@ import {
     type RequestValues,
 } from "./request-state";
 import { SnippetPanel, type SnippetLanguage } from "./SnippetPanel";
-import { initialRequestExample } from "./schema-example";
+import { exampleFromSchema, initialRequestExample } from "./schema-example";
 import { curlSnippet } from "./snippets/curl";
 import { javascriptSnippet } from "./snippets/javascript";
-import type { Operation, Param } from "./types";
+import type {
+    Contract,
+    ContractExample,
+    Operation,
+    Param,
+    ParamGroup,
+    SecurityRequirement,
+    SecuritySchemeRef,
+} from "./types";
+
+type SecuritySchemeDefinition = {
+    type?: string;
+    scheme?: string;
+    bearerFormat?: string;
+    in?: string;
+    name?: string;
+    description?: string | null;
+};
+
+function contractLabel(contract: Contract): string {
+    const parts = [contract.status, contract.mediaType].filter((part): part is string => Boolean(part));
+
+    return parts.length > 0 ? parts.join(" ") : "default";
+}
+
+function ParamRow({ param, control }: { param: Param; control?: React.ReactNode }): React.ReactNode {
+    const allowedValues = parameterAllowedValues(param.schema);
+    const rowLayout = control
+        ? "grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-start"
+        : "py-2";
+
+    return (
+        <li className={`border-b border-lt-border last:border-b-0 ${rowLayout}`}>
+            <div>
+                <div className="flex items-center gap-2">
+                    <span className="font-mono text-lt-fg">{param.name}</span>
+                    <span className="rounded-lt-xs bg-lt-muted px-1.5 py-0.5 text-xs text-lt-muted-fg">
+                        {parameterTypeLabel(param.schema)}
+                    </span>
+                    {param.required ? <span className="text-lt-danger">*</span> : null}
+                    {param.deprecated ? <Badge color="danger">deprecated</Badge> : null}
+                </div>
+                {param.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{param.description}</p> : null}
+                {allowedValues.length > 0 ? (
+                    <p className="mt-0.5 text-xs text-lt-muted-fg">
+                        Available values: {allowedValues.join(", ")}
+                    </p>
+                ) : null}
+            </div>
+            {control}
+        </li>
+    );
+}
+
+function ParamGroupSection({
+    group,
+    idPrefix,
+    values,
+    errors,
+    onChange,
+}: {
+    group: ParamGroup;
+    idPrefix: string;
+    values: RequestValues;
+    errors: Record<string, string>;
+    onChange: (param: Param, value: string) => void;
+}): React.ReactNode {
+    const isInline = group.location === "path" || group.location === "query";
+
+    return (
+        <div className="mb-4">
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                {group.location} parameters
+            </h3>
+            <ul>
+                {group.params.map((param) => (
+                    <ParamRow
+                        key={`${param.location}-${param.name}`}
+                        param={param}
+                        control={
+                            isInline && isRenderableParameter(group.location, param) ? (
+                                <RequestParameterField
+                                    inline
+                                    idPrefix={idPrefix}
+                                    param={param}
+                                    value={values.parameters[parameterKey(param)] ?? ""}
+                                    error={errors[parameterKey(param)] ?? null}
+                                    onChange={(value) => onChange(param, value)}
+                                />
+                            ) : undefined
+                        }
+                    />
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+type SchemaTab = "schema" | "example";
+
+const SCHEMA_TABS: Array<{ key: SchemaTab; label: string }> = [
+    { key: "schema", label: "Schema" },
+    { key: "example", label: "Example" },
+];
+
+function SchemaExampleView({
+    name,
+    schema,
+    examples,
+    components,
+    noSchemaMessage,
+    expandDepth,
+    exampleLabel,
+    maxHeight = 2400,
+    defaultTab = "schema",
+    generateExample = false,
+}: {
+    name: string;
+    schema: unknown;
+    examples: ContractExample[];
+    components: unknown;
+    noSchemaMessage: string;
+    expandDepth: number;
+    exampleLabel: string;
+    maxHeight?: number;
+    defaultTab?: SchemaTab;
+    generateExample?: boolean;
+}): React.ReactNode {
+    const [tab, setTab] = useState<SchemaTab>(defaultTab);
+    const [selected, setSelected] = useState(0);
+    const displayedExamples = useMemo<ContractExample[]>(
+        () =>
+            examples.length > 0 || !generateExample
+                ? examples
+                : [
+                      {
+                          name: null,
+                          summary: null,
+                          description: null,
+                          value: exampleFromSchema(schema, components),
+                      },
+                  ],
+        [components, examples, generateExample, schema],
+    );
+    const isGenerated = generateExample && examples.length === 0;
+
+    if (displayedExamples.length === 0) {
+        return <SchemaView schema={schema} components={components} expandDepth={expandDepth} />;
+    }
+
+    const current = displayedExamples[selected] ?? displayedExamples[0];
+
+    return (
+        <div>
+            <div className="mb-2 pb-2">
+                <SegmentedPills
+                    name={name}
+                    ariaLabel="Schema or example"
+                    options={SCHEMA_TABS.map(({ key, label }) => ({ label, value: key, data: null }))}
+                    value={tab}
+                    onSelect={(value) => setTab(value as SchemaTab)}
+                />
+            </div>
+            {tab === "schema" ? (
+                schema ? (
+                    <SchemaView schema={schema} components={components} expandDepth={expandDepth} />
+                ) : (
+                    <p className="text-lt-muted-fg">{noSchemaMessage}</p>
+                )
+            ) : (
+                <div>
+                    {displayedExamples.length > 1 ? (
+                        <NativeSelect
+                            value={selected}
+                            onChange={(event) => setSelected(Number(event.target.value))}
+                            className="mb-2"
+                        >
+                            {displayedExamples.map((example, index) => (
+                                <option key={example.name ?? index} value={index}>
+                                    {example.name ?? `Example ${index + 1}`}
+                                    {example.summary ? ` — ${example.summary}` : ""}
+                                </option>
+                            ))}
+                        </NativeSelect>
+                    ) : current?.summary ? (
+                        <p className="mb-1 text-xs text-lt-muted-fg">{current.summary}</p>
+                    ) : null}
+                    {isGenerated ? <p className="mb-1 text-xs text-lt-muted-fg">Generated from schema</p> : null}
+                    {current?.description ? (
+                        <p className="mb-1 text-xs text-lt-muted-fg">{current.description}</p>
+                    ) : null}
+                    {current?.externalValue ? (
+                        <a
+                            href={current.externalValue}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mb-2 block text-xs text-lt-primary underline underline-offset-2"
+                        >
+                            Open external example
+                        </a>
+                    ) : null}
+                    {current?.value !== undefined ? (
+                        <CodeBlock aria-label={exampleLabel} copyable language="json" lineNumbers maxHeight={maxHeight}>
+                            {JSON.stringify(current.value, null, 2)}
+                        </CodeBlock>
+                    ) : null}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function RequestBodySection({
+    requests,
+    components,
+    expandDepth,
+}: {
+    requests: Contract[];
+    components: unknown;
+    expandDepth: number;
+}): React.ReactNode {
+    if (requests.length === 0) return null;
+
+    return (
+        <section className="mb-6">
+            <h2 className="mb-2 font-semibold text-lt-fg">Request body</h2>
+            {requests.map((request, index) => (
+                <div key={`${request.mediaType ?? "none"}-${index}`} className="mb-4">
+                    <p className="mb-1 font-mono text-xs text-lt-muted-fg">
+                        {request.mediaType ?? "unspecified media type"}
+                        {request.title ? ` — ${request.title}` : ""}
+                    </p>
+                    {request.schema || request.examples.length > 0 ? (
+                        <SchemaExampleView
+                            name={`request-${request.mediaType ?? "none"}-${index}-tab`}
+                            schema={request.schema}
+                            examples={request.examples}
+                            components={components}
+                            noSchemaMessage="No request body schema."
+                            expandDepth={expandDepth}
+                            exampleLabel="Request body example"
+                        />
+                    ) : (
+                        <p className="text-lt-muted-fg">No request body schema.</p>
+                    )}
+                </div>
+            ))}
+        </section>
+    );
+}
+
+function ResponsesSection({
+    responses,
+    components,
+    expandDepth,
+}: {
+    responses: Contract[];
+    components: unknown;
+    expandDepth: number;
+}): React.ReactNode {
+    const [activeLabel, setActiveLabel] = useState<string | null>(null);
+
+    if (responses.length === 0) return null;
+
+    const current = responses.find((response) => contractLabel(response) === activeLabel) ?? responses[0];
+    const options: Option[] = responses.map((response) => ({
+        label: contractLabel(response),
+        value: contractLabel(response),
+        data: null,
+    }));
+
+    return (
+        <section>
+            <h2 className="mb-2 font-semibold text-lt-fg">Responses</h2>
+            <div className="mb-3 pb-2">
+                <SegmentedPills
+                    name="response-status"
+                    ariaLabel="Response status"
+                    options={options}
+                    value={activeLabel ?? options[0]?.value ?? ""}
+                    onSelect={setActiveLabel}
+                />
+            </div>
+            {current ? (
+                <div>
+                    {current.title ? <p className="mb-2 text-lt-muted-fg">{current.title}</p> : null}
+                    {current.headers.length > 0 ? (
+                        <div className="mb-4">
+                            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                                Response headers
+                            </h3>
+                            <ul>
+                                {current.headers.map((header) => (
+                                    <ParamRow key={header.name} param={header} />
+                                ))}
+                            </ul>
+                        </div>
+                    ) : null}
+                    {current.schema || current.examples.length > 0 ? (
+                        <SchemaExampleView
+                            key={contractLabel(current)}
+                            name={`response-${contractLabel(current)}-tab`}
+                            schema={current.schema}
+                            examples={current.examples}
+                            components={components}
+                            noSchemaMessage="No response body."
+                            expandDepth={expandDepth}
+                            exampleLabel="Response example"
+                            maxHeight={800}
+                            defaultTab="example"
+                            generateExample
+                        />
+                    ) : (
+                        <p className="text-lt-muted-fg">No response body.</p>
+                    )}
+                </div>
+            ) : null}
+        </section>
+    );
+}
+
+function securitySchemeLabel(name: string, definition: SecuritySchemeDefinition | null): string {
+    if (!definition) return name;
+
+    if (definition.type === "http" && definition.scheme === "bearer") {
+        return definition.bearerFormat ? `HTTP Bearer (${definition.bearerFormat})` : "HTTP Bearer";
+    }
+    if (definition.type === "http" && definition.scheme === "basic") {
+        return "HTTP Basic";
+    }
+    if (definition.type === "apiKey") {
+        return `API key (${definition.in}: ${definition.name})`;
+    }
+    if (definition.type === "oauth2") {
+        return "OAuth 2.0";
+    }
+    if (definition.type === "openIdConnect") {
+        return "OpenID Connect";
+    }
+
+    return name;
+}
+
+function SecuritySchemeRow({ scheme, components }: { scheme: SecuritySchemeRef; components: unknown }): React.ReactNode {
+    const definitions = (components as { securitySchemes?: Record<string, SecuritySchemeDefinition> } | null)?.securitySchemes ?? {};
+    const definition = definitions[scheme.name] ?? null;
+
+    return (
+        <li className="border-b border-lt-border py-2 last:border-b-0">
+            <span className="text-lt-fg">{securitySchemeLabel(scheme.name, definition)}</span>
+            {definition?.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{definition.description}</p> : null}
+            {scheme.scopes.length > 0 ? (
+                <div className="mt-1 flex flex-wrap gap-1">
+                    {scheme.scopes.map((scope) => (
+                        <code key={scope} className="rounded-lt-xs bg-lt-muted px-1.5 py-0.5 text-xs text-lt-muted-fg">
+                            {scope}
+                        </code>
+                    ))}
+                </div>
+            ) : null}
+        </li>
+    );
+}
+
+function SecurityRequirementRow({ requirement, components }: { requirement: SecurityRequirement; components: unknown }): React.ReactNode {
+    if (requirement.schemes.length === 0) {
+        return <p className="text-lt-muted-fg">Optional authentication</p>;
+    }
+
+    return (
+        <ul>
+            {requirement.schemes.map((scheme) => (
+                <SecuritySchemeRow key={scheme.name} scheme={scheme} components={components} />
+            ))}
+        </ul>
+    );
+}
+
+function SecuritySection({ security, components }: { security: SecurityRequirement[]; components: unknown }): React.ReactNode {
+    if (security.length === 0) return null;
+
+    return (
+        <section className="mb-6">
+            <h2 className="mb-2 font-semibold text-lt-fg">Authorization</h2>
+            {security.map((requirement, index) => (
+                <div key={index}>
+                    {index > 0 ? (
+                        <p className="my-2 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">OR</p>
+                    ) : null}
+                    <SecurityRequirementRow requirement={requirement} components={components} />
+                </div>
+            ))}
+        </section>
+    );
+}
 
 export type RequestPlaygroundProps = {
     operation: Operation;
     baseUrl: string | null;
     token: string | null;
     components: unknown;
-    values?: RequestValues;
-    onValuesChange?: Dispatch<SetStateAction<RequestValues>>;
-    hideInlineParameters?: boolean;
-    onValidationError?: (fieldKey: string | null) => void;
-    requestContent?: ReactNode;
-    referenceContent?: ReactNode;
-    showMarkdownCopy?: boolean;
+    expandDepth?: number;
+    hideHeaderIdentity?: boolean;
 };
 
 export function RequestPlayground({
@@ -64,53 +452,27 @@ export function RequestPlayground({
     baseUrl,
     token,
     components,
-    values: controlledValues,
-    onValuesChange,
-    hideInlineParameters = false,
-    onValidationError,
-    requestContent = null,
-    referenceContent = null,
-    showMarkdownCopy = true,
+    expandDepth = 2,
+    hideHeaderIdentity = false,
 }: RequestPlaygroundProps): React.ReactNode {
     const idPrefix = `${operation.summary.id}-${useId().replaceAll(/[^a-zA-Z0-9_-]/g, "")}`;
     const playgroundRef = useRef<HTMLElement>(null);
     const activeControllerRef = useRef<AbortController | null>(null);
-    const [internalValues, setInternalValues] = useState<RequestValues>(() =>
+    const [values, setValues] = useState<RequestValues>(() =>
         initialPlaygroundValues(operation, components),
     );
     const [snippetLanguage, setSnippetLanguage] = useState<SnippetLanguage>("curl");
     const [isLoading, setIsLoading] = useState(false);
     const [liveResult, setLiveResult] = useState<ExecutedResponse | ExecutionError | null>(null);
-    const values = controlledValues ?? internalValues;
-    const setValues = onValuesChange ?? setInternalValues;
     const jsonContracts = jsonRequestContracts(operation);
     const selectedContract = jsonContracts.find((contract) => contract.mediaType === values.mediaType) ?? null;
-    const requestBodySchema = useMemo(
-        () => selectedContract === null
-            ? null
-            : resolveRequestBodySchema(selectedContract.schema, components),
-        [selectedContract, components],
-    );
     const buildResult = useMemo(
         () => buildRequest({ operation, baseUrl, values, token }),
         [operation, baseUrl, values, token],
     );
     const nonInteractiveParameterLimitations = parameterLimitationsWithoutControls(operation);
-    const hasUnsupportedRequestBody = operation.requests.length > 0
-        && (jsonContracts.length === 0 || requestBodySchema?.schema === null);
+    const hasUnsupportedRequestBody = operation.requests.length > 0 && jsonContracts.length === 0;
     const requestBodyRequired = selectedContract?.required ?? false;
-    const requestBodyValue = requestBodySchema?.schema === undefined || requestBodySchema.schema === null
-        ? null
-        : parseBody(values.body, requestBodySchema.schema);
-    const requestBodyValidationError = requestBodySchema?.schema === undefined
-        || requestBodySchema.schema === null
-        || (!requestBodyRequired && values.body.trim() === "")
-        ? null
-        : validateRequestBodyValue(requestBodySchema.schema, requestBodyValue, requestBodyRequired);
-    const requestBodyError = buildResult.errors?.body
-        ?? (requestBodyValidationError === null
-            ? null
-            : `${requestBodyValidationError.path}: ${requestBodyValidationError.message}`);
     const snippet = useMemo(() => {
         if (buildResult.request === null) {
             return "";
@@ -122,10 +484,7 @@ export function RequestPlayground({
             ? curlSnippet.generate(request)
             : javascriptSnippet.generate(request);
     }, [buildResult, snippetLanguage]);
-    const markdown = useMemo(
-        () => (showMarkdownCopy ? operationToMarkdown(operation, components) : ""),
-        [showMarkdownCopy, operation, components],
-    );
+    const markdown = useMemo(() => operationToMarkdown(operation, components), [operation, components]);
 
     useEffect(() => {
         return () => {
@@ -144,8 +503,8 @@ export function RequestPlayground({
         }));
     }
 
-    function updateBody(body: unknown): void {
-        setValues((current) => ({ ...current, body: prettyJson(body) }));
+    function updateBody(body: string): void {
+        setValues((current) => ({ ...current, body }));
     }
 
     function updateMediaType(mediaType: string): void {
@@ -171,7 +530,6 @@ export function RequestPlayground({
             const fieldKey = firstErrorFieldKey(operation, result.errors);
             const fields = playgroundRef.current?.querySelectorAll<HTMLElement>("[data-field-key]") ?? [];
 
-            onValidationError?.(fieldKey);
             Array.from(fields).find((field) => field.dataset.fieldKey === fieldKey)?.focus();
 
             return;
@@ -201,16 +559,32 @@ export function RequestPlayground({
     }
 
     return (
-        <>
+        <div className="grid min-w-0 items-start text-base xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
             <aside
                 ref={playgroundRef}
                 aria-label="Request"
                 className="min-w-0 p-6 xl:col-start-1 xl:row-start-1"
             >
-                {requestContent}
+                <OperationHeader operation={operation} baseUrl={baseUrl} hideIdentity={hideHeaderIdentity} />
+                <SecuritySection security={operation.security} components={components} />
+                {operation.paramGroups.length > 0 ? (
+                    <section className="mb-6">
+                        <h2 className="mb-2 font-semibold text-lt-fg">Parameters</h2>
+                        {operation.paramGroups.map((group) => (
+                            <ParamGroupSection
+                                key={group.location}
+                                group={group}
+                                idPrefix={idPrefix}
+                                values={values}
+                                errors={buildResult.errors?.parameters ?? {}}
+                                onChange={updateParameter}
+                            />
+                        ))}
+                    </section>
+                ) : null}
                 <div className="flex flex-col gap-6">
                     {operation.paramGroups
-                        .filter((group) => !hideInlineParameters || !isInlineParameterGroup(group.location))
+                        .filter((group) => !isInlineParameterGroup(group.location))
                         .map((group) => {
                             const supportedParams = group.params.filter((param) =>
                                 isRenderableParameter(group.location, param),
@@ -253,11 +627,7 @@ export function RequestPlayground({
                                     </li>
                                 ))}
                                 {hasUnsupportedRequestBody ? (
-                                    <li>
-                                        {jsonContracts.length === 0
-                                            ? "Only JSON request bodies can be sent from the playground."
-                                            : requestBodySchema?.error}
-                                    </li>
+                                    <li>Only JSON request bodies can be sent from the playground.</li>
                                 ) : null}
                             </ul>
                         </section>
@@ -286,34 +656,41 @@ export function RequestPlayground({
                                     )}
                                 </FormFieldFrame>
                             ) : null}
-                            {requestBodySchema?.schema !== null && requestBodySchema !== null ? (
-                                <RequestBodyEditor
-                                    idPrefix={`${idPrefix}-request-body`}
-                                    schema={requestBodySchema.schema}
-                                    value={requestBodyValue}
-                                    onChange={updateBody}
-                                    error={requestBodyError}
+                            {selectedContract !== null ? (
+                                <FormFieldFrame
+                                    id={`${idPrefix}-request-body`}
+                                    label="JSON body"
                                     required={requestBodyRequired}
-                                />
+                                    error={buildResult.errors?.body ?? undefined}
+                                >
+                                    {(controlProps) => (
+                                        <Textarea
+                                            {...controlProps}
+                                            value={values.body}
+                                            required={requestBodyRequired}
+                                            data-field-key="body"
+                                            onChange={(event) => updateBody(event.target.value)}
+                                            className="min-h-40 font-mono"
+                                        />
+                                    )}
+                                </FormFieldFrame>
                             ) : null}
                         </section>
                     ) : null}
 
                     {buildResult.errors?.request ? (
-                        <p className="text-sm text-lt-danger">{buildResult.errors.request}</p>
+                        <p className="text-lt-danger">{buildResult.errors.request}</p>
                     ) : null}
 
                     <form onSubmit={tryRequest} className="flex flex-wrap items-center gap-3">
                         <Button
                             type="submit"
-                            disabled={
-                                isLoading || hasUnsupportedRequestBody || requestBodyValidationError !== null
-                            }
+                            disabled={isLoading || hasUnsupportedRequestBody}
                         >
                             {isLoading ? <Spinner className="size-lt-icon-sm" /> : null}
                             Execute
                         </Button>
-                        {showMarkdownCopy ? (
+                        {!hideHeaderIdentity ? (
                             <CopyButton
                                 value={markdown}
                                 label="as Markdown"
@@ -339,10 +716,11 @@ export function RequestPlayground({
                         snippet={snippet}
                         onLanguageChange={setSnippetLanguage}
                     />
-                    {referenceContent}
+                    <RequestBodySection requests={operation.requests} components={components} expandDepth={expandDepth} />
+                    <ResponsesSection responses={operation.responses} components={components} expandDepth={expandDepth} />
                 </div>
             </aside>
-        </>
+        </div>
     );
 }
 
@@ -403,7 +781,7 @@ export function RequestParameterField({
                                 {selectedArrayOptions.length === 0 ? "Not set" : selectedArrayOptions.join(", ")}
                             </span>
                         }
-                        triggerClassName="flex h-lt-control-md w-full items-center rounded-lt-sm border border-lt-input bg-transparent px-3 py-1 text-left text-sm outline-none focus-visible:border-lt-ring focus-visible:ring-[length:var(--lt-ring-width)] focus-visible:ring-lt-ring/50"
+                        triggerClassName="flex h-lt-control-md w-full items-center rounded-lt-sm border border-lt-input bg-transparent px-3 py-1 text-left outline-none focus-visible:border-lt-ring focus-visible:ring-[length:var(--lt-ring-width)] focus-visible:ring-lt-ring/50"
                         triggerProps={
                             {
                                 ...controlProps,
@@ -563,18 +941,6 @@ function parameterStep(schema: Record<string, unknown>): number | "any" | undefi
 
 function numberValue(value: unknown): number | undefined {
     return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function parseBody(body: string, schema: Parameters<typeof defaultRequestBodyValue>[0]): unknown {
-    if (body.trim() === "") {
-        return defaultRequestBodyValue(schema);
-    }
-
-    try {
-        return JSON.parse(body);
-    } catch {
-        return defaultRequestBodyValue(schema);
-    }
 }
 
 function prettyJson(value: unknown): string {
