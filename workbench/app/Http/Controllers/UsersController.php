@@ -3,16 +3,16 @@ declare(strict_types=1);
 
 namespace Workbench\App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use Bambamboole\Spectacular\PaginationMode;
+use Bambamboole\Spectacular\QueryBuilder;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\QueryBuilder;
 use Workbench\App\Http\Resources\UserResource;
 use Workbench\App\Models\User;
 
 class UsersController
 {
-    public function __invoke(Request $request): AnonymousResourceCollection
+    public function __invoke(): AnonymousResourceCollection
     {
         $users = QueryBuilder::for(User::class)
             ->allowedFilters(
@@ -22,9 +22,11 @@ class UsersController
             ->allowedSorts('name', 'created_at')
             ->allowedIncludes('roles')
             ->allowedFields('id', 'name', 'email', 'roles.id', 'roles.name')
-            ->paginate($request->integer('per_page', 15));
-
-        $users->appends($request->query());
+            ->apiPaginate(modes: [
+                PaginationMode::Default,
+                PaginationMode::Simple,
+                PaginationMode::Cursor,
+            ]);
 
         return UserResource::collection($users);
     }

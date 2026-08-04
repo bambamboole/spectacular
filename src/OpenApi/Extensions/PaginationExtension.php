@@ -17,6 +17,7 @@ use Dedoc\Scramble\Support\Generator\Types\IntegerType;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\RouteInfo;
+use Illuminate\Support\Str;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\FunctionLike;
@@ -177,6 +178,8 @@ final class PaginationExtension extends AbstractQueryBuilderExtension
             if (! $response instanceof Response || (string) $response->code !== '200') {
                 continue;
             }
+
+            $response->description = Str::replaceStart('Array of', 'Paginated set of', $response->description);
 
             foreach ($response->content as $content) {
                 if (! $content instanceof Schema

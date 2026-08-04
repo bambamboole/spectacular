@@ -113,32 +113,17 @@ it('documents the json api resource response from the workbench endpoint', funct
     $document = generatedUsersOpenApiDocument();
     $operation = generatedUsersOperation();
     $schema = $operation['responses']['200']['content']['application/vnd.api+json']['schema'];
+    $branches = $schema['anyOf'];
     $userResource = $document['components']['schemas']['UserResource'];
     $roleResource = $document['components']['schemas']['RoleResource'];
 
     expect($operation['responses']['200']['content'])
         ->toHaveKey('application/vnd.api+json')
-        ->and($schema['type'])->toBe('object')
-        ->and($schema['required'])->toBe(['data', 'links', 'meta'])
-        ->and($schema['properties'])->toHaveKeys(['data', 'links', 'meta', 'included'])
-        ->and($schema['properties']['data'])->toMatchArray([
-            'type' => 'array',
-            'items' => [
-                '$ref' => '#/components/schemas/UserResource',
-            ],
-        ])
-        ->and($schema['properties']['links'])->toMatchArray([
-            'type' => 'object',
-        ])
-        ->and($schema['properties']['meta'])->toMatchArray([
-            'type' => 'object',
-        ])
-        ->and($schema['properties']['included'])->toMatchArray([
-            'type' => 'array',
-            'items' => [
-                '$ref' => '#/components/schemas/RoleResource',
-            ],
-        ])
+        ->and($operation['responses']['200']['description'])
+        ->toBe('Paginated set of `UserResource`')
+        ->and($branches)->toHaveCount(3)
+        ->and(array_column($branches, 'title'))
+        ->toBe(['Default pagination', 'Simple pagination', 'Cursor pagination'])
         ->and($userResource['type'])->toBe('object')
         ->and($userResource['required'])->toBe(['id', 'type'])
         ->and($userResource['properties']['id'])->toBe(['type' => 'string'])
@@ -158,6 +143,19 @@ it('documents the json api resource response from the workbench endpoint', funct
         ->toMatchArray([
             'name' => ['type' => 'string'],
         ]);
+
+    foreach ($branches as $branch) {
+        expect($branch['required'])->toBe(['data', 'links', 'meta'])
+            ->and($branch['properties'])->toHaveKeys(['data', 'links', 'meta', 'included'])
+            ->and($branch['properties']['data'])->toMatchArray([
+                'type' => 'array',
+                'items' => ['$ref' => '#/components/schemas/UserResource'],
+            ])
+            ->and($branch['properties']['included'])->toMatchArray([
+                'type' => 'array',
+                'items' => ['$ref' => '#/components/schemas/RoleResource'],
+            ]);
+    }
 });
 
 it('documents pagination parameters and the paginated json api resource response', function (): void {
@@ -166,7 +164,7 @@ it('documents pagination parameters and the paginated json api resource response
     $schema = $operation['responses']['200']['content']['application/vnd.api+json']['schema'];
 
     expect($parameters)
-        ->toHaveKeys(['page', 'per_page'])
+        ->toHaveKeys(['page', 'cursor', 'per_page', 'x-pagination'])
         ->and($parameters['page'])
         ->toMatchArray([
             'in' => 'query',
@@ -183,13 +181,19 @@ it('documents pagination parameters and the paginated json api resource response
             'schema' => [
                 'type' => 'integer',
                 'minimum' => 1,
-                'default' => 15,
+                'maximum' => 100,
             ],
         ])
-        ->and($schema['properties'])
-        ->toHaveKeys(['data', 'links', 'meta'])
-        ->and($schema['required'])
-        ->toBe(['data', 'links', 'meta']);
+        ->and($parameters['x-pagination'])
+        ->toMatchArray([
+            'in' => 'header',
+            'schema' => [
+                'type' => 'string',
+                'enum' => ['default', 'simple', 'cursor'],
+                'default' => 'default',
+            ],
+        ])
+        ->and($schema['anyOf'])->toHaveCount(3);
 });
 
 it('documents categories pagination without a redundant total header', function (): void {
