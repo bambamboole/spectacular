@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+use Bambamboole\Spectacular\PaginationMode;
+use Bambamboole\Spectacular\QueryBuilder as SpectacularQueryBuilder;
 use Dedoc\Scramble\Generator;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Http\Request;
@@ -111,32 +113,17 @@ it('documents the json api resource response from the workbench endpoint', funct
     $document = generatedUsersOpenApiDocument();
     $operation = generatedUsersOperation();
     $schema = $operation['responses']['200']['content']['application/vnd.api+json']['schema'];
+    $branches = $schema['anyOf'];
     $userResource = $document['components']['schemas']['UserResource'];
     $roleResource = $document['components']['schemas']['RoleResource'];
 
     expect($operation['responses']['200']['content'])
         ->toHaveKey('application/vnd.api+json')
-        ->and($schema['type'])->toBe('object')
-        ->and($schema['required'])->toBe(['data', 'links', 'meta'])
-        ->and($schema['properties'])->toHaveKeys(['data', 'links', 'meta', 'included'])
-        ->and($schema['properties']['data'])->toMatchArray([
-            'type' => 'array',
-            'items' => [
-                '$ref' => '#/components/schemas/UserResource',
-            ],
-        ])
-        ->and($schema['properties']['links'])->toMatchArray([
-            'type' => 'object',
-        ])
-        ->and($schema['properties']['meta'])->toMatchArray([
-            'type' => 'object',
-        ])
-        ->and($schema['properties']['included'])->toMatchArray([
-            'type' => 'array',
-            'items' => [
-                '$ref' => '#/components/schemas/RoleResource',
-            ],
-        ])
+        ->and($operation['responses']['200']['description'])
+        ->toBe('Paginated set of `UserResource`')
+        ->and($branches)->toHaveCount(3)
+        ->and(array_column($branches, 'title'))
+        ->toBe(['Default pagination', 'Simple pagination', 'Cursor pagination'])
         ->and($userResource['type'])->toBe('object')
         ->and($userResource['required'])->toBe(['id', 'type'])
         ->and($userResource['properties']['id'])->toBe(['type' => 'string'])
@@ -156,6 +143,19 @@ it('documents the json api resource response from the workbench endpoint', funct
         ->toMatchArray([
             'name' => ['type' => 'string'],
         ]);
+
+    foreach ($branches as $branch) {
+        expect($branch['required'])->toBe(['data', 'links', 'meta'])
+            ->and($branch['properties'])->toHaveKeys(['data', 'links', 'meta', 'included'])
+            ->and($branch['properties']['data'])->toMatchArray([
+                'type' => 'array',
+                'items' => ['$ref' => '#/components/schemas/UserResource'],
+            ])
+            ->and($branch['properties']['included'])->toMatchArray([
+                'type' => 'array',
+                'items' => ['$ref' => '#/components/schemas/RoleResource'],
+            ]);
+    }
 });
 
 it('documents pagination parameters and the paginated json api resource response', function (): void {
@@ -164,7 +164,7 @@ it('documents pagination parameters and the paginated json api resource response
     $schema = $operation['responses']['200']['content']['application/vnd.api+json']['schema'];
 
     expect($parameters)
-        ->toHaveKeys(['page', 'per_page'])
+        ->toHaveKeys(['page', 'cursor', 'per_page', 'x-pagination'])
         ->and($parameters['page'])
         ->toMatchArray([
             'in' => 'query',
@@ -181,13 +181,20 @@ it('documents pagination parameters and the paginated json api resource response
             'schema' => [
                 'type' => 'integer',
                 'minimum' => 1,
-                'default' => 15,
+                'maximum' => 100,
             ],
         ])
-        ->and($schema['properties'])
-        ->toHaveKeys(['data', 'links', 'meta'])
-        ->and($schema['required'])
-        ->toBe(['data', 'links', 'meta']);
+        ->and($parameters['x-pagination'])
+        ->toMatchArray([
+            'in' => 'header',
+            'schema' => [
+                'type' => 'string',
+                'enum' => ['default', 'simple', 'cursor'],
+                'default' => 'default',
+            ],
+        ])
+        ->and($parameters['x-pagination'])->not->toHaveKey('description')
+        ->and($schema['anyOf'])->toHaveCount(3);
 });
 
 it('documents categories pagination without a redundant total header', function (): void {
@@ -298,6 +305,112 @@ it('documents cursor pagination parameters from cursorPaginate', function (): vo
                 'default' => 15,
             ],
         ]);
+});
+
+it('documents multiple pagination modes as selectable request and response contracts', function (): void {
+    RouteFacade::get('api/multiple-pagination-users', MultiplePaginatedUsersController::class)
+        ->name('api.multiple-pagination-users.index');
+
+    $document = generatedOpenApiDocumentForUri('api/multiple-pagination-users');
+    $operation = generatedOperationForUri('api/multiple-pagination-users');
+    $parameters = generatedOperationParametersForUri('api/multiple-pagination-users');
+    $schema = $operation['responses']['200']['content']['application/vnd.api+json']['schema'];
+
+    expect($parameters)
+        ->toHaveKeys(['page', 'cursor', 'per_page', 'x-pagination'])
+        ->and($parameters['x-pagination'])
+        ->toMatchArray([
+            'in' => 'header',
+            'schema' => [
+                'type' => 'string',
+                'enum' => ['default', 'simple', 'cursor'],
+                'default' => 'default',
+            ],
+        ])
+        ->and($parameters['per_page']['schema'])
+        ->toBe([
+            'type' => 'integer',
+            'minimum' => 1,
+            'maximum' => 50,
+        ])
+        ->and($schema['anyOf'])
+        ->toHaveCount(3)
+        ->and(array_column($schema['anyOf'], 'title'))
+        ->toBe(['Default pagination', 'Simple pagination', 'Cursor pagination']);
+
+    foreach ($schema['anyOf'] as $branch) {
+        expect($branch['required'])->toBe(['data', 'links', 'meta'])
+            ->and($branch['properties'])->toHaveKeys(['data', 'links', 'meta', 'included'])
+            ->and($branch['properties']['data'])->toMatchArray([
+                'type' => 'array',
+                'items' => ['$ref' => '#/components/schemas/UserResource'],
+            ])
+            ->and($branch['properties']['included'])->toMatchArray([
+                'type' => 'array',
+                'items' => ['$ref' => '#/components/schemas/RoleResource'],
+            ]);
+    }
+
+    expect($schema['anyOf'][0]['properties']['meta']['properties'])
+        ->toHaveKeys(['total', 'last_page'])
+        ->and($schema['anyOf'][1]['properties']['meta']['properties'])
+        ->not->toHaveKeys(['total', 'last_page'])
+        ->and($schema['anyOf'][2]['properties']['meta']['properties'])
+        ->toHaveKeys(['next_cursor', 'prev_cursor'])
+        ->and($document['components']['schemas'])->toHaveKeys(['UserResource', 'RoleResource']);
+});
+
+it('documents the default api pagination mode without a selector or anyOf', function (): void {
+    RouteFacade::get('api/default-api-pagination-users', DefaultApiPaginatedUsersController::class)
+        ->name('api.default-api-pagination-users.index');
+
+    $operation = generatedOperationForUri('api/default-api-pagination-users');
+    $parameters = generatedOperationParametersForUri('api/default-api-pagination-users');
+    $schema = $operation['responses']['200']['content']['application/vnd.api+json']['schema'];
+
+    expect($parameters)
+        ->toHaveKeys(['page', 'per_page'])
+        ->not->toHaveKeys(['cursor', 'x-pagination'])
+        ->and($parameters['per_page']['schema'])
+        ->toBe([
+            'type' => 'integer',
+            'minimum' => 1,
+            'maximum' => 100,
+        ])
+        ->and($schema)->not->toHaveKey('anyOf')
+        ->and($schema['properties'])->toHaveKeys(['data', 'links', 'meta', 'included'])
+        ->and($schema['required'])->toBe(['data', 'links', 'meta']);
+});
+
+it('documents a named maximum with the default pagination mode', function (): void {
+    RouteFacade::get('api/default-api-pagination-users-with-max', DefaultApiPaginatedUsersWithMaxController::class)
+        ->name('api.default-api-pagination-users-with-max.index');
+
+    $parameters = generatedOperationParametersForUri('api/default-api-pagination-users-with-max');
+
+    expect($parameters)
+        ->toHaveKeys(['page', 'per_page'])
+        ->not->toHaveKeys(['cursor', 'x-pagination'])
+        ->and($parameters['per_page']['schema'])
+        ->toBe([
+            'type' => 'integer',
+            'minimum' => 1,
+            'maximum' => 50,
+        ]);
+});
+
+it('leaves dynamic api pagination arguments undocumented', function (): void {
+    RouteFacade::get('api/dynamic-api-pagination-users', DynamicApiPaginatedUsersController::class)
+        ->name('api.dynamic-api-pagination-users.index');
+
+    $operation = generatedOperationForUri('api/dynamic-api-pagination-users');
+    $parameters = generatedOperationParametersForUri('api/dynamic-api-pagination-users');
+    $schema = $operation['responses']['200']['content']['application/vnd.api+json']['schema'];
+
+    expect($parameters)->not->toHaveKeys(['page', 'cursor', 'per_page', 'x-pagination'])
+        ->and($schema)->not->toHaveKey('anyOf')
+        ->and($schema['properties'])->toHaveKeys(['data', 'included'])
+        ->and($schema['properties'])->not->toHaveKeys(['links', 'meta']);
 });
 
 /**
@@ -455,5 +568,47 @@ final class CursorPaginatedUsersController
         return UserResource::collection(QueryBuilder::for(User::class)
             ->defaultSort('id')
             ->cursorPaginate($request->integer('per_page', 15)));
+    }
+}
+
+final class MultiplePaginatedUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(SpectacularQueryBuilder::for(User::class)
+            ->apiPaginate(
+                modes: [
+                    PaginationMode::Default,
+                    PaginationMode::Simple,
+                    PaginationMode::Cursor,
+                ],
+                max: 50,
+            ));
+    }
+}
+
+final class DefaultApiPaginatedUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(SpectacularQueryBuilder::for(User::class)->apiPaginate());
+    }
+}
+
+final class DefaultApiPaginatedUsersWithMaxController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(SpectacularQueryBuilder::for(User::class)->apiPaginate(max: 50));
+    }
+}
+
+final class DynamicApiPaginatedUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        $modes = [PaginationMode::Default, PaginationMode::Cursor];
+
+        return UserResource::collection(SpectacularQueryBuilder::for(User::class)->apiPaginate($modes));
     }
 }

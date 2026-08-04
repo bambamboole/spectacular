@@ -180,6 +180,86 @@ function ParamGroupSection({
     );
 }
 
+type PaginationParameters = {
+    mode: Param | null;
+    page: Param | null;
+    cursor: Param | null;
+    perPage: Param | null;
+};
+
+function paginationParameters(operation: Operation): PaginationParameters | null {
+    const parameters = operation.paramGroups.flatMap((group) => group.params);
+    const mode = parameters.find(
+        (param) => param.location === "header" && param.name.toLowerCase() === "x-pagination",
+    ) ?? null;
+
+    const queryParameter = (name: string): Param | null =>
+        parameters.find((param) => param.location === "query" && param.name === name) ?? null;
+    const page = queryParameter("page");
+    const cursor = queryParameter("cursor");
+    const perPage = queryParameter("per_page");
+
+    return perPage === null || (page === null && cursor === null)
+        ? null
+        : { mode, page, cursor, perPage };
+}
+
+function PaginationParameterSection({
+    parameters,
+    idPrefix,
+    values,
+    errors,
+    onModeChange,
+    onChange,
+}: {
+    parameters: PaginationParameters;
+    idPrefix: string;
+    values: RequestValues;
+    errors: Record<string, string>;
+    onModeChange: (value: string) => void;
+    onChange: (param: Param, value: string) => void;
+}): React.ReactNode {
+    const usesCursor = parameters.mode === null
+        ? parameters.page === null
+        : values.parameters[parameterKey(parameters.mode)] === "cursor";
+    const activeParameters = usesCursor
+        ? [parameters.cursor, parameters.perPage]
+        : [parameters.page, parameters.perPage];
+
+    return (
+        <fieldset className="mb-4 rounded-lt-sm border border-lt-border p-3">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                Pagination
+            </legend>
+            <div className="flex flex-col gap-3">
+                {parameters.mode === null ? null : (
+                    <div className="flex flex-wrap gap-4">
+                        <RequestParameterField
+                            idPrefix={idPrefix}
+                            param={parameters.mode}
+                            value={values.parameters[parameterKey(parameters.mode)] ?? ""}
+                            error={errors[parameterKey(parameters.mode)] ?? null}
+                            onChange={onModeChange}
+                        />
+                    </div>
+                )}
+                <div className="flex flex-wrap gap-4">
+                    {activeParameters.map((param) => param === null ? null : (
+                        <RequestParameterField
+                            key={parameterKey(param)}
+                            idPrefix={idPrefix}
+                            param={param}
+                            value={values.parameters[parameterKey(param)] ?? ""}
+                            error={errors[parameterKey(param)] ?? null}
+                            onChange={(value) => onChange(param, value)}
+                        />
+                    ))}
+                </div>
+            </div>
+        </fieldset>
+    );
+}
+
 type SchemaTab = "schema" | "example";
 
 const SCHEMA_TABS: Array<{ key: SchemaTab; label: string }> = [
@@ -507,6 +587,20 @@ export function RequestPlayground({
     const [snippetLanguage, setSnippetLanguage] = useState<SnippetLanguage>("curl");
     const [isLoading, setIsLoading] = useState(false);
     const [liveResult, setLiveResult] = useState<ExecutedResponse | ExecutionError | null>(null);
+    const pagination = paginationParameters(operation);
+    const paginationKeys = new Set(
+        pagination === null
+            ? []
+            : [pagination.mode, pagination.page, pagination.cursor, pagination.perPage]
+                  .filter((param): param is Param => param !== null)
+                  .map(parameterKey),
+    );
+    const parameterGroups = operation.paramGroups
+        .map((group) => ({
+            ...group,
+            params: group.params.filter((param) => !paginationKeys.has(parameterKey(param))),
+        }))
+        .filter((group) => group.params.length > 0);
     const jsonContracts = jsonRequestContracts(operation);
     const selectedContract = jsonContracts.find((contract) => contract.mediaType === values.mediaType) ?? null;
     const buildResult = useMemo(
@@ -545,6 +639,29 @@ export function RequestPlayground({
             ...current,
             parameters: { ...current.parameters, [key]: value },
         }));
+    }
+
+    function updatePaginationMode(value: string): void {
+        if (pagination === null || pagination.mode === null) {
+            return;
+        }
+
+        const mode = pagination.mode;
+
+        setValues((current) => {
+            const parameters = {
+                ...current.parameters,
+                [parameterKey(mode)]: value,
+            };
+
+            if (value === "cursor" && pagination.page !== null) {
+                parameters[parameterKey(pagination.page)] = "";
+            } else if (pagination.cursor !== null) {
+                parameters[parameterKey(pagination.cursor)] = "";
+            }
+
+            return { ...current, parameters };
+        });
     }
 
     function updateBody(body: string): void {
@@ -607,10 +724,20 @@ export function RequestPlayground({
             <aside ref={playgroundRef} aria-label="Request" className="min-w-0 p-6">
                 <OperationHeader operation={operation} baseUrl={baseUrl} hideIdentity={hideHeaderIdentity} />
                 <SecuritySection security={operation.security} components={components} />
-                {operation.paramGroups.length > 0 ? (
+                {parameterGroups.length > 0 || pagination !== null ? (
                     <section className="mb-6">
                         <h2 className="mb-2 font-semibold text-lt-fg">Parameters</h2>
-                        {operation.paramGroups.map((group) => (
+                        {pagination !== null ? (
+                            <PaginationParameterSection
+                                parameters={pagination}
+                                idPrefix={idPrefix}
+                                values={values}
+                                errors={buildResult.errors?.parameters ?? {}}
+                                onModeChange={updatePaginationMode}
+                                onChange={updateParameter}
+                            />
+                        ) : null}
+                        {parameterGroups.map((group) => (
                             <ParamGroupSection
                                 key={group.location}
                                 group={group}
@@ -623,7 +750,7 @@ export function RequestPlayground({
                     </section>
                 ) : null}
                 <div className="flex flex-col gap-6">
-                    {operation.paramGroups
+                    {parameterGroups
                         .filter((group) => !isInlineParameterGroup(group.location))
                         .map((group) => {
                             const supportedParams = group.params.filter((param) =>

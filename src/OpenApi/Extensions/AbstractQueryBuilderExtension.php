@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Extensions;
 
+use Bambamboole\Spectacular\QueryBuilder as SpectacularQueryBuilder;
 use Dedoc\Scramble\Extensions\OperationExtension;
 use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Parameter;
@@ -13,7 +14,7 @@ use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
-use Spatie\QueryBuilder\QueryBuilder;
+use Spatie\QueryBuilder\QueryBuilder as SpatieQueryBuilder;
 
 abstract class AbstractQueryBuilderExtension extends OperationExtension
 {
@@ -68,7 +69,8 @@ abstract class AbstractQueryBuilderExtension extends OperationExtension
 
         return $expression instanceof Expr\StaticCall
             && $this->methodName($expression->name) === 'for'
-            && $this->isClassName($expression->class, QueryBuilder::class);
+            && ($this->isClassName($expression->class, SpatieQueryBuilder::class)
+                || $this->isClassName($expression->class, SpectacularQueryBuilder::class));
     }
 
     protected function isClassName(Name|Expr $class, string $expected): bool
