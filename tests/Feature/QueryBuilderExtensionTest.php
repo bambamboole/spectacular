@@ -381,6 +381,23 @@ it('documents the default api pagination mode without a selector or anyOf', func
         ->and($schema['required'])->toBe(['data', 'links', 'meta']);
 });
 
+it('documents a named maximum with the default pagination mode', function (): void {
+    RouteFacade::get('api/default-api-pagination-users-with-max', DefaultApiPaginatedUsersWithMaxController::class)
+        ->name('api.default-api-pagination-users-with-max.index');
+
+    $parameters = generatedOperationParametersForUri('api/default-api-pagination-users-with-max');
+
+    expect($parameters)
+        ->toHaveKeys(['page', 'per_page'])
+        ->not->toHaveKeys(['cursor', 'x-pagination'])
+        ->and($parameters['per_page']['schema'])
+        ->toBe([
+            'type' => 'integer',
+            'minimum' => 1,
+            'maximum' => 50,
+        ]);
+});
+
 it('leaves dynamic api pagination arguments undocumented', function (): void {
     RouteFacade::get('api/dynamic-api-pagination-users', DynamicApiPaginatedUsersController::class)
         ->name('api.dynamic-api-pagination-users.index');
@@ -574,6 +591,14 @@ final class DefaultApiPaginatedUsersController
     public function __invoke(): AnonymousResourceCollection
     {
         return UserResource::collection(SpectacularQueryBuilder::for(User::class)->apiPaginate());
+    }
+}
+
+final class DefaultApiPaginatedUsersWithMaxController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(SpectacularQueryBuilder::for(User::class)->apiPaginate(max: 50));
     }
 }
 

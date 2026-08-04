@@ -380,6 +380,10 @@ final class PaginationExtension extends AbstractQueryBuilderExtension
             }
         }
 
-        return $arguments[$position]->value ?? null;
+        $argument = $arguments[$position] ?? null;
+
+        return $argument !== null && $argument->name === null
+            ? $argument->value
+            : null;
     }
 }
