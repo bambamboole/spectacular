@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.0](https://github.com/bambamboole/spectacular/compare/0.5.0...0.6.0) (2026-08-04)
+
+
+### Features
+
+* add selectable pagination modes ([70d4625](https://github.com/bambamboole/spectacular/commit/70d46259f0cba3024fa71fff70ecaf56a7645436))
+* add selectable pagination query builder ([4370e93](https://github.com/bambamboole/spectacular/commit/4370e93e1cadab51e5b9ae560417407945ae67d8))
+* document selectable pagination modes ([0ab6901](https://github.com/bambamboole/spectacular/commit/0ab6901e4febe66c3ab1db757e14545226ce091b))
+* group pagination request controls ([050d923](https://github.com/bambamboole/spectacular/commit/050d9234f27abb59ad52a41e2e380357fd5f1ea7))
+
+
+### Bug Fixes
+
+* detect standalone pagination controls ([d8484a1](https://github.com/bambamboole/spectacular/commit/d8484a1ec5d6d271c126f24e4e494303625d9283))
+* handle named pagination arguments ([bd1db1f](https://github.com/bambamboole/spectacular/commit/bd1db1f899425d82d914d8267f1b975c065c5d9d))
+* prevent pagination mode field growth ([3f45352](https://github.com/bambamboole/spectacular/commit/3f45352d708bf4be2000f9071bf0b5282dbb7430))
+* stop documenting allowed fields ([5d6d005](https://github.com/bambamboole/spectacular/commit/5d6d0051f4c39755eb72624b5c2538b7e0a8c156))
+* stop documenting allowed fields ([786427b](https://github.com/bambamboole/spectacular/commit/786427b8ad7920f776c3233333fd2a5f4662bfc9))
+
 ## [0.5.0](https://github.com/bambamboole/spectacular/compare/0.4.0...0.5.0) (2026-08-04)
 
 
