@@ -17,6 +17,7 @@ type ApiReferenceProps = {
     tags?: string[] | null;
     defaultOperation?: string | null;
     hideHeader?: boolean;
+    hideBaseUrl?: boolean;
     title?: string | null;
     expandDepth?: number;
     token?: string | null;
@@ -45,7 +46,7 @@ function InfoHeader({ title, info }: { title: string | null; info: ApiInfo }): R
     if (!resolvedTitle && !info.version && !info.description) return null;
 
     return (
-        <header className="border-b border-lt-border p-6">
+        <header className="border-b border-lt-border py-6">
             {resolvedTitle ? <h1 className="text-lg font-semibold text-lt-fg">{resolvedTitle}</h1> : null}
             {info.version ? <p className="mt-1 text-xs text-lt-muted-fg">v{info.version}</p> : null}
             {info.description ? <p className="mt-2 text-lt-muted-fg">{info.description}</p> : null}
@@ -61,6 +62,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         tags,
         defaultOperation,
         hideHeader = false,
+        hideBaseUrl = false,
         title = null,
         expandDepth = 2,
         token = null,
@@ -210,8 +212,8 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
             <div className="flex w-full text-base">
                 <div className="flex min-w-0 flex-1 flex-col">
                     {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
-                    {activeOperation ? (
-                        <div className="border-b border-lt-border p-3">
+                    {activeOperation && !hideBaseUrl ? (
+                        <div className="border-b border-lt-border py-3">
                             <ServerPicker
                                 servers={activeOperation.servers}
                                 selectedServerUrl={activeOperation.serverUrl}
@@ -235,8 +237,8 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
     return (
         <div className="flex min-w-0 w-full flex-col text-base">
             {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
-            {activeOperation ? (
-                <div className="border-b border-lt-border p-3">
+            {activeOperation && !hideBaseUrl ? (
+                <div className="border-b border-lt-border py-3">
                     <ServerPicker
                         servers={activeOperation.servers}
                         selectedServerUrl={activeOperation.serverUrl}
@@ -244,7 +246,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                     />
                 </div>
             ) : null}
-            <div className="flex flex-col gap-8 p-6">
+            <div className="flex flex-col gap-8 py-6">
                 {navigation.groups.map((group) => (
                     <section key={group.id} aria-labelledby={`api-reference-tag-${group.id}`}>
                         <h2

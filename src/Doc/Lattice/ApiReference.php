@@ -24,6 +24,8 @@ final class ApiReference extends Component
 
     public bool $hideHeader = false;
 
+    public bool $hideBaseUrl = false;
+
     public ?string $title = null;
 
     public int $expandDepth = 2;
@@ -79,6 +81,13 @@ final class ApiReference extends Component
     public function hideHeader(bool $hide = true): static
     {
         $this->hideHeader = $hide;
+
+        return $this;
+    }
+
+    public function hideBaseUrl(bool $hide = true): static
+    {
+        $this->hideBaseUrl = $hide;
 
         return $this;
     }

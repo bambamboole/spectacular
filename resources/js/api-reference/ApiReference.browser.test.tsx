@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 import type { Node } from "@lattice-php/lattice";
 import ApiReference from "./ApiReference";
+import { ServerPicker } from "./ServerPicker";
 
 function apiReferenceNode(props: Record<string, unknown>): Node<"spectacular.api-reference"> {
     return { type: "spectacular.api-reference", props };
@@ -12,6 +13,22 @@ afterEach(() => {
 });
 
 describe("ApiReference", () => {
+    it("aligns a single base URL without horizontal padding", async () => {
+        const screen = await render(
+            <ServerPicker
+                servers={[{ url: "https://api.example.test", description: "Production" }]}
+                selectedServerUrl="https://api.example.test"
+                onServerChange={() => undefined}
+            />,
+        );
+
+        const url = screen.getByText("Production — https://api.example.test");
+
+        await expect.element(url).toBeVisible();
+        expect(url.element().classList).toContain("py-1");
+        expect(url.element().classList).not.toContain("px-2");
+    });
+
     it("groups operations by tag and mounts only the selected operation", async () => {
         window.history.replaceState(null, "", window.location.pathname);
 
@@ -67,6 +84,8 @@ describe("ApiReference", () => {
         const clipboardWrite = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
         const listProductsHeader = listProducts.element().parentElement;
         const listProductsUrlRow = copyListProductsUrl.element().parentElement;
+        const groups = screen.getByRole("heading", { name: "Products", level: 2 }).element().parentElement?.parentElement;
+        const serverRow = screen.getByLabelText("Select server").element().parentElement;
 
         await expect.element(screen.getByRole("navigation")).not.toBeInTheDocument();
         await expect.element(screen.getByRole("heading", { name: "Products", level: 2 })).toBeVisible();
@@ -77,6 +96,10 @@ describe("ApiReference", () => {
         await expect.element(listProductsHeader as HTMLElement).toHaveTextContent("https://api.example.test/products");
         expect(listProducts.element().className).toContain("absolute inset-0");
         expect(listProductsHeader?.className).toContain("bg-lt-muted");
+        expect(serverRow?.classList).toContain("py-3");
+        expect(serverRow?.classList).not.toContain("p-3");
+        expect(groups?.classList).toContain("py-6");
+        expect(groups?.classList).not.toContain("p-6");
         expect(listProductsUrlRow?.previousElementSibling?.textContent).toBe("List products");
         expect(copyListProductsMarkdown.element().parentElement).not.toBe(listProductsUrlRow);
         expect(listProductsHeader?.querySelector("svg")?.compareDocumentPosition(listProducts.element()))
@@ -124,6 +147,53 @@ describe("ApiReference", () => {
         await expect.element(listOrders[0]).toHaveAttribute("aria-expanded", "false");
         await expect.element(listOrders[1]).toHaveAttribute("aria-expanded", "true");
         await expect.poll(() => screen.getByRole("complementary", { name: "Request" }).all().length).toBe(1);
+    });
+
+    it("hides the base URL row without shortening operation URLs", async () => {
+        window.history.replaceState(null, "", window.location.pathname);
+
+        const screen = await render(
+            <ApiReference
+                node={apiReferenceNode({
+                    defaultOperation: "get-products",
+                    hideBaseUrl: true,
+                    spec: {
+                        openapi: "3.1.0",
+                        info: { title: "Catalog", version: "1.0.0" },
+                        servers: [
+                            { url: "https://api.example.test", description: "Production" },
+                            { url: "https://sandbox.example.test", description: "Sandbox" },
+                        ],
+                        paths: {
+                            "/products": {
+                                get: {
+                                    summary: "List products",
+                                    tags: ["Products"],
+                                    responses: { "200": { description: "OK" } },
+                                },
+                            },
+                        },
+                    },
+                })}
+            >
+                {null}
+            </ApiReference>,
+        );
+
+        const copyUrl = screen.getByRole("button", { name: "Copy List products URL" });
+        const clipboardWrite = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+        const infoHeader = screen.getByRole("heading", { name: "Catalog", level: 1 }).element().parentElement;
+
+        await expect.element(screen.getByLabelText("Select server")).not.toBeInTheDocument();
+        expect(infoHeader?.classList).toContain("py-6");
+        expect(infoHeader?.classList).not.toContain("p-6");
+        await expect.element(copyUrl.element().parentElement as HTMLElement).toHaveTextContent(
+            "https://api.example.test/products",
+        );
+
+        await copyUrl.click();
+
+        await expect.poll(() => clipboardWrite.mock.calls[0]?.[0]).toBe("https://api.example.test/products");
     });
 
     it("keeps Execute directly below parameters when the response reference is tall", async () => {

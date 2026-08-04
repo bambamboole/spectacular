@@ -18,7 +18,7 @@ export function ServerPicker({
 
     if (servers.length === 1) {
         return (
-            <p className="truncate px-2 py-1 text-xs text-lt-muted-fg" title={servers[0].url}>
+            <p className="truncate py-1 text-xs text-lt-muted-fg" title={servers[0].url}>
                 {serverLabel(servers[0])}
             </p>
         );
