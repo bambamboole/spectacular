@@ -776,6 +776,7 @@ export function RequestParameterField({
                         selected={selectedArrayOptions}
                         onSelect={toggleArrayOption}
                         emptyLabel="No values found."
+                        showSearch={arrayOptions.length >= 10}
                         searchPlaceholder="Search values..."
                         trigger={
                             <span className={selectedArrayOptions.length === 0 ? "text-lt-muted-fg" : undefined}>
