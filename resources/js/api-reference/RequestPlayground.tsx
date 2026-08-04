@@ -233,13 +233,15 @@ function PaginationParameterSection({
             </legend>
             <div className="flex flex-col gap-3">
                 {parameters.mode === null ? null : (
-                    <RequestParameterField
-                        idPrefix={idPrefix}
-                        param={parameters.mode}
-                        value={values.parameters[parameterKey(parameters.mode)] ?? ""}
-                        error={errors[parameterKey(parameters.mode)] ?? null}
-                        onChange={onModeChange}
-                    />
+                    <div className="flex flex-wrap gap-4">
+                        <RequestParameterField
+                            idPrefix={idPrefix}
+                            param={parameters.mode}
+                            value={values.parameters[parameterKey(parameters.mode)] ?? ""}
+                            error={errors[parameterKey(parameters.mode)] ?? null}
+                            onChange={onModeChange}
+                        />
+                    </div>
                 )}
                 <div className="flex flex-wrap gap-4">
                     {activeParameters.map((param) => param === null ? null : (

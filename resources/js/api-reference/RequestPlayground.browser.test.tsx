@@ -395,6 +395,7 @@ describe("RequestPlayground", () => {
                 .map((field) => field.dataset.fieldKey);
 
         expect(pagination.element().classList).toContain("p-3");
+        expect(paginationMode.element().parentElement?.parentElement?.classList).toContain("flex-wrap");
         await expect.element(paginationMode).toHaveValue("default");
         expect(fieldKeys()).toEqual(["header:x-pagination", "query:page", "query:per_page"]);
 
