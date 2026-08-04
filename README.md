@@ -280,6 +280,8 @@ php artisan spectacular:asyncapi --pretty=false   # compact JSON
 
 ## Displaying docs with Lattice
 
+![Spectacular API reference](.github/assets/api-reference.png)
+
 Spectacular ships a [Lattice](https://latticephp.com) component (`lattice-php/lattice` `^0.36`, install separately)
 that renders a generated OpenAPI document as a browsable API reference. Its frontend is auto-discovered by Lattice's
 Vite plugin — no manual `registry.ts` registration needed — but Spectacular ships raw `.ts`/`.tsx` compiled by your
