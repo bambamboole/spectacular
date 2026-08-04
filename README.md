@@ -88,6 +88,28 @@ config is reflected in the generated document.
 
 Custom page/cursor names (`pageName`, `cursorName`) and the per-page key are read from the call arguments.
 
+To let clients choose between pagination modes, use Spectacular's query builder:
+
+```php
+use Bambamboole\Spectacular\PaginationMode;
+use Bambamboole\Spectacular\QueryBuilder;
+
+return UserResource::collection(
+    QueryBuilder::for(User::class)->apiPaginate(
+        modes: [PaginationMode::Default, PaginationMode::Cursor],
+        max: 100,
+    ),
+);
+```
+
+Available modes are `Default`, `Simple` and `Cursor`. Modes default to `[PaginationMode::Default]`; when several are
+declared, the first is the default and clients select another with the `x-pagination` header. The API reference renders
+that header as a select and includes it in generated and live requests. OpenAPI responses use titled `anyOf` branches
+for each declared mode.
+
+`per_page` defaults to the model's page size. Supplied integers are clamped between `1` and `max`, which defaults to
+`100`.
+
 ### Generating the document
 
 ```bash
