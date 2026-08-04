@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/bambamboole/spectacular/compare/0.4.0...0.5.0) (2026-08-04)
+
+
+### Features
+
+* improve responsive api reference layout ([aee9035](https://github.com/bambamboole/spectacular/commit/aee90355a1f2ead00d2299e6ff55abf183a67048))
+
+
+### Bug Fixes
+
+* improve responsive operation headers ([629b802](https://github.com/bambamboole/spectacular/commit/629b802983061e58776be2104c0d6275179236ea))
+
 ## [0.4.0](https://github.com/bambamboole/spectacular/compare/0.3.0...0.4.0) (2026-08-04)
 
 
