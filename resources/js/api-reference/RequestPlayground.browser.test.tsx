@@ -349,11 +349,48 @@ describe("RequestPlayground", () => {
 
     });
 
+    it("groups filters, sorts, and includes before pagination", async () => {
+        const filter = parameter({ name: "filter[name]", location: "query" });
+        const sort = parameter({ name: "sort", location: "query" });
+        const include = parameter({ name: "include", location: "query" });
+        const search = parameter({ name: "search", location: "query" });
+        const page = parameter({ name: "page", location: "query" });
+        const perPage = parameter({ name: "per_page", location: "query" });
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    paramGroups: [{ location: "query", params: [filter, sort, include, search, page, perPage] }],
+                    requests: [],
+                })}
+                baseUrl="https://api.example.test"
+                token={null}
+                components={null}
+            />,
+        );
+
+        const fieldsets = Array.from(screen.getByRole("heading", { name: "Parameters", exact: true }).element().parentElement?.querySelectorAll("fieldset") ?? []);
+
+        expect(fieldsets.map((fieldset) => fieldset.querySelector("legend")?.textContent?.trim())).toEqual([
+            "Filter",
+            "Sort",
+            "Include",
+            "Pagination",
+        ]);
+        expect(screen.getByRole("group", { name: "Filter" }).element().querySelector("[data-field-key]")?.getAttribute("data-field-key"))
+            .toBe("query:filter[name]");
+        await expect.element(screen.getByLabelText("search")).toBeVisible();
+    });
+
     it("groups pagination controls and shows only the active mode fields", async () => {
-        const page = parameter({ name: "page", schema: { type: "integer", minimum: 1 } });
+        const page = parameter({
+            name: "page",
+            description: "The page number to retrieve.",
+            schema: { type: "integer", minimum: 1 },
+        });
         const cursor = parameter({ name: "cursor" });
         const perPage = parameter({
             name: "per_page",
+            description: "The number of items to retrieve per page. Use a smaller page size when requesting expensive relationships.",
             schema: { type: "integer", minimum: 1, maximum: 100 },
         });
         const mode = parameter({
@@ -398,6 +435,8 @@ describe("RequestPlayground", () => {
         expect(paginationMode.element().parentElement?.parentElement?.classList).toContain("flex-wrap");
         await expect.element(paginationMode).toHaveValue("default");
         expect(fieldKeys()).toEqual(["header:x-pagination", "query:page", "query:per_page"]);
+        expect(screen.getByLabelText("page", { exact: true }).element().getBoundingClientRect().top)
+            .toBe(screen.getByLabelText("per_page").element().getBoundingClientRect().top);
 
         await screen.getByLabelText("page", { exact: true }).fill("3");
         await screen.getByLabelText("per_page").fill("25");

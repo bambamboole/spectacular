@@ -180,6 +180,57 @@ function ParamGroupSection({
     );
 }
 
+type GroupedQueryParameters = {
+    label: "Filter" | "Sort" | "Include";
+    params: Param[];
+};
+
+function groupedQueryParameters(operation: Operation): GroupedQueryParameters[] {
+    const parameters = operation.paramGroups
+        .flatMap((group) => group.params)
+        .filter((param) => param.location === "query");
+
+    return [
+        { label: "Filter", params: parameters.filter((param) => /^filter\[.+\]$/.test(param.name)) },
+        { label: "Sort", params: parameters.filter((param) => param.name === "sort") },
+        { label: "Include", params: parameters.filter((param) => param.name === "include") },
+    ].filter((group) => group.params.length > 0) as GroupedQueryParameters[];
+}
+
+function GroupedQueryParameterSection({
+    group,
+    idPrefix,
+    values,
+    errors,
+    onChange,
+}: {
+    group: GroupedQueryParameters;
+    idPrefix: string;
+    values: RequestValues;
+    errors: Record<string, string>;
+    onChange: (param: Param, value: string) => void;
+}): React.ReactNode {
+    return (
+        <fieldset className="mb-4 rounded-lt-sm border border-lt-border p-3">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
+                {group.label}
+            </legend>
+            <div className="flex flex-wrap items-start gap-4">
+                {group.params.map((param) => (
+                    <RequestParameterField
+                        key={parameterKey(param)}
+                        idPrefix={idPrefix}
+                        param={param}
+                        value={values.parameters[parameterKey(param)] ?? ""}
+                        error={errors[parameterKey(param)] ?? null}
+                        onChange={(value) => onChange(param, value)}
+                    />
+                ))}
+            </div>
+        </fieldset>
+    );
+}
+
 type PaginationParameters = {
     mode: Param | null;
     page: Param | null;
@@ -233,7 +284,7 @@ function PaginationParameterSection({
             </legend>
             <div className="flex flex-col gap-3">
                 {parameters.mode === null ? null : (
-                    <div className="flex flex-wrap gap-4">
+                    <div className="flex flex-wrap items-start gap-4">
                         <RequestParameterField
                             idPrefix={idPrefix}
                             param={parameters.mode}
@@ -243,7 +294,7 @@ function PaginationParameterSection({
                         />
                     </div>
                 )}
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap items-start gap-4">
                     {activeParameters.map((param) => param === null ? null : (
                         <RequestParameterField
                             key={parameterKey(param)}
@@ -587,18 +638,20 @@ export function RequestPlayground({
     const [snippetLanguage, setSnippetLanguage] = useState<SnippetLanguage>("curl");
     const [isLoading, setIsLoading] = useState(false);
     const [liveResult, setLiveResult] = useState<ExecutedResponse | ExecutionError | null>(null);
+    const queryParameterGroups = groupedQueryParameters(operation);
     const pagination = paginationParameters(operation);
-    const paginationKeys = new Set(
-        pagination === null
+    const groupedParameterKeys = new Set([
+        ...queryParameterGroups.flatMap((group) => group.params).map(parameterKey),
+        ...(pagination === null
             ? []
             : [pagination.mode, pagination.page, pagination.cursor, pagination.perPage]
                   .filter((param): param is Param => param !== null)
-                  .map(parameterKey),
-    );
+                  .map(parameterKey)),
+    ]);
     const parameterGroups = operation.paramGroups
         .map((group) => ({
             ...group,
-            params: group.params.filter((param) => !paginationKeys.has(parameterKey(param))),
+            params: group.params.filter((param) => !groupedParameterKeys.has(parameterKey(param))),
         }))
         .filter((group) => group.params.length > 0);
     const jsonContracts = jsonRequestContracts(operation);
@@ -724,9 +777,19 @@ export function RequestPlayground({
             <aside ref={playgroundRef} aria-label="Request" className="min-w-0 p-6">
                 <OperationHeader operation={operation} baseUrl={baseUrl} hideIdentity={hideHeaderIdentity} />
                 <SecuritySection security={operation.security} components={components} />
-                {parameterGroups.length > 0 || pagination !== null ? (
+                {parameterGroups.length > 0 || queryParameterGroups.length > 0 || pagination !== null ? (
                     <section className="mb-6">
                         <h2 className="mb-2 font-semibold text-lt-fg">Parameters</h2>
+                        {queryParameterGroups.map((group) => (
+                            <GroupedQueryParameterSection
+                                key={group.label}
+                                group={group}
+                                idPrefix={idPrefix}
+                                values={values}
+                                errors={buildResult.errors?.parameters ?? {}}
+                                onChange={updateParameter}
+                            />
+                        ))}
                         {pagination !== null ? (
                             <PaginationParameterSection
                                 parameters={pagination}
