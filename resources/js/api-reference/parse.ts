@@ -53,6 +53,19 @@ type RawRequestBody = {
     content?: Record<string, RawMediaTypeObject>;
 };
 
+type RawResponse = {
+    $ref?: string;
+    description?: string | null;
+    content?: Record<string, RawMediaTypeObject>;
+    headers?: Record<string, RawParameter>;
+};
+
+type RawSecurityScheme = {
+    $ref?: string;
+    type?: string;
+    scheme?: string;
+};
+
 type RawOperation = {
     operationId?: string;
     summary?: string;
@@ -61,7 +74,7 @@ type RawOperation = {
     deprecated?: boolean;
     parameters?: RawParameter[];
     requestBody?: RawRequestBody;
-    responses?: Record<string, { $ref?: string; description?: string | null; content?: Record<string, RawMediaTypeObject>; headers?: Record<string, RawParameter> }>;
+    responses?: Record<string, RawResponse>;
     security?: Array<Record<string, string[]>>;
     servers?: RawServer[];
 };
@@ -76,6 +89,25 @@ type RawServer = {
     description?: string | null;
     variables?: Record<string, { default?: unknown }>;
 };
+
+type RawComponents = {
+    parameters?: Record<string, RawParameter>;
+    requestBodies?: Record<string, RawRequestBody>;
+    responses?: Record<string, RawResponse>;
+    examples?: Record<string, RawExample>;
+    headers?: Record<string, RawParameter>;
+    securitySchemes?: Record<string, RawSecurityScheme>;
+};
+
+type RawSpec = {
+    info?: { title?: string; version?: string | null; description?: string | null };
+    paths?: Record<string, RawPathItem>;
+    servers?: RawServer[];
+    security?: Array<Record<string, string[]>>;
+    components?: RawComponents;
+};
+
+type ComponentKind = keyof RawComponents;
 
 /**
  * Derives a stable slug from a path so client-derived operation ids stay stable for deep-linking.
@@ -104,7 +136,7 @@ function operationTitle(operation: RawOperation, method: string, path: string): 
     return `${method.toUpperCase()} ${path}`;
 }
 
-function resolveRef<T>(spec: any, ref: string | undefined, kind: "parameters" | "requestBodies" | "responses" | "examples" | "headers"): T | null {
+function resolveRef<T>(spec: RawSpec, ref: string | undefined, kind: ComponentKind): T | null {
     if (typeof ref !== "string") return null;
     const name = ref.split("/").pop();
     if (!name) return null;
@@ -112,8 +144,8 @@ function resolveRef<T>(spec: any, ref: string | undefined, kind: "parameters" | 
     return (spec?.components?.[kind]?.[name] as T | undefined) ?? null;
 }
 
-function findOperation(spec: any, opId: string): { path: string; method: string; pathItem: RawPathItem; operation: RawOperation } | null {
-    const paths = spec?.paths ?? {};
+function findOperation(spec: RawSpec, opId: string): { path: string; method: string; pathItem: RawPathItem; operation: RawOperation } | null {
+    const paths = spec.paths ?? {};
 
     for (const path of Object.keys(paths)) {
         const pathItem = paths[path] as RawPathItem;
@@ -151,23 +183,24 @@ function substituteServerVariables(url: string, variables: RawServer["variables"
     });
 }
 
-function buildServers(spec: any): Server[] {
-    const servers = normalizeServers(spec?.servers);
+function buildServers(spec: RawSpec): Server[] {
+    const servers = normalizeServers(spec.servers);
 
     return servers.length > 0 ? servers : [{ url: "/", description: null }];
 }
 
-export function buildNavigation(spec: any): Navigation {
+export function buildNavigation(input: unknown): Navigation {
+    const spec = asRawSpec(input);
     const info: ApiInfo = {
-        title: spec?.info?.title ?? "",
-        version: spec?.info?.version ?? null,
-        description: spec?.info?.description ?? null,
+        title: spec.info?.title ?? "",
+        version: spec.info?.version ?? null,
+        description: spec.info?.description ?? null,
     };
 
     const summaries: Record<string, OperationSummary> = {};
     const operationIdsByTag = new Map<string, string[]>();
 
-    const paths = spec?.paths ?? {};
+    const paths = spec.paths ?? {};
     for (const path of Object.keys(paths)) {
         const pathItem = paths[path] as RawPathItem;
 
@@ -210,7 +243,7 @@ function slugifyTag(tag: string): string {
         .replace(/^-+|-+$/g, "");
 }
 
-function buildParam(spec: any, parameter: RawParameter): Param {
+function buildParam(spec: RawSpec, parameter: RawParameter): Param {
     const schema = parameter.schema ?? {};
 
     return {
@@ -226,7 +259,7 @@ function buildParam(spec: any, parameter: RawParameter): Param {
     };
 }
 
-function parameterExample(spec: any, parameter: RawParameter, schema: unknown): unknown {
+function parameterExample(spec: RawSpec, parameter: RawParameter, schema: unknown): unknown {
     if (parameter.example !== undefined) {
         return parameter.example;
     }
@@ -249,7 +282,7 @@ function parameterExample(spec: any, parameter: RawParameter, schema: unknown): 
     return schemaValue(schema, "default") ?? null;
 }
 
-function firstExampleValue(spec: any, examples: Record<string, RawExample> | undefined): unknown | undefined {
+function firstExampleValue(spec: RawSpec, examples: Record<string, RawExample> | undefined): unknown | undefined {
     if (!examples) return undefined;
 
     for (const example of Object.values(examples)) {
@@ -271,7 +304,7 @@ function schemaValue(schema: unknown, key: "example" | "examples" | "default"): 
     return (schema as Record<string, unknown>)[key];
 }
 
-function buildResponseHeaders(spec: any, headers: Record<string, RawParameter> | undefined): Param[] {
+function buildResponseHeaders(spec: RawSpec, headers: Record<string, RawParameter> | undefined): Param[] {
     if (!headers) return [];
 
     return Object.entries(headers).map(([name, header]) => {
@@ -283,7 +316,7 @@ function buildResponseHeaders(spec: any, headers: Record<string, RawParameter> |
     });
 }
 
-function buildParamGroups(spec: any, sharedParameters: RawParameter[], operationParameters: RawParameter[]): ParamGroup[] {
+function buildParamGroups(spec: RawSpec, sharedParameters: RawParameter[], operationParameters: RawParameter[]): ParamGroup[] {
     const merged = new Map<string, RawParameter>();
 
     for (const parameters of [sharedParameters, operationParameters]) {
@@ -313,14 +346,14 @@ function buildParamGroups(spec: any, sharedParameters: RawParameter[], operation
     return groups;
 }
 
-function buildExamples(spec: any, mediaTypeObject: RawMediaTypeObject | undefined): ContractExample[] {
+function buildExamples(spec: RawSpec, mediaTypeObject: RawMediaTypeObject | undefined): ContractExample[] {
     if (!mediaTypeObject) return [];
 
     const named = mediaTypeObject.examples;
     if (named && Object.keys(named).length > 0) {
         return Object.entries(named).map(([name, ex]) => {
             const resolved =
-                ex && typeof ex === "object" && "$ref" in ex ? (resolveRef<any>(spec, ex.$ref, "examples") ?? ex) : ex;
+                ex && typeof ex === "object" && "$ref" in ex ? (resolveRef<RawExample>(spec, ex.$ref, "examples") ?? ex) : ex;
 
             return {
                 name,
@@ -339,7 +372,7 @@ function buildExamples(spec: any, mediaTypeObject: RawMediaTypeObject | undefine
     return [];
 }
 
-function buildRequests(spec: any, requestBody: RawOperation["requestBody"]): Contract[] {
+function buildRequests(spec: RawSpec, requestBody: RawOperation["requestBody"]): Contract[] {
     if (!requestBody) return [];
 
     const resolved = requestBody.$ref
@@ -361,7 +394,7 @@ function buildRequests(spec: any, requestBody: RawOperation["requestBody"]): Con
     }));
 }
 
-function buildResponses(spec: any, responses: RawOperation["responses"]): Contract[] {
+function buildResponses(spec: RawSpec, responses: RawOperation["responses"]): Contract[] {
     if (!responses) return [];
 
     const contracts: Contract[] = [];
@@ -398,12 +431,29 @@ function buildResponses(spec: any, responses: RawOperation["responses"]): Contra
     return contracts;
 }
 
-function buildSecurity(spec: any, operation: RawOperation): SecurityRequirement[] {
-    const raw: Array<Record<string, string[]>> = operation.security !== undefined ? operation.security : (spec?.security ?? []);
+function buildSecurity(spec: RawSpec, operation: RawOperation): SecurityRequirement[] {
+    const raw = operation.security !== undefined ? operation.security : (spec.security ?? []);
 
     return raw.map((requirement) => ({
-        schemes: Object.entries(requirement).map(([name, scopes]) => ({ name, scopes: scopes ?? [] })),
+        schemes: Object.entries(requirement).map(([name, scopes]) => {
+            const definition = resolveSecurityScheme(spec, name);
+
+            return {
+                name,
+                scopes: scopes ?? [],
+                type: definition?.type ?? null,
+                scheme: definition?.scheme ?? null,
+            };
+        }),
     }));
+}
+
+function resolveSecurityScheme(spec: RawSpec, name: string): RawSecurityScheme | null {
+    const definition = spec.components?.securitySchemes?.[name] ?? null;
+
+    return definition?.$ref
+        ? (resolveRef<RawSecurityScheme>(spec, definition.$ref, "securitySchemes") ?? definition)
+        : definition;
 }
 
 export function filterNavigationByTags(nav: Navigation, tags: string[]): Navigation {
@@ -415,7 +465,8 @@ export function filterNavigationByTags(nav: Navigation, tags: string[]): Navigat
     return { ...nav, groups, summaries };
 }
 
-export function parseOperation(spec: any, opId: string, selectedServerUrl: string | null = null): Operation | null {
+export function parseOperation(input: unknown, opId: string, selectedServerUrl: string | null = null): Operation | null {
+    const spec = asRawSpec(input);
     const found = findOperation(spec, opId);
     if (!found) return null;
 
@@ -454,4 +505,8 @@ export function parseOperation(spec: any, opId: string, selectedServerUrl: strin
         responses: buildResponses(spec, operation.responses),
         security: buildSecurity(spec, operation),
     };
+}
+
+function asRawSpec(input: unknown): RawSpec {
+    return typeof input === "object" && input !== null ? (input as RawSpec) : {};
 }

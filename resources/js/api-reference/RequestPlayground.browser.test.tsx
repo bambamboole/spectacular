@@ -99,10 +99,18 @@ describe("RequestPlayground", () => {
         vi.stubGlobal("fetch", fetchMock);
         const screen = await render(
             <RequestPlayground
-                operation={playgroundOperation()}
+                operation={playgroundOperation({
+                    security: [
+                        {
+                            schemes: [
+                                { name: "oauth2", scopes: ["widgets:write"], type: "oauth2", scheme: null },
+                            ],
+                        },
+                    ],
+                })}
                 baseUrl="https://api.example.test/v1"
                 token={REAL_TOKEN}
-                components={null}
+                components={{ securitySchemes: { oauth2: { type: "oauth2" } } }}
                 twoColumnBreakpoint="xl"
             />,
         );
@@ -138,6 +146,7 @@ describe("RequestPlayground", () => {
         await expect.poll(() => snippet.element().querySelector(".cm-lineNumbers")).not.toBeNull();
         await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
+        await expect.element(screen.getByText("Access token supplied by the host page.")).toBeVisible();
 
         await id.fill("a/b");
         await screen.getByLabelText("status").selectOptions("archived");
@@ -565,6 +574,7 @@ describe("RequestPlayground", () => {
                 { url: "https://production.example.test", description: "Production" },
                 { url: "https://staging.example.test", description: "Staging" },
             ],
+            security: [{ oauth2: [] }],
             paths: {
                 "/widgets": {
                     get: {
@@ -576,9 +586,25 @@ describe("RequestPlayground", () => {
                     },
                 },
             },
+            components: {
+                securitySchemes: {
+                    oauth2: {
+                        type: "oauth2",
+                        flows: {
+                            authorizationCode: {
+                                authorizationUrl: "https://auth.example.test/oauth/authorize",
+                                tokenUrl: "https://auth.example.test/oauth/token",
+                                scopes: {},
+                            },
+                        },
+                    },
+                },
+            },
         };
         const screen = await render(
-            <ApiReference node={apiReferenceNode({ spec, defaultOperation: "get-widgets", hideHeader: true })}>
+            <ApiReference
+                node={apiReferenceNode({ spec, defaultOperation: "get-widgets", hideHeader: true, token: REAL_TOKEN })}
+            >
                 {null}
             </ApiReference>,
         );
@@ -593,6 +619,33 @@ describe("RequestPlayground", () => {
 
         await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
         expect(fetchMock.mock.calls[0]?.[0]).toBe("https://sandbox.operation.example/widgets");
+        expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Authorization")).toBe(`Bearer ${REAL_TOKEN}`);
+    });
+
+    it("marks unsupported live-request authentication schemes", async () => {
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    requests: [],
+                    security: [
+                        {
+                            schemes: [{ name: "service-key", scopes: [], type: "apiKey", scheme: null }],
+                        },
+                    ],
+                })}
+                baseUrl="https://api.example.test"
+                token={REAL_TOKEN}
+                components={{
+                    securitySchemes: {
+                        "service-key": { type: "apiKey", in: "header", name: "X-Service-Key" },
+                    },
+                }}
+            />,
+        );
+
+        await expect.element(screen.getByText("API key (header: X-Service-Key)")).toBeVisible();
+        await expect.element(screen.getByText("This authentication scheme is not supported for live requests.")).toBeVisible();
+        await expect.element(screen.getByLabelText("Request snippet", { exact: true })).not.toHaveTextContent("Bearer");
     });
 
     it("switches response contracts with a select", async () => {
@@ -600,8 +653,8 @@ describe("RequestPlayground", () => {
             <RequestPlayground
                 operation={playgroundOperation({
                     responses: [
-                        requestContract({ role: "response", status: "200", title: "Successful response" }),
                         requestContract({ role: "response", status: "422", title: "Validation response" }),
+                        requestContract({ role: "response", status: "200", title: "Successful response" }),
                     ],
                 })}
                 baseUrl="https://api.example.test"
@@ -613,8 +666,10 @@ describe("RequestPlayground", () => {
 
         await expect.element(responseStatus).toHaveValue("200 application/json");
         await expect.element(screen.getByText("Successful response")).toBeVisible();
+        await expect.element(screen.getByText("200", { exact: true })).toHaveClass("lt-tone-success");
         await responseStatus.selectOptions("422 application/json");
         await expect.element(screen.getByText("Validation response")).toBeVisible();
+        await expect.element(screen.getByText("422", { exact: true })).toHaveClass("lt-tone-warning");
     });
 
     it("aborts the active request before starting another", async () => {
