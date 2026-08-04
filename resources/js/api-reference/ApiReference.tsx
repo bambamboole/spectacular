@@ -5,6 +5,7 @@ import { Badge, CopyButton } from "@lattice-php/lattice/ui";
 import { httpMethodColor } from "./http-method-color";
 import { operationToMarkdown } from "./operation-markdown";
 import { OperationView } from "./OperationView";
+import type { TwoColumnBreakpoint } from "./RequestPlayground";
 import { buildNavigation, filterNavigationByTags, parseOperation } from "./parse";
 import { operationUrl } from "./request-builder";
 import { ServerPicker } from "./ServerPicker";
@@ -20,6 +21,7 @@ type ApiReferenceProps = {
     hideBaseUrl?: boolean;
     title?: string | null;
     expandDepth?: number;
+    twoColumnBreakpoint?: TwoColumnBreakpoint;
     token?: string | null;
 };
 
@@ -65,6 +67,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         hideBaseUrl = false,
         title = null,
         expandDepth = 2,
+        twoColumnBreakpoint = "lg",
         token = null,
     } = node.props as ApiReferenceProps;
 
@@ -228,6 +231,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                         baseUrl={selectedServerUrlFor(operation)}
                         token={token}
                         expandDepth={expandDepth}
+                        twoColumnBreakpoint={twoColumnBreakpoint}
                     />
                 </div>
             </div>
@@ -275,7 +279,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                 return (
                                     <div key={id} className="border-b border-lt-border last:border-b-0">
                                         <div className="relative bg-lt-muted">
-                                            <div className="pointer-events-none relative z-10 flex items-center gap-2 px-4 py-3">
+                                            <div className="@container pointer-events-none relative z-10 flex items-center gap-2 px-4 py-3">
                                                 <Icon
                                                     name="chevron-down"
                                                     className={`size-lt-icon-xs shrink-0 text-lt-muted-fg transition-transform${isOpen ? "" : " -rotate-90"}`}
@@ -288,7 +292,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                                         {summary.title}
                                                     </span>
                                                     <div className="flex items-center gap-1">
-                                                        <span className="min-w-0 break-all font-mono text-xs text-lt-muted-fg">
+                                                        <span className="min-w-0 break-words font-mono text-xs text-lt-muted-fg">
                                                             {url}
                                                         </span>
                                                         <CopyButton
@@ -305,7 +309,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                                     testId={`copy-${id}-markdown`}
                                                     className="pointer-events-auto shrink-0"
                                                 >
-                                                    Copy as Markdown
+                                                    <span className="hidden @3xl:inline">Copy as Markdown</span>
                                                 </CopyButton>
                                             </div>
                                             <button
@@ -326,6 +330,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                                     baseUrl={selectedServerUrlFor(id)}
                                                     token={token}
                                                     expandDepth={expandDepth}
+                                                    twoColumnBreakpoint={twoColumnBreakpoint}
                                                     hideHeaderIdentity
                                                 />
                                             </div>

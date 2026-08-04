@@ -84,6 +84,8 @@ describe("ApiReference", () => {
         const clipboardWrite = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
         const listProductsHeader = listProducts.element().parentElement;
         const listProductsUrlRow = copyListProductsUrl.element().parentElement;
+        const listProductsUrl = listProductsUrlRow?.querySelector("span");
+        const markdownLabel = copyListProductsMarkdown.element().querySelector(":scope > span");
         const groups = screen.getByRole("heading", { name: "Products", level: 2 }).element().parentElement?.parentElement;
         const serverRow = screen.getByLabelText("Select server").element().parentElement;
 
@@ -96,6 +98,10 @@ describe("ApiReference", () => {
         await expect.element(listProductsHeader as HTMLElement).toHaveTextContent("https://api.example.test/products");
         expect(listProducts.element().className).toContain("absolute inset-0");
         expect(listProductsHeader?.className).toContain("bg-lt-muted");
+        expect(listProductsHeader?.firstElementChild?.classList).toContain("@container");
+        expect(listProductsUrl?.classList).toContain("break-words");
+        expect(markdownLabel?.classList).toContain("hidden");
+        expect(markdownLabel?.classList).toContain("@3xl:inline");
         expect(serverRow?.classList).toContain("py-3");
         expect(serverRow?.classList).not.toContain("p-3");
         expect(groups?.classList).toContain("py-6");

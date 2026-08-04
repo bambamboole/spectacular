@@ -103,6 +103,7 @@ describe("RequestPlayground", () => {
                 baseUrl="https://api.example.test/v1"
                 token={REAL_TOKEN}
                 components={null}
+                twoColumnBreakpoint="xl"
             />,
         );
 
@@ -113,18 +114,18 @@ describe("RequestPlayground", () => {
         const referencePanel = screen.getByRole("complementary", { name: "Reference" });
         const execute = requestPanel.getByRole("button", { name: "Execute" });
         const markdownCopy = requestPanel.getByRole("button", { name: "Copy as Markdown" });
-        const statusType = screen.getByLabelText("status").element().closest("li")?.querySelectorAll("span")[1];
+        const statusRow = screen.getByLabelText("status").element().closest("li");
+        const statusType = statusRow?.querySelectorAll("span")[1];
 
         await expect.element(id).toHaveValue("42");
         await expect.element(requestPanel.getByText("Try it out")).not.toBeInTheDocument();
         expect(requestPanel.element().querySelector('[data-slot="card"]')).toBeNull();
         expect(execute.element().parentElement).toBe(markdownCopy.element().parentElement);
         expect(requestPanel.element().parentElement?.classList).toContain(
-            "lg:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]",
+            "xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]",
         );
-        expect(requestPanel.element().classList).toContain("lg:col-start-1");
-        expect(referencePanel.element().classList).toContain("lg:col-start-2");
-        expect(referencePanel.element().classList).toContain("lg:border-l");
+        expect(referencePanel.element().classList).toContain("xl:border-l");
+        expect(statusRow?.classList).toContain("sm:grid-cols-[minmax(0,3fr)_minmax(12rem,2fr)]");
         expect(statusType?.classList).toContain("px-2");
         expect(statusType?.classList).toContain("py-1");
         await expect.element(markdownCopy).toHaveClass("ml-auto");

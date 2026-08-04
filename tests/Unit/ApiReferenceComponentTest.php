@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Bambamboole\Spectacular\Doc\Lattice\ApiReference;
+use Lattice\Lattice\Ui\Enums\Breakpoint;
 
 it('serializes the spectacular.api-reference node', function (): void {
     $node = ApiReference::make()->url('/openapi.json')->jsonSerialize();
@@ -23,6 +24,7 @@ it('defaults to the grouped API reference', function (): void {
             'hideBaseUrl' => false,
             'title' => null,
             'expandDepth' => 2,
+            'twoColumnBreakpoint' => 'lg',
             'token' => null,
         ]);
 });
@@ -40,6 +42,7 @@ it('serializes fluent options', function (Closure $configure, string $property, 
     'hidden base URL' => [fn (ApiReference $reference): ApiReference => $reference->hideBaseUrl(), 'hideBaseUrl', true],
     'title' => [fn (ApiReference $reference): ApiReference => $reference->title('My API'), 'title', 'My API'],
     'expand depth' => [fn (ApiReference $reference): ApiReference => $reference->expandDepth(2), 'expandDepth', 2],
+    'two column breakpoint' => [fn (ApiReference $reference): ApiReference => $reference->twoColumnBreakpoint(Breakpoint::Xl), 'twoColumnBreakpoint', 'xl'],
 ]);
 
 it('normalizes tag input', function (string|array $tags, array $expected): void {

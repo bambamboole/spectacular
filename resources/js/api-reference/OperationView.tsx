@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { parseOperation } from "./parse";
-import { RequestPlayground } from "./RequestPlayground";
+import { RequestPlayground, type TwoColumnBreakpoint } from "./RequestPlayground";
 
 type OperationViewProps = {
     spec: unknown;
@@ -8,6 +8,7 @@ type OperationViewProps = {
     baseUrl?: string | null;
     token?: string | null;
     expandDepth?: number;
+    twoColumnBreakpoint?: TwoColumnBreakpoint;
     hideHeaderIdentity?: boolean;
 };
 
@@ -17,6 +18,7 @@ export function OperationView({
     baseUrl,
     token,
     expandDepth = 2,
+    twoColumnBreakpoint = "lg",
     hideHeaderIdentity = false,
 }: OperationViewProps): React.ReactNode {
     const operation = useMemo(
@@ -46,6 +48,7 @@ export function OperationView({
                 token={token ?? null}
                 components={components}
                 expandDepth={expandDepth}
+                twoColumnBreakpoint={twoColumnBreakpoint}
                 hideHeaderIdentity={hideHeaderIdentity}
             />
         </div>

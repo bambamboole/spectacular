@@ -6,6 +6,7 @@ namespace Bambamboole\Spectacular\Doc\Lattice;
 
 use Lattice\Lattice\Attributes\AsComponent;
 use Lattice\Lattice\Ui\Components\Component;
+use Lattice\Lattice\Ui\Enums\Breakpoint;
 
 #[AsComponent('spectacular.api-reference')]
 final class ApiReference extends Component
@@ -29,6 +30,8 @@ final class ApiReference extends Component
     public ?string $title = null;
 
     public int $expandDepth = 2;
+
+    public Breakpoint $twoColumnBreakpoint = Breakpoint::Lg;
 
     public ?string $token = null;
 
@@ -102,6 +105,13 @@ final class ApiReference extends Component
     public function expandDepth(int $depth): static
     {
         $this->expandDepth = $depth;
+
+        return $this;
+    }
+
+    public function twoColumnBreakpoint(Breakpoint $breakpoint): static
+    {
+        $this->twoColumnBreakpoint = $breakpoint;
 
         return $this;
     }
