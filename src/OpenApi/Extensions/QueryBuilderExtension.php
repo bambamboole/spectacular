@@ -10,24 +10,19 @@ use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\RouteInfo;
-use Illuminate\Database\Eloquent\Model;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\FunctionLike;
-use PhpParser\Node\Identifier;
-use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\Includes\IncludedRelationship;
-use Spatie\QueryBuilder\QueryBuilder;
 
 final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 {
     /** @var list<string> */
     private const QUERY_BUILDER_METHODS = [
-        'allowedFields',
         'allowedFilters',
         'allowedIncludes',
         'allowedSorts',
@@ -47,7 +42,6 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             $parameters = [
                 ...$parameters,
                 ...match ($this->methodName($call->name)) {
-                    'allowedFields' => $this->fieldParameters($call),
                     'allowedFilters' => $this->filterParameters($call),
                     'allowedIncludes' => $this->includeParameters($call),
                     'allowedSorts' => $this->sortParameters($call),
@@ -130,35 +124,6 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             $includes,
             $this->availableValuesDescription('includes', $includes),
         )];
-    }
-
-    /**
-     * @return list<Parameter>
-     */
-    private function fieldParameters(Expr\MethodCall $call): array
-    {
-        $fields = [];
-        $defaultResource = $this->queryBuilderModelTable($call) ?? '_';
-
-        foreach ($this->literalArgumentStrings($call->args) as $field) {
-            [$resource, $name] = str_contains($field, '.')
-                ? explode('.', $field, 2)
-                : [$defaultResource, $field];
-
-            $fields[$resource][] = $name;
-        }
-
-        $parameters = [];
-
-        foreach ($fields as $resource => $resourceFields) {
-            $parameters[] = $this->arrayParameter(
-                $this->nestedParameterName('fields', $resource),
-                $resourceFields,
-                $this->availableValuesDescription('fields', $resourceFields),
-            );
-        }
-
-        return $parameters;
     }
 
     /**
@@ -276,49 +241,6 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     }
 
     /**
-     * @param  list<Arg>  $arguments
-     * @return list<string>
-     */
-    private function literalArgumentStrings(array $arguments): array
-    {
-        $values = [];
-
-        foreach ($arguments as $argument) {
-            $values = [
-                ...$values,
-                ...$this->literalExpressionStrings($argument->value),
-            ];
-        }
-
-        return $this->uniqueStrings($values);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function literalExpressionStrings(Expr $expression): array
-    {
-        if ($expression instanceof String_) {
-            return [$expression->value];
-        }
-
-        if ($expression instanceof Expr\Array_) {
-            $values = [];
-
-            foreach ($expression->items as $item) {
-                $values = [
-                    ...$values,
-                    ...$this->literalExpressionStrings($item->value),
-                ];
-            }
-
-            return $values;
-        }
-
-        return [];
-    }
-
-    /**
      * @param  class-string  $allowedClass
      */
     private function factoryName(Expr $expression, string $allowedClass, ?string $defaultFactoryName = null): ?string
@@ -351,52 +273,6 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             if ($argument->value instanceof String_) {
                 return $argument->value->value;
             }
-        }
-
-        return null;
-    }
-
-    private function queryBuilderModelTable(Expr\MethodCall $call): ?string
-    {
-        $expression = $call->var;
-
-        while ($expression instanceof Expr\MethodCall) {
-            $expression = $expression->var;
-        }
-
-        if (! $expression instanceof Expr\StaticCall
-            || $this->methodName($expression->name) !== 'for'
-            || ! $this->isClassName($expression->class, QueryBuilder::class)
-        ) {
-            return null;
-        }
-
-        $modelClass = $this->classStringArgument($expression->args);
-
-        if ($modelClass === null || ! class_exists($modelClass)) {
-            return null;
-        }
-
-        $model = new $modelClass;
-
-        return $model instanceof Model ? $model->getTable() : null;
-    }
-
-    /**
-     * @param  list<Arg>  $arguments
-     */
-    private function classStringArgument(array $arguments): ?string
-    {
-        foreach ($arguments as $argument) {
-            if (! $argument->value instanceof Expr\ClassConstFetch
-                || ! $argument->value->name instanceof Identifier
-                || $argument->value->name->name !== 'class'
-                || ! $argument->value->class instanceof Name
-            ) {
-                continue;
-            }
-
-            return $this->resolvedClassName($argument->value->class);
         }
 
         return null;
