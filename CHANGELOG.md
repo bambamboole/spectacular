@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/bambamboole/spectacular/compare/0.6.0...0.7.0) (2026-08-04)
+
+
+### Features
+
+* group request parameters ([ff95a15](https://github.com/bambamboole/spectacular/commit/ff95a1597e0d5765ccd4fbae6ab9315600e03943))
+* group request parameters ([3dad515](https://github.com/bambamboole/spectacular/commit/3dad5150efb7f5060cc74d762108885d8f33340a))
+
 ## [0.6.0](https://github.com/bambamboole/spectacular/compare/0.5.0...0.6.0) (2026-08-04)
 
 
