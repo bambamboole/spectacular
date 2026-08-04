@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/bambamboole/spectacular/compare/0.3.0...0.4.0) (2026-08-04)
+
+
+### Features
+
+* hide search for small api enum selects ([b0b7bc5](https://github.com/bambamboole/spectacular/commit/b0b7bc5a822e305e10af34ff5a32e246fef15e34))
+* refine api reference layout ([919e4e1](https://github.com/bambamboole/spectacular/commit/919e4e184316b7a9cf2bbaa475ce0cd10d3ae0b4))
+
 ## [0.3.0](https://github.com/bambamboole/spectacular/compare/0.2.1...0.3.0) (2026-08-03)
 
 
