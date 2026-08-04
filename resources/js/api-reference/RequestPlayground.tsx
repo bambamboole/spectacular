@@ -78,7 +78,7 @@ function ParamRow({ param, control }: { param: Param; control?: React.ReactNode 
             <div>
                 <div className="flex items-center gap-2">
                     <span className="font-mono text-lt-fg">{param.name}</span>
-                    <span className="rounded-lt-xs bg-lt-muted px-1.5 py-0.5 text-xs text-lt-muted-fg">
+                    <span className="rounded-lt-xs bg-lt-muted px-2 py-1 text-xs text-lt-muted-fg">
                         {parameterTypeLabel(param.schema)}
                     </span>
                     {param.required ? <span className="text-lt-danger">*</span> : null}
@@ -560,11 +560,11 @@ export function RequestPlayground({
     }
 
     return (
-        <div className="grid min-w-0 items-start text-base xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
+        <div className="grid min-w-0 items-start text-base lg:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
             <aside
                 ref={playgroundRef}
                 aria-label="Request"
-                className="min-w-0 p-6 xl:col-start-1 xl:row-start-1"
+                className="min-w-0 p-6 lg:col-start-1 lg:row-start-1"
             >
                 <OperationHeader operation={operation} baseUrl={baseUrl} hideIdentity={hideHeaderIdentity} />
                 <SecuritySection security={operation.security} components={components} />
@@ -708,7 +708,7 @@ export function RequestPlayground({
             </aside>
             <aside
                 aria-label="Reference"
-                className="min-w-0 border-t border-lt-border p-6 xl:sticky xl:top-0 xl:col-start-2 xl:row-start-1 xl:border-t-0 xl:border-l"
+                className="min-w-0 border-t border-lt-border p-6 lg:sticky lg:top-0 lg:col-start-2 lg:row-start-1 lg:border-t-0 lg:border-l"
             >
                 <div className="flex flex-col gap-6">
                     <SnippetPanel
