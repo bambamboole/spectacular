@@ -62,7 +62,6 @@ class UsersController
             ->allowedFilters('name', AllowedFilter::exact('email'))
             ->allowedSorts('name', 'created_at')
             ->allowedIncludes('roles')
-            ->allowedFields('id', 'name', 'email', 'roles.id', 'roles.name')
             ->paginate($request->integer('per_page', 15));
 
         return UserResource::collection($users);
@@ -70,11 +69,13 @@ class UsersController
 }
 ```
 
-Produces `filter[name]`, `filter[email]`, `sort`, `include`, `fields[users]` and `fields[roles]` parameters — with
-enums, descriptions and the correct array styling — plus `page` and `per_page` from the extension below.
+Produces `filter[name]`, `filter[email]`, `sort` and `include` parameters — with enums, descriptions and the correct
+array styling — plus `page` and `per_page` from the extension below. Spectacular does not document `allowedFields()`
+because it limits selected database columns rather than the fields serialized by a standard Laravel JSON resource.
+Laravel `JsonApiResource` sparse fieldsets are handled separately by Scramble.
 
-Parameter names honour your `config/query-builder.php` settings (`parameters.*`, `suffixes.*`), so a customised
-query-builder config is reflected in the generated document.
+Filter, sort and include names honour the relevant `config/query-builder.php` settings, so a customised query-builder
+config is reflected in the generated document.
 
 ### Pagination parameters
 
@@ -279,6 +280,8 @@ php artisan spectacular:asyncapi --pretty=false   # compact JSON
 ```
 
 ## Displaying docs with Lattice
+
+![Spectacular API reference](.github/assets/api-reference.png)
 
 Spectacular ships a [Lattice](https://latticephp.com) component (`lattice-php/lattice` `^0.36`, install separately)
 that renders a generated OpenAPI document as a browsable API reference. Its frontend is auto-discovered by Lattice's

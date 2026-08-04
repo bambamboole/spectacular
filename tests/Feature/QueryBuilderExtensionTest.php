@@ -5,16 +5,25 @@ use Dedoc\Scramble\Generator;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route as RouteFacade;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 use Workbench\App\Http\Resources\UserResource;
 use Workbench\App\Models\User;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
-it('documents spatie query builder parameters from the route action', function (): void {
-    $parameters = generatedUsersOperationParameters();
+it('documents supported spatie query builder parameters from the route action', function (): void {
+    RouteFacade::get('api/standard-users', StandardUsersController::class)->name('api.standard-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/standard-users');
+
+    expect($parameters)->not->toHaveKeys([
+        'fields[users]',
+        'fields[roles]',
+    ]);
 
     expect($parameters)
         ->toHaveKeys([
@@ -22,8 +31,6 @@ it('documents spatie query builder parameters from the route action', function (
             'filter[email]',
             'sort',
             'include',
-            'fields[users]',
-            'fields[roles]',
         ])
         ->and($parameters['filter[name]']['schema'])
         ->toBe(['type' => 'string'])
@@ -58,34 +65,6 @@ it('documents spatie query builder parameters from the route action', function (
                 'items' => [
                     'type' => 'string',
                     'enum' => ['roles', 'rolesCount', 'rolesExists'],
-                ],
-            ],
-        ])
-        ->and($parameters['fields[users]'])
-        ->toMatchArray([
-            'in' => 'query',
-            'description' => 'Available fields are `id`, `name`, `email`. You can include multiple options by separating them with a comma.',
-            'style' => 'form',
-            'explode' => false,
-            'schema' => [
-                'type' => 'array',
-                'items' => [
-                    'type' => 'string',
-                    'enum' => ['id', 'name', 'email'],
-                ],
-            ],
-        ])
-        ->and($parameters['fields[roles]'])
-        ->toMatchArray([
-            'in' => 'query',
-            'description' => 'Available fields are `id`, `name`. You can include multiple options by separating them with a comma.',
-            'style' => 'form',
-            'explode' => false,
-            'schema' => [
-                'type' => 'array',
-                'items' => [
-                    'type' => 'string',
-                    'enum' => ['id', 'name'],
                 ],
             ],
         ]);
@@ -450,6 +429,22 @@ final class SimplePaginatedUsersController
     {
         return UserResource::collection(QueryBuilder::for(User::class)
             ->simplePaginate($request->integer('per_page', 15)));
+    }
+}
+
+final class StandardUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(User::class)
+            ->allowedFilters(
+                'name',
+                AllowedFilter::exact('email'),
+            )
+            ->allowedSorts('name', 'created_at')
+            ->allowedIncludes('roles')
+            ->allowedFields('id', 'name', 'email', 'roles.id', 'roles.name')
+            ->get());
     }
 }
 
