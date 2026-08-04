@@ -667,7 +667,6 @@
                     {
                         "name": "x-pagination",
                         "in": "header",
-                        "description": "The pagination mode to use.",
                         "schema": {
                             "type": "string",
                             "enum": [

@@ -181,7 +181,7 @@ function ParamGroupSection({
 }
 
 type PaginationParameters = {
-    mode: Param;
+    mode: Param | null;
     page: Param | null;
     cursor: Param | null;
     perPage: Param | null;
@@ -191,11 +191,7 @@ function paginationParameters(operation: Operation): PaginationParameters | null
     const parameters = operation.paramGroups.flatMap((group) => group.params);
     const mode = parameters.find(
         (param) => param.location === "header" && param.name.toLowerCase() === "x-pagination",
-    );
-
-    if (mode === undefined) {
-        return null;
-    }
+    ) ?? null;
 
     const queryParameter = (name: string): Param | null =>
         parameters.find((param) => param.location === "query" && param.name === name) ?? null;
@@ -203,7 +199,7 @@ function paginationParameters(operation: Operation): PaginationParameters | null
     const cursor = queryParameter("cursor");
     const perPage = queryParameter("per_page");
 
-    return page === null && cursor === null && perPage === null
+    return perPage === null || (page === null && cursor === null)
         ? null
         : { mode, page, cursor, perPage };
 }
@@ -223,23 +219,28 @@ function PaginationParameterSection({
     onModeChange: (value: string) => void;
     onChange: (param: Param, value: string) => void;
 }): React.ReactNode {
-    const activeParameters = values.parameters[parameterKey(parameters.mode)] === "cursor"
+    const usesCursor = parameters.mode === null
+        ? parameters.page === null
+        : values.parameters[parameterKey(parameters.mode)] === "cursor";
+    const activeParameters = usesCursor
         ? [parameters.cursor, parameters.perPage]
         : [parameters.page, parameters.perPage];
 
     return (
-        <fieldset className="mb-4 rounded-lt-sm border border-lt-border p-4">
+        <fieldset className="mb-4 rounded-lt-sm border border-lt-border p-3">
             <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">
                 Pagination
             </legend>
             <div className="flex flex-col gap-3">
-                <RequestParameterField
-                    idPrefix={idPrefix}
-                    param={parameters.mode}
-                    value={values.parameters[parameterKey(parameters.mode)] ?? ""}
-                    error={errors[parameterKey(parameters.mode)] ?? null}
-                    onChange={onModeChange}
-                />
+                {parameters.mode === null ? null : (
+                    <RequestParameterField
+                        idPrefix={idPrefix}
+                        param={parameters.mode}
+                        value={values.parameters[parameterKey(parameters.mode)] ?? ""}
+                        error={errors[parameterKey(parameters.mode)] ?? null}
+                        onChange={onModeChange}
+                    />
+                )}
                 <div className="flex flex-wrap gap-4">
                     {activeParameters.map((param) => param === null ? null : (
                         <RequestParameterField
@@ -639,14 +640,16 @@ export function RequestPlayground({
     }
 
     function updatePaginationMode(value: string): void {
-        if (pagination === null) {
+        if (pagination === null || pagination.mode === null) {
             return;
         }
+
+        const mode = pagination.mode;
 
         setValues((current) => {
             const parameters = {
                 ...current.parameters,
-                [parameterKey(pagination.mode)]: value,
+                [parameterKey(mode)]: value,
             };
 
             if (value === "cursor" && pagination.page !== null) {

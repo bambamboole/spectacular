@@ -394,6 +394,7 @@ describe("RequestPlayground", () => {
             Array.from(pagination.element().querySelectorAll<HTMLElement>("[data-field-key]"))
                 .map((field) => field.dataset.fieldKey);
 
+        expect(pagination.element().classList).toContain("p-3");
         await expect.element(paginationMode).toHaveValue("default");
         expect(fieldKeys()).toEqual(["header:x-pagination", "query:page", "query:per_page"]);
 
@@ -408,6 +409,30 @@ describe("RequestPlayground", () => {
         await screen.getByLabelText("cursor").fill("next-page");
         await expect.element(snippet).toHaveTextContent("/users?cursor=next-page&per_page=25");
         await expect.element(snippet).not.toHaveTextContent("page=3");
+    });
+
+    it.each(["page", "cursor"])("groups %s pagination without a mode selector", async (name) => {
+        const active = parameter({ name });
+        const perPage = parameter({ name: "per_page", schema: { type: "integer", minimum: 1 } });
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    paramGroups: [{ location: "query", params: [active, perPage] }],
+                    requests: [],
+                })}
+                baseUrl="https://api.example.test"
+                token={null}
+                components={null}
+            />,
+        );
+
+        const pagination = screen.getByRole("group", { name: "Pagination" });
+        const fieldKeys = Array.from(
+            pagination.element().querySelectorAll<HTMLElement>("[data-field-key]"),
+        ).map((field) => field.dataset.fieldKey);
+
+        expect(fieldKeys).toEqual([`query:${name}`, "query:per_page"]);
+        await expect.element(screen.getByLabelText("x-pagination")).not.toBeInTheDocument();
     });
 
     it("shows stable required errors without fetching and focuses the first invalid field", async () => {

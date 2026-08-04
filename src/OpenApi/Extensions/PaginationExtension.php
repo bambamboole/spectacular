@@ -162,7 +162,6 @@ final class PaginationExtension extends AbstractQueryBuilderExtension
                 ->default($modes[0]->value);
 
             $parameters[] = Parameter::make('x-pagination', 'header')
-                ->description('The pagination mode to use.')
                 ->setSchema(Schema::fromType($type));
         }
 

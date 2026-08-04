@@ -193,6 +193,7 @@ it('documents pagination parameters and the paginated json api resource response
                 'default' => 'default',
             ],
         ])
+        ->and($parameters['x-pagination'])->not->toHaveKey('description')
         ->and($schema['anyOf'])->toHaveCount(3);
 });
 
