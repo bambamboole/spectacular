@@ -263,7 +263,21 @@ describe("RequestPlayground", () => {
             explode: false,
             schema: {
                 type: "array",
-                items: { type: "string", enum: ["name", "-name", "created_at", "-created_at"] },
+                items: {
+                    type: "string",
+                    enum: [
+                        "name",
+                        "-name",
+                        "created_at",
+                        "-created_at",
+                        "email",
+                        "-email",
+                        "id",
+                        "-id",
+                        "status",
+                        "-status",
+                    ],
+                },
             },
         });
         const include = parameter({
@@ -307,10 +321,12 @@ describe("RequestPlayground", () => {
 
         await filterField.fill("Taylor");
         await sortField.click();
+        await expect.element(screen.getByLabelText("Search options")).toBeVisible();
         const sortOption = screen.getByRole("option", { name: "-created_at" });
         await sortOption.click();
         document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
         await includeField.click();
+        await expect.element(screen.getByLabelText("Search options")).not.toBeInTheDocument();
         await screen.getByRole("option", { name: "roles", exact: true }).click();
         const rolesCountOption = screen.getByRole("option", { name: "rolesCount" });
         await rolesCountOption.click();
