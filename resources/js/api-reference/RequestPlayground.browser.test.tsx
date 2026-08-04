@@ -349,6 +349,67 @@ describe("RequestPlayground", () => {
 
     });
 
+    it("groups pagination controls and shows only the active mode fields", async () => {
+        const page = parameter({ name: "page", schema: { type: "integer", minimum: 1 } });
+        const cursor = parameter({ name: "cursor" });
+        const perPage = parameter({
+            name: "per_page",
+            schema: { type: "integer", minimum: 1, maximum: 100 },
+        });
+        const mode = parameter({
+            name: "x-pagination",
+            location: "header",
+            schema: {
+                type: "string",
+                enum: ["default", "simple", "cursor"],
+                default: "default",
+            },
+        });
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    summary: {
+                        id: "list-users",
+                        method: "GET",
+                        path: "/users",
+                        title: "List users",
+                        deprecated: false,
+                    },
+                    paramGroups: [
+                        { location: "query", params: [page, cursor, perPage] },
+                        { location: "header", params: [mode] },
+                    ],
+                    requests: [],
+                })}
+                baseUrl="https://api.example.test"
+                token={null}
+                components={null}
+            />,
+        );
+
+        const pagination = screen.getByRole("group", { name: "Pagination" });
+        const paginationMode = screen.getByLabelText("x-pagination");
+        const snippet = screen.getByLabelText("Request snippet", { exact: true });
+        const fieldKeys = () =>
+            Array.from(pagination.element().querySelectorAll<HTMLElement>("[data-field-key]"))
+                .map((field) => field.dataset.fieldKey);
+
+        await expect.element(paginationMode).toHaveValue("default");
+        expect(fieldKeys()).toEqual(["header:x-pagination", "query:page", "query:per_page"]);
+
+        await screen.getByLabelText("page", { exact: true }).fill("3");
+        await screen.getByLabelText("per_page").fill("25");
+        await expect.element(snippet).toHaveTextContent("/users?page=3&per_page=25");
+
+        await paginationMode.selectOptions("cursor");
+
+        expect(fieldKeys()).toEqual(["header:x-pagination", "query:cursor", "query:per_page"]);
+        await expect.element(screen.getByLabelText("page", { exact: true })).not.toBeInTheDocument();
+        await screen.getByLabelText("cursor").fill("next-page");
+        await expect.element(snippet).toHaveTextContent("/users?cursor=next-page&per_page=25");
+        await expect.element(snippet).not.toHaveTextContent("page=3");
+    });
+
     it("shows stable required errors without fetching and focuses the first invalid field", async () => {
         const id = parameter({ name: "id", location: "path", required: true });
         const trace = parameter({

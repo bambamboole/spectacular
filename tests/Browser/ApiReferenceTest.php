@@ -35,11 +35,20 @@ it('selects and sends an available pagination mode', function () {
     ]));
 
     $paginationSelector = 'select[data-field-key="header:x-pagination"]';
+    $pageSelector = 'input[data-field-key="query:page"]';
+    $cursorSelector = 'input[data-field-key="query:cursor"]';
+    $perPageSelector = 'input[data-field-key="query:per_page"]';
 
     visit('/docs-browser')
         ->click('button[aria-label="users.index"]')
         ->assertSelected($paginationSelector, 'default')
+        ->assertPresent($pageSelector)
+        ->assertMissing($cursorSelector)
+        ->assertPresent($perPageSelector)
         ->select($paginationSelector, 'cursor')
+        ->assertMissing($pageSelector)
+        ->assertPresent($cursorSelector)
+        ->assertPresent($perPageSelector)
         ->assertSee('x-pagination: cursor')
         ->click('button:has-text("Execute")')
         ->assertSee('received_pagination_mode')
