@@ -279,7 +279,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                 return (
                                     <div key={id} className="border-b border-lt-border last:border-b-0">
                                         <div className="relative bg-lt-muted">
-                                            <div className="pointer-events-none relative z-10 flex items-center gap-2 px-4 py-3">
+                                            <div className="@container pointer-events-none relative z-10 flex items-center gap-2 px-4 py-3">
                                                 <Icon
                                                     name="chevron-down"
                                                     className={`size-lt-icon-xs shrink-0 text-lt-muted-fg transition-transform${isOpen ? "" : " -rotate-90"}`}
@@ -292,7 +292,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                                         {summary.title}
                                                     </span>
                                                     <div className="flex items-center gap-1">
-                                                        <span className="min-w-0 break-all font-mono text-xs text-lt-muted-fg">
+                                                        <span className="min-w-0 break-words font-mono text-xs text-lt-muted-fg">
                                                             {url}
                                                         </span>
                                                         <CopyButton
@@ -309,7 +309,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                                     testId={`copy-${id}-markdown`}
                                                     className="pointer-events-auto shrink-0"
                                                 >
-                                                    Copy as Markdown
+                                                    <span className="hidden @3xl:inline">Copy as Markdown</span>
                                                 </CopyButton>
                                             </div>
                                             <button
