@@ -61,6 +61,35 @@ type SecuritySchemeDefinition = {
     description?: string | null;
 };
 
+export type TwoColumnBreakpoint = "default" | "sm" | "md" | "lg" | "xl" | "2xl";
+
+const TWO_COLUMN_LAYOUTS: Record<TwoColumnBreakpoint, { grid: string; reference: string }> = {
+    default: {
+        grid: "grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]",
+        reference: "sticky top-0 border-l border-t-0",
+    },
+    sm: {
+        grid: "sm:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]",
+        reference: "sm:sticky sm:top-0 sm:border-l sm:border-t-0",
+    },
+    md: {
+        grid: "md:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]",
+        reference: "md:sticky md:top-0 md:border-l md:border-t-0",
+    },
+    lg: {
+        grid: "lg:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]",
+        reference: "lg:sticky lg:top-0 lg:border-l lg:border-t-0",
+    },
+    xl: {
+        grid: "xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]",
+        reference: "xl:sticky xl:top-0 xl:border-l xl:border-t-0",
+    },
+    "2xl": {
+        grid: "2xl:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]",
+        reference: "2xl:sticky 2xl:top-0 2xl:border-l 2xl:border-t-0",
+    },
+};
+
 function contractLabel(contract: Contract): string {
     const parts = [contract.status, contract.mediaType].filter((part): part is string => Boolean(part));
 
@@ -70,28 +99,39 @@ function contractLabel(contract: Contract): string {
 function ParamRow({ param, control }: { param: Param; control?: React.ReactNode }): React.ReactNode {
     const allowedValues = parameterAllowedValues(param.schema);
     const rowLayout = control
-        ? "grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-start"
-        : "py-2";
+        ? "grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 py-3 sm:grid-cols-[minmax(0,3fr)_minmax(12rem,2fr)] sm:items-start"
+        : "grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 py-2";
+    const hasDetails = Boolean(param.description) || allowedValues.length > 0;
 
     return (
         <li className={`border-b border-lt-border last:border-b-0 ${rowLayout}`}>
-            <div>
-                <div className="flex items-center gap-2">
-                    <span className="font-mono text-lt-fg">{param.name}</span>
-                    <span className="rounded-lt-xs bg-lt-muted px-2 py-1 text-xs text-lt-muted-fg">
-                        {parameterTypeLabel(param.schema)}
-                    </span>
-                    {param.required ? <span className="text-lt-danger">*</span> : null}
-                    {param.deprecated ? <Badge color="danger">deprecated</Badge> : null}
-                </div>
-                {param.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{param.description}</p> : null}
-                {allowedValues.length > 0 ? (
-                    <p className="mt-0.5 text-xs text-lt-muted-fg">
-                        Available values: {allowedValues.join(", ")}
-                    </p>
-                ) : null}
+            <div className="flex min-w-0 items-center gap-2">
+                <span className="min-w-0 break-words font-mono text-lt-fg">{param.name}</span>
+                {param.required ? <span className="text-lt-danger">*</span> : null}
+                {param.deprecated ? <Badge color="danger">deprecated</Badge> : null}
             </div>
-            {control}
+            <span className="col-start-2 row-start-1 justify-self-end rounded-lt-xs bg-lt-muted px-2 py-1 text-xs text-lt-muted-fg">
+                {parameterTypeLabel(param.schema)}
+            </span>
+            {hasDetails ? (
+                <div
+                    className={`col-span-2 min-w-0${control ? " sm:col-span-1 sm:col-start-1 sm:row-start-2" : ""}`}
+                >
+                    {param.description ? (
+                        <p className="mt-0.5 text-xs text-lt-muted-fg">{param.description}</p>
+                    ) : null}
+                    {allowedValues.length > 0 ? (
+                        <p className="mt-0.5 text-xs text-lt-muted-fg">
+                            Available values: {allowedValues.join(", ")}
+                        </p>
+                    ) : null}
+                </div>
+            ) : null}
+            {control ? (
+                <div className="col-span-2 min-w-0 sm:col-span-1 sm:col-start-2 sm:row-start-2">
+                    {control}
+                </div>
+            ) : null}
         </li>
     );
 }
@@ -445,6 +485,7 @@ export type RequestPlaygroundProps = {
     token: string | null;
     components: unknown;
     expandDepth?: number;
+    twoColumnBreakpoint?: TwoColumnBreakpoint;
     hideHeaderIdentity?: boolean;
 };
 
@@ -454,6 +495,7 @@ export function RequestPlayground({
     token,
     components,
     expandDepth = 2,
+    twoColumnBreakpoint = "lg",
     hideHeaderIdentity = false,
 }: RequestPlaygroundProps): React.ReactNode {
     const idPrefix = `${operation.summary.id}-${useId().replaceAll(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -474,6 +516,7 @@ export function RequestPlayground({
     const nonInteractiveParameterLimitations = parameterLimitationsWithoutControls(operation);
     const hasUnsupportedRequestBody = operation.requests.length > 0 && jsonContracts.length === 0;
     const requestBodyRequired = selectedContract?.required ?? false;
+    const twoColumnLayout = TWO_COLUMN_LAYOUTS[twoColumnBreakpoint];
     const snippet = useMemo(() => {
         if (buildResult.request === null) {
             return "";
@@ -560,12 +603,8 @@ export function RequestPlayground({
     }
 
     return (
-        <div className="grid min-w-0 items-start text-base lg:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
-            <aside
-                ref={playgroundRef}
-                aria-label="Request"
-                className="min-w-0 p-6 lg:col-start-1 lg:row-start-1"
-            >
+        <div className={`grid min-w-0 items-start text-base ${twoColumnLayout.grid}`}>
+            <aside ref={playgroundRef} aria-label="Request" className="min-w-0 p-6">
                 <OperationHeader operation={operation} baseUrl={baseUrl} hideIdentity={hideHeaderIdentity} />
                 <SecuritySection security={operation.security} components={components} />
                 {operation.paramGroups.length > 0 ? (
@@ -708,7 +747,7 @@ export function RequestPlayground({
             </aside>
             <aside
                 aria-label="Reference"
-                className="min-w-0 border-t border-lt-border p-6 lg:sticky lg:top-0 lg:col-start-2 lg:row-start-1 lg:border-t-0 lg:border-l"
+                className={`min-w-0 border-t border-lt-border p-6 ${twoColumnLayout.reference}`}
             >
                 <div className="flex flex-col gap-6">
                     <SnippetPanel

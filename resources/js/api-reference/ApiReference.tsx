@@ -5,6 +5,7 @@ import { Badge, CopyButton } from "@lattice-php/lattice/ui";
 import { httpMethodColor } from "./http-method-color";
 import { operationToMarkdown } from "./operation-markdown";
 import { OperationView } from "./OperationView";
+import type { TwoColumnBreakpoint } from "./RequestPlayground";
 import { buildNavigation, filterNavigationByTags, parseOperation } from "./parse";
 import { operationUrl } from "./request-builder";
 import { ServerPicker } from "./ServerPicker";
@@ -20,6 +21,7 @@ type ApiReferenceProps = {
     hideBaseUrl?: boolean;
     title?: string | null;
     expandDepth?: number;
+    twoColumnBreakpoint?: TwoColumnBreakpoint;
     token?: string | null;
 };
 
@@ -65,6 +67,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         hideBaseUrl = false,
         title = null,
         expandDepth = 2,
+        twoColumnBreakpoint = "lg",
         token = null,
     } = node.props as ApiReferenceProps;
 
@@ -228,6 +231,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                         baseUrl={selectedServerUrlFor(operation)}
                         token={token}
                         expandDepth={expandDepth}
+                        twoColumnBreakpoint={twoColumnBreakpoint}
                     />
                 </div>
             </div>
@@ -326,6 +330,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
                                                     baseUrl={selectedServerUrlFor(id)}
                                                     token={token}
                                                     expandDepth={expandDepth}
+                                                    twoColumnBreakpoint={twoColumnBreakpoint}
                                                     hideHeaderIdentity
                                                 />
                                             </div>
