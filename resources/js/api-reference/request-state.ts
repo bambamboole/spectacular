@@ -1,5 +1,6 @@
 import { initialRequestExample } from "./schema-example";
 import type { Contract, Operation, Param } from "./types";
+import { isRecord, prettyJson } from "./utils";
 
 export type RequestValues = {
     parameters: Record<string, string>;
@@ -90,12 +91,3 @@ function scalarString(value: unknown): string | null {
     return null;
 }
 
-function prettyJson(value: unknown): string {
-    const serialized = JSON.stringify(value, null, 2);
-
-    return serialized ?? "";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}

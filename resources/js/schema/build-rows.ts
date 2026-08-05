@@ -250,7 +250,7 @@ function childRows(schema: Schema, id: string, components: Schema | null, ancest
     return rows;
 }
 
-export async function buildSchemaRows(schema: unknown, components: unknown): Promise<SchemaRow[]> {
+export function buildSchemaRows(schema: unknown, components: unknown): SchemaRow[] {
     const root = asSchema(schema);
     if (root === null) {
         return [];

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { buildSchemaRows, type SchemaRow } from "./build-rows";
 import { Icon } from "@lattice-php/lattice/icons";
 
@@ -51,22 +51,7 @@ export function SchemaView({
     components: unknown;
     expandDepth?: number;
 }): React.ReactNode {
-    const [rows, setRows] = useState<SchemaRow[]>([]);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        let active = true;
-        buildSchemaRows(schema, components)
-            .then((result) => active && setRows(result))
-            .catch((e: unknown) => active && setError(String(e)));
-        return () => {
-            active = false;
-        };
-    }, [schema, components]);
-
-    if (error) {
-        return <div className="text-lt-danger">{error}</div>;
-    }
+    const rows = useMemo(() => buildSchemaRows(schema, components), [schema, components]);
 
     return (
         <div className="text-base">

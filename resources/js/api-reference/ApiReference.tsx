@@ -210,20 +210,26 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
         return <div className="p-6 text-base text-lt-muted-fg">No API specification provided.</div>;
     }
 
+    const header = (
+        <>
+            {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
+            {activeOperation && !hideBaseUrl ? (
+                <div className="border-b border-lt-border py-3">
+                    <ServerPicker
+                        servers={activeOperation.servers}
+                        selectedServerUrl={activeOperation.serverUrl}
+                        onServerChange={selectServer}
+                    />
+                </div>
+            ) : null}
+        </>
+    );
+
     if (operation) {
         return (
             <div className="flex w-full text-base">
                 <div className="flex min-w-0 flex-1 flex-col">
-                    {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
-                    {activeOperation && !hideBaseUrl ? (
-                        <div className="border-b border-lt-border py-3">
-                            <ServerPicker
-                                servers={activeOperation.servers}
-                                selectedServerUrl={activeOperation.serverUrl}
-                                onServerChange={selectServer}
-                            />
-                        </div>
-                    ) : null}
+                    {header}
                     <OperationView
                         key={operation}
                         spec={spec}
@@ -240,16 +246,7 @@ const ApiReference: RendererComponent<"spectacular.api-reference"> = ({ node }) 
 
     return (
         <div className="flex min-w-0 w-full flex-col text-base">
-            {!hideHeader ? <InfoHeader title={title} info={navigation.info} /> : null}
-            {activeOperation && !hideBaseUrl ? (
-                <div className="border-b border-lt-border py-3">
-                    <ServerPicker
-                        servers={activeOperation.servers}
-                        selectedServerUrl={activeOperation.serverUrl}
-                        onServerChange={selectServer}
-                    />
-                </div>
-            ) : null}
+            {header}
             <div className="flex flex-col gap-8 py-6">
                 {navigation.groups.map((group) => (
                     <section key={group.id} aria-labelledby={`api-reference-tag-${group.id}`}>

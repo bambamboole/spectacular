@@ -1,6 +1,7 @@
 import { initialContractExample, initialRequestExample } from "./schema-example";
 import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
 import type { Contract, ContractExample, Operation, Param, SecurityRequirement } from "./types";
+import { contractLabel } from "./utils";
 
 export function operationToMarkdown(operation: Operation, components?: unknown): string {
     const sections = [
@@ -100,10 +101,6 @@ function responseContractSection(contract: Contract, components: unknown): strin
     ]
         .filter((section): section is string => Boolean(section))
         .join("\n\n");
-}
-
-function contractLabel(contract: Contract): string {
-    return [contract.status, contract.mediaType].filter((part): part is string => Boolean(part)).join(" ") || "default";
 }
 
 function contractSections(contract: Contract, components: unknown, headingLevel: number): string | null {

@@ -1,5 +1,6 @@
 import { isJsonMediaType, parameterKey, type RequestValues } from "./request-state";
 import type { Contract, Operation, Param } from "./types";
+import { isRecord } from "./utils";
 
 export type RequestErrors = {
     parameters: Record<string, string>;
@@ -121,7 +122,7 @@ function validateParameters(parameters: Param[], values: RequestValues, errors: 
         }
 
         if (param.required && value === "") {
-            errors.parameters[key] = `This ${parameterLocationLabel(param.location)} parameter is required.`;
+            errors.parameters[key] = `This ${param.location} parameter is required.`;
 
             continue;
         }
@@ -375,14 +376,7 @@ function upsertHeader(headers: Record<string, string>, name: string, value: stri
     headers[name] = value;
 }
 
-function parameterLocationLabel(location: string): string {
-    return location === "header" ? "header" : location;
-}
-
 function hasErrors(errors: RequestErrors): boolean {
     return Object.keys(errors.parameters).length > 0 || errors.body !== null || errors.request !== null;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
