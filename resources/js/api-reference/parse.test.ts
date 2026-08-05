@@ -735,6 +735,21 @@ describe("effective security resolution", () => {
         openapi: "3.0.0",
         info: { title: "Security API", version: "1.0.0", description: null },
         security: [{ http: [] }],
+        components: {
+            securitySchemes: {
+                http: { type: "http", scheme: "bearer" },
+                oauth2: {
+                    type: "oauth2",
+                    flows: {
+                        authorizationCode: {
+                            authorizationUrl: "https://auth.example.test/oauth/authorize",
+                            tokenUrl: "https://auth.example.test/oauth/token",
+                            scopes: { read: "Read", write: "Write" },
+                        },
+                    },
+                },
+            },
+        },
         paths: {
             "/inherited": {
                 get: {
@@ -769,7 +784,9 @@ describe("effective security resolution", () => {
     it("inherits the top-level security when the operation omits it", () => {
         const op = parseOperation(securitySpec, "get-inherited")!;
 
-        expect(op.security).toEqual([{ schemes: [{ name: "http", scopes: [] }] }]);
+        expect(op.security).toEqual([
+            { schemes: [{ name: "http", scopes: [], type: "http", scheme: "bearer" }] },
+        ]);
     });
 
     it("treats an explicit empty security array as public, overriding the top-level default", () => {
@@ -781,7 +798,9 @@ describe("effective security resolution", () => {
     it("uses the operation's own security requirements when present, with scopes carried through", () => {
         const op = parseOperation(securitySpec, "get-override")!;
 
-        expect(op.security).toEqual([{ schemes: [{ name: "oauth2", scopes: ["read", "write"] }] }]);
+        expect(op.security).toEqual([
+            { schemes: [{ name: "oauth2", scopes: ["read", "write"], type: "oauth2", scheme: null }] },
+        ]);
     });
 
     it("resolves an empty requirement object to a requirement with no schemes", () => {

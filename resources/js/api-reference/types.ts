@@ -2,7 +2,12 @@ export type ApiInfo = { title: string; version: string | null; description: stri
 export type OperationSummary = { id: string; method: string; path: string; title: string; deprecated: boolean };
 export type NavGroup = { id: string; title: string; operationIds: string[] };
 export type Server = { url: string; description: string | null };
-export type SecuritySchemeRef = { name: string; scopes: string[] };
+export type SecuritySchemeRef = {
+    name: string;
+    scopes: string[];
+    type: string | null;
+    scheme: string | null;
+};
 export type SecurityRequirement = { schemes: SecuritySchemeRef[] };
 export type Navigation = {
     info: ApiInfo;

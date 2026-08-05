@@ -18,11 +18,11 @@ const operation: Operation = {
     security: [
         {
             schemes: [
-                { name: "bearer", scopes: ["widgets:write"] },
-                { name: "service-key", scopes: [] },
+                { name: "bearer", scopes: ["widgets:write"], type: "http", scheme: "bearer" },
+                { name: "service-key", scopes: [], type: "apiKey", scheme: null },
             ],
         },
-        { schemes: [{ name: "signed-request", scopes: [] }] },
+        { schemes: [{ name: "signed-request", scopes: [], type: "http", scheme: "signature" }] },
     ],
     paramGroups: [
         {
