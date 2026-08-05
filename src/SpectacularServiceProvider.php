@@ -8,38 +8,36 @@ use Bambamboole\Spectacular\AsyncApi\Console\GenerateAsyncApiCommand;
 use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
+use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
+use Bambamboole\Spectacular\OpenApi\Extensions\QueryBuilderExtension;
 use Dedoc\Scramble\Scramble;
-use Spatie\LaravelPackageTools\Package;
-use Spatie\LaravelPackageTools\PackageServiceProvider;
+use Illuminate\Support\ServiceProvider;
 
-final class SpectacularServiceProvider extends PackageServiceProvider
+final class SpectacularServiceProvider extends ServiceProvider
 {
-    public static string $name = 'spectacular';
-
-    public function configurePackage(Package $package): void
+    public function register(): void
     {
-        $package
-            ->name(self::$name)
-            ->hasConfigFile()
-            ->hasCommands([
-                GenerateAsyncApiCommand::class,
-                GenerateOpenApiCommand::class,
-            ]);
-    }
-
-    public function packageRegistered(): void
-    {
+        $this->mergeConfigFrom(__DIR__.'/../config/spectacular.php', 'spectacular');
         $this->mergeAsyncApiWebhookConfigDefaults();
 
         $this->app->singleton(PayloadSchemaFactory::class);
         $this->app->singleton(MessageDefinitionFactory::class);
         $this->app->singleton(AsyncApiGenerator::class);
 
-        foreach (config('spectacular.scramble.extensions', []) as $extension) {
-            if (is_string($extension)) {
-                Scramble::registerExtension($extension);
-            }
-        }
+        Scramble::registerExtension(QueryBuilderExtension::class);
+        Scramble::registerExtension(PaginationExtension::class);
+    }
+
+    public function boot(): void
+    {
+        $this->publishes([
+            __DIR__.'/../config/spectacular.php' => config_path('spectacular.php'),
+        ], 'spectacular-config');
+
+        $this->commands([
+            GenerateAsyncApiCommand::class,
+            GenerateOpenApiCommand::class,
+        ]);
     }
 
     private function mergeAsyncApiWebhookConfigDefaults(): void

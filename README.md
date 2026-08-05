@@ -33,17 +33,9 @@ This writes `config/spectacular.php`.
 
 ## OpenAPI
 
-Spectacular ships two Scramble [operation extensions](https://scramble.dedoc.co/usage/extending). They are registered
-for you through `config/spectacular.php`:
-
-```php
-'scramble' => [
-    'extensions' => [
-        Bambamboole\Spectacular\OpenApi\Extensions\QueryBuilderExtension::class,
-        Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension::class,
-    ],
-],
-```
+Spectacular ships two Scramble [operation extensions](https://scramble.dedoc.co/usage/extending),
+`QueryBuilderExtension` and `PaginationExtension`. The service provider registers them for you; add your own through
+Scramble's native `scramble.extensions` config.
 
 ### Query builder parameters
 
