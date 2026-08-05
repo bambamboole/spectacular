@@ -17,10 +17,7 @@ workbench:
   welcome: false
   install: true
   discovers:
-    web: true
     api: true
-    commands: false
-    components: false
     views: true
   build:
     - create-sqlite-db
