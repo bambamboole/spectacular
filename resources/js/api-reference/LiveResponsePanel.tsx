@@ -1,4 +1,5 @@
 import { Badge, CodeBlock } from "@lattice-php/lattice/ui";
+import type { ColorName } from "@lattice-php/lattice/types/generated";
 import type { ExecutedResponse, ExecutionError } from "./execute-request";
 
 type LiveResponsePanelProps = {
@@ -60,10 +61,9 @@ export function LiveResponsePanel({ result }: LiveResponsePanelProps): React.Rea
     );
 }
 
-function responseBadgeColor(status: number): "success" | "warning" | "danger" {
-    if (status >= 200 && status < 300) {
-        return "success";
-    }
-
-    return status >= 400 && status < 500 ? "warning" : "danger";
+export function responseBadgeColor(status: string | number | null): ColorName {
+    return (
+        ({ "2": "success", "3": "info", "4": "warning", "5": "danger" } as const)[String(status)[0]] ??
+        "default"
+    );
 }

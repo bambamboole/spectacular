@@ -1,5 +1,5 @@
 import { isJsonMediaType, parameterKey, type RequestValues } from "./request-state";
-import type { Contract, Operation, Param } from "./types";
+import type { Contract, Operation, Param, SecuritySchemeRef } from "./types";
 
 export type RequestErrors = {
     parameters: Record<string, string>;
@@ -78,7 +78,7 @@ export function buildRequest(input: {
         upsertHeader(headers, "Content-Type", selectedContract.mediaType);
     }
 
-    if (input.token !== null && input.token !== "") {
+    if (input.token !== null && input.token !== "" && operationAcceptsAccessToken(input.operation)) {
         upsertHeader(headers, "Authorization", `Bearer ${input.token}`);
     }
 
@@ -91,6 +91,14 @@ export function buildRequest(input: {
         },
         errors: null,
     };
+}
+
+export function isBearerAccessTokenScheme(scheme: SecuritySchemeRef): boolean {
+    return scheme.type === "oauth2" || (scheme.type === "http" && scheme.scheme?.toLowerCase() === "bearer");
+}
+
+function operationAcceptsAccessToken(operation: Operation): boolean {
+    return operation.security.some((requirement) => requirement.schemes.some(isBearerAccessTokenScheme));
 }
 
 export function redactAuthorization(request: BuiltRequest): BuiltRequest {

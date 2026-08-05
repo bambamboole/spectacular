@@ -22,12 +22,13 @@ import {
 } from "@lattice-php/lattice/ui";
 import { SchemaView } from "../schema/SchemaView";
 import { executeRequest, type ExecutedResponse, type ExecutionError } from "./execute-request";
-import { LiveResponsePanel } from "./LiveResponsePanel";
+import { LiveResponsePanel, responseBadgeColor } from "./LiveResponsePanel";
 import { OperationHeader } from "./OperationHeader";
 import { operationToMarkdown } from "./operation-markdown";
 import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
 import {
     buildRequest,
+    isBearerAccessTokenScheme,
     parameterLimitation,
     redactAuthorization,
     type RequestErrors,
@@ -478,13 +479,15 @@ function ResponsesSection({
 
     if (responses.length === 0) return null;
 
-    const current = responses.find((response) => contractLabel(response) === activeLabel) ?? responses[0];
-    const responseLabels = responses.map(contractLabel);
+    const orderedResponses = [...responses].sort(compareResponses);
+    const current =
+        orderedResponses.find((response) => contractLabel(response) === activeLabel) ?? orderedResponses[0];
+    const responseLabels = orderedResponses.map(contractLabel);
 
     return (
         <section>
             <h2 className="mb-2 font-semibold text-lt-fg">Responses</h2>
-            <div className="mb-3 pb-2">
+            <div className="mb-3 flex items-center gap-2 pb-2">
                 <NativeSelect
                     aria-label="Response status"
                     value={activeLabel ?? responseLabels[0] ?? ""}
@@ -496,6 +499,9 @@ function ResponsesSection({
                         </option>
                     ))}
                 </NativeSelect>
+                {current ? (
+                    <Badge color={responseBadgeColor(current.status)}>{current.status ?? "default"}</Badge>
+                ) : null}
             </div>
             {current ? (
                 <div>
@@ -535,6 +541,20 @@ function ResponsesSection({
     );
 }
 
+function compareResponses(left: Contract, right: Contract): number {
+    const leftStatus = left.status ?? "default";
+    const rightStatus = right.status ?? "default";
+    const rankDifference = responseRank(leftStatus) - responseRank(rightStatus);
+
+    return rankDifference !== 0 || leftStatus === rightStatus
+        ? rankDifference
+        : leftStatus.localeCompare(rightStatus, undefined, { numeric: true });
+}
+
+function responseRank(status: string): number {
+    return ({ "2": 0, "3": 1, "4": 2, "5": 3 } as const)[status[0]] ?? 4;
+}
+
 function securitySchemeLabel(name: string, definition: SecuritySchemeDefinition | null): string {
     if (!definition) return name;
 
@@ -557,7 +577,15 @@ function securitySchemeLabel(name: string, definition: SecuritySchemeDefinition 
     return name;
 }
 
-function SecuritySchemeRow({ scheme, components }: { scheme: SecuritySchemeRef; components: unknown }): React.ReactNode {
+function SecuritySchemeRow({
+    scheme,
+    components,
+    token,
+}: {
+    scheme: SecuritySchemeRef;
+    components: unknown;
+    token: string | null;
+}): React.ReactNode {
     const definitions = (components as { securitySchemes?: Record<string, SecuritySchemeDefinition> } | null)?.securitySchemes ?? {};
     const definition = definitions[scheme.name] ?? null;
 
@@ -565,6 +593,13 @@ function SecuritySchemeRow({ scheme, components }: { scheme: SecuritySchemeRef; 
         <li className="border-b border-lt-border py-2 last:border-b-0">
             <span className="text-lt-fg">{securitySchemeLabel(scheme.name, definition)}</span>
             {definition?.description ? <p className="mt-0.5 text-xs text-lt-muted-fg">{definition.description}</p> : null}
+            <p className="mt-0.5 text-xs text-lt-muted-fg">
+                {isBearerAccessTokenScheme(scheme)
+                    ? token
+                        ? "Access token supplied by the host page."
+                        : "No access token is configured for live requests."
+                    : "This authentication scheme is not supported for live requests."}
+            </p>
             {scheme.scopes.length > 0 ? (
                 <div className="mt-1 flex flex-wrap gap-1">
                     {scheme.scopes.map((scope) => (
@@ -578,7 +613,15 @@ function SecuritySchemeRow({ scheme, components }: { scheme: SecuritySchemeRef; 
     );
 }
 
-function SecurityRequirementRow({ requirement, components }: { requirement: SecurityRequirement; components: unknown }): React.ReactNode {
+function SecurityRequirementRow({
+    requirement,
+    components,
+    token,
+}: {
+    requirement: SecurityRequirement;
+    components: unknown;
+    token: string | null;
+}): React.ReactNode {
     if (requirement.schemes.length === 0) {
         return <p className="text-lt-muted-fg">Optional authentication</p>;
     }
@@ -586,13 +629,26 @@ function SecurityRequirementRow({ requirement, components }: { requirement: Secu
     return (
         <ul>
             {requirement.schemes.map((scheme) => (
-                <SecuritySchemeRow key={scheme.name} scheme={scheme} components={components} />
+                <SecuritySchemeRow
+                    key={scheme.name}
+                    scheme={scheme}
+                    components={components}
+                    token={token}
+                />
             ))}
         </ul>
     );
 }
 
-function SecuritySection({ security, components }: { security: SecurityRequirement[]; components: unknown }): React.ReactNode {
+function SecuritySection({
+    security,
+    components,
+    token,
+}: {
+    security: SecurityRequirement[];
+    components: unknown;
+    token: string | null;
+}): React.ReactNode {
     if (security.length === 0) return null;
 
     return (
@@ -603,7 +659,7 @@ function SecuritySection({ security, components }: { security: SecurityRequireme
                     {index > 0 ? (
                         <p className="my-2 text-xs font-semibold uppercase tracking-wide text-lt-muted-fg">OR</p>
                     ) : null}
-                    <SecurityRequirementRow requirement={requirement} components={components} />
+                    <SecurityRequirementRow requirement={requirement} components={components} token={token} />
                 </div>
             ))}
         </section>
@@ -776,7 +832,7 @@ export function RequestPlayground({
         <div className={`grid min-w-0 items-start text-base ${twoColumnLayout.grid}`}>
             <aside ref={playgroundRef} aria-label="Request" className="min-w-0 p-6">
                 <OperationHeader operation={operation} baseUrl={baseUrl} hideIdentity={hideHeaderIdentity} />
-                <SecuritySection security={operation.security} components={components} />
+                <SecuritySection security={operation.security} components={components} token={token} />
                 {parameterGroups.length > 0 || queryParameterGroups.length > 0 || pagination !== null ? (
                     <section className="mb-6">
                         <h2 className="mb-2 font-semibold text-lt-fg">Parameters</h2>

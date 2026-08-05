@@ -32,7 +32,7 @@ function requestContract(overrides: Partial<Contract> = {}): Contract {
     };
 }
 
-function operation(params: Param[] = [], requests: Contract[] = []): Operation {
+function operation(params: Param[] = [], requests: Contract[] = [], overrides: Partial<Operation> = {}): Operation {
     return {
         summary: {
             id: "post-widgets-id",
@@ -55,8 +55,13 @@ function operation(params: Param[] = [], requests: Contract[] = []): Operation {
         requests,
         responses: [],
         security: [],
+        ...overrides,
     };
 }
+
+const oauth2Security = [
+    { schemes: [{ name: "oauth2", scopes: [], type: "oauth2", scheme: null }] },
+];
 
 function values(parameters: Array<[Param, string]>, overrides: Partial<RequestValues> = {}): RequestValues {
     return {
@@ -98,7 +103,11 @@ describe("buildRequest", () => {
         const page = parameter({ name: "page", location: "query", schema: { type: "integer" } });
         const trace = parameter({ name: "X-Trace", location: "header", schema: { type: "boolean" } });
         const result = buildRequest({
-            operation: operation([id, search, page, trace], [requestContract({ mediaType: "application/problem+json" })]),
+            operation: operation(
+                [id, search, page, trace],
+                [requestContract({ mediaType: "application/problem+json" })],
+                { security: oauth2Security },
+            ),
             baseUrl: "https://api.example.test/v1/",
             values: values(
                 [
@@ -288,7 +297,9 @@ describe("buildRequest", () => {
         const contentType = parameter({ name: "content-type", location: "header" });
         const authorization = parameter({ name: "authorization", location: "header" });
         const result = buildRequest({
-            operation: operation([id, contentType, authorization], [requestContract()]),
+            operation: operation([id, contentType, authorization], [requestContract()], {
+                security: oauth2Security,
+            }),
             baseUrl: "https://api.example.test",
             values: values(
                 [
@@ -329,6 +340,45 @@ describe("buildRequest", () => {
             expect(snippet).not.toContain("stale-credential");
             expect(snippet).not.toContain("real-secret-token");
         }
+    });
+
+    it("adds a configured token for an HTTP bearer security scheme", () => {
+        const result = buildRequest({
+            operation: operation([], [], {
+                security: [
+                    { schemes: [{ name: "bearer", scopes: [], type: "http", scheme: "bearer" }] },
+                ],
+            }),
+            baseUrl: "https://api.example.test",
+            values: values([]),
+            token: "real-secret-token",
+        });
+
+        expect(result).toMatchObject({
+            request: { headers: { Authorization: "Bearer real-secret-token" } },
+        });
+    });
+
+    it.each([
+        ["public operations", []],
+        [
+            "HTTP basic",
+            [{ schemes: [{ name: "basic", scopes: [], type: "http", scheme: "basic" }] }],
+        ],
+        [
+            "API keys",
+            [{ schemes: [{ name: "apiKey", scopes: [], type: "apiKey", scheme: null }] }],
+        ],
+    ])("does not add an OAuth access token to %s", (_label, security) => {
+        const result = buildRequest({
+            operation: operation([], [], { security }),
+            baseUrl: "https://api.example.test",
+            values: values([]),
+            token: "real-secret-token",
+        });
+
+        expect(result).toMatchObject({ request: { headers: { Accept: "application/json" } } });
+        expect(result.request && new Headers(result.request.headers).has("Authorization")).toBe(false);
     });
 
     it("returns field errors for empty required path, query, and header values", () => {

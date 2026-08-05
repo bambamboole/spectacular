@@ -7,6 +7,17 @@ export function parameterTypeLabel(schema: unknown): string {
         return schema.$ref.split("/").pop() ?? "ref";
     }
 
+    for (const [keyword, separator] of [
+        ["oneOf", " | "],
+        ["anyOf", " | "],
+        ["allOf", " & "],
+    ] as const) {
+        const variants = schema[keyword];
+        if (Array.isArray(variants) && variants.length > 0) {
+            return [...new Set(variants.map(parameterTypeLabel))].join(separator);
+        }
+    }
+
     if (Array.isArray(schema.type)) {
         return schema.type.join(" | ");
     }
