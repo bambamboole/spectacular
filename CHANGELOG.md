@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.0](https://github.com/bambamboole/spectacular/compare/0.7.0...0.8.0) (2026-08-05)
+
+
+### Features
+
+* render JSON request bodies as fields ([b367557](https://github.com/bambamboole/spectacular/commit/b3675579b239dad479a150c5f5bde155bbe5d966))
+* render JSON request bodies as fields ([1ee8ec9](https://github.com/bambamboole/spectacular/commit/1ee8ec9a7fb216be9c6f5b7b4286d9bd049453c4))
+
+
+### Bug Fixes
+
+* harden API reference authentication and contracts ([efd2b47](https://github.com/bambamboole/spectacular/commit/efd2b47e32b0344342793dcead288335935fdd4f))
+* harden API reference interactions ([b5b06e1](https://github.com/bambamboole/spectacular/commit/b5b06e175864abd7dc273bcea28adad174abed6a))
+
 ## [0.7.0](https://github.com/bambamboole/spectacular/compare/0.6.0...0.7.0) (2026-08-04)
 
 
