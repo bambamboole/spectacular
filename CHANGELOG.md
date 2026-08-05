@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/bambamboole/spectacular/compare/0.8.0...0.9.0) (2026-08-05)
+
+
+### Miscellaneous Chores
+
+* release 0.9.0 ([73d7e1e](https://github.com/bambamboole/spectacular/commit/73d7e1eb8fa1b364ad285f6291d5e655b8a11f04))
+
 ## [0.8.0](https://github.com/bambamboole/spectacular/compare/0.7.0...0.8.0) (2026-08-05)
 
 
