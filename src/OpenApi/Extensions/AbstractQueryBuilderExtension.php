@@ -8,7 +8,6 @@ use Bambamboole\Spectacular\QueryBuilder as SpectacularQueryBuilder;
 use Dedoc\Scramble\Extensions\OperationExtension;
 use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Parameter;
-use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
@@ -24,23 +23,12 @@ abstract class AbstractQueryBuilderExtension extends OperationExtension
      */
     protected function queryBuilderCalls(FunctionLike $actionNode, array $methods): array
     {
-        $nodes = (new NodeFinder)->find(
-            $actionNode,
-            fn (Node $node): bool => $node instanceof Expr\MethodCall
-                && $node->name instanceof Identifier
+        return array_values(array_filter(
+            (new NodeFinder)->findInstanceOf($actionNode, Expr\MethodCall::class),
+            fn (Expr\MethodCall $node): bool => $node->name instanceof Identifier
                 && in_array($node->name->name, $methods, true)
                 && $this->isQueryBuilderChain($node->var),
-        );
-
-        $calls = [];
-
-        foreach ($nodes as $node) {
-            if ($node instanceof Expr\MethodCall) {
-                $calls[] = $node;
-            }
-        }
-
-        return $calls;
+        ));
     }
 
     /**

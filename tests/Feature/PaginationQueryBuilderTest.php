@@ -6,8 +6,6 @@ use Bambamboole\Spectacular\PaginationMode;
 use Bambamboole\Spectacular\QueryBuilder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Route;
-use InvalidArgumentException;
-use ReflectionMethod;
 use Workbench\App\Models\User;
 
 uses(LazilyRefreshDatabase::class);
@@ -113,16 +111,4 @@ it('retains query parameters in pagination links', function (): void {
         ->assertSuccessful()
         ->assertJsonPath('next_page_url', fn (string $url): bool => str_contains($url, 'per_page=1')
             && str_contains($url, 'filter%5Bname%5D=User'));
-});
-
-it('rejects invalid pagination configuration', function (): void {
-    $builder = QueryBuilder::for(User::class);
-    $apiPaginate = new ReflectionMethod($builder, 'apiPaginate');
-
-    expect(fn () => $apiPaginate->invoke($builder, []))
-        ->toThrow(InvalidArgumentException::class, 'At least one pagination mode is required.')
-        ->and(fn () => $apiPaginate->invoke($builder, ['default']))
-        ->toThrow(InvalidArgumentException::class, 'Every pagination mode must be a PaginationMode instance.')
-        ->and(fn () => QueryBuilder::for(User::class)->apiPaginate(max: 0))
-        ->toThrow(InvalidArgumentException::class, 'The maximum page size must be at least 1.');
 });

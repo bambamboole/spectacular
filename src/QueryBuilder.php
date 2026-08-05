@@ -9,7 +9,6 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
-use InvalidArgumentException;
 use Spatie\QueryBuilder\QueryBuilder as SpatieQueryBuilder;
 
 /**
@@ -27,8 +26,6 @@ class QueryBuilder extends SpatieQueryBuilder
         array $modes = [PaginationMode::Default],
         int $max = 100,
     ): Paginator|LengthAwarePaginator|CursorPaginator {
-        $this->validatePaginationConfiguration($modes, $max);
-
         $mode = $this->selectedPaginationMode($modes);
         $perPage = $this->selectedPerPage($max);
 
@@ -37,26 +34,6 @@ class QueryBuilder extends SpatieQueryBuilder
             PaginationMode::Simple => $this->getEloquentBuilder()->simplePaginate($perPage),
             PaginationMode::Cursor => $this->getEloquentBuilder()->cursorPaginate($perPage),
         })->withQueryString();
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $modes
-     */
-    private function validatePaginationConfiguration(array $modes, int $max): void
-    {
-        if ($modes === []) {
-            throw new InvalidArgumentException('At least one pagination mode is required.');
-        }
-
-        foreach ($modes as $mode) {
-            if (! $mode instanceof PaginationMode) {
-                throw new InvalidArgumentException('Every pagination mode must be a PaginationMode instance.');
-            }
-        }
-
-        if ($max < 1) {
-            throw new InvalidArgumentException('The maximum page size must be at least 1.');
-        }
     }
 
     /**
