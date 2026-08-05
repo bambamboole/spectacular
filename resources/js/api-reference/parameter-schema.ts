@@ -1,3 +1,5 @@
+import { isRecord } from "./utils";
+
 export function parameterTypeLabel(schema: unknown): string {
     if (!isRecord(schema)) {
         return "any";
@@ -51,6 +53,3 @@ function displayValue(value: unknown): string {
     return typeof value === "string" ? value : (JSON.stringify(value) ?? String(value));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}

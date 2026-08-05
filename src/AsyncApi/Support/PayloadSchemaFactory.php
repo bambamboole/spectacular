@@ -35,6 +35,8 @@ use UnitEnum;
 
 final class PayloadSchemaFactory
 {
+    use InvokesZeroArgMethods;
+
     private TypeTransformer $types;
 
     public function __construct()
@@ -189,23 +191,8 @@ final class PayloadSchemaFactory
      */
     private function withNotificationType(ReflectionClass $notification, array $schema): array
     {
-        $type = $notification->getName();
-
-        if ($notification->hasMethod('broadcastType')) {
-            $method = $notification->getMethod('broadcastType');
-
-            if ($method->isPublic() && $method->getNumberOfRequiredParameters() === 0) {
-                try {
-                    $broadcastType = $method->invoke($notification->newInstanceWithoutConstructor());
-
-                    if (is_string($broadcastType) && $broadcastType !== '') {
-                        $type = $broadcastType;
-                    }
-                } catch (Throwable) {
-                    $type = $notification->getName();
-                }
-            }
-        }
+        $broadcastType = $this->invokeZeroArgMethod($notification, 'broadcastType');
+        $type = is_string($broadcastType) && $broadcastType !== '' ? $broadcastType : $notification->getName();
 
         $schema['type'] ??= 'object';
         $schema['properties'] ??= [];

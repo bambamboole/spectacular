@@ -131,7 +131,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
      */
     private function arrayParameter(string $name, array $values, string $description): Parameter
     {
-        $items = (new StringType)->enum($this->uniqueStrings($values));
+        $items = (new StringType)->enum($values);
 
         return Parameter::make($name, 'query')
             ->description($description)
@@ -316,10 +316,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     {
         return implode(
             ', ',
-            array_map(
-                fn (string $value): string => "`{$value}`",
-                $this->uniqueStrings($values),
-            ),
+            array_map(fn (string $value): string => "`{$value}`", $values),
         );
     }
 }

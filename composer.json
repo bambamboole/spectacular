@@ -19,10 +19,9 @@
     ],
     "require": {
         "php": "^8.4",
-        "bambamboole/laravel-webhooks": "^0.2",
+        "bambamboole/laravel-webhooks": ">=0.3 <1.0.0",
         "dedoc/scramble": "^0.13.30",
         "illuminate/support": "^13.0",
-        "spatie/laravel-package-tools": "^1.16 || ^2.0",
         "spatie/laravel-query-builder": "^7.0"
     },
     "require-dev": {

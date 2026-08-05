@@ -1,9 +1,6 @@
 <?php
 declare(strict_types=1);
 
-use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
-use Bambamboole\Spectacular\OpenApi\Extensions\QueryBuilderExtension;
-
 return [
     'asyncapi' => [
         'version' => '3.0.0',
@@ -26,13 +23,6 @@ return [
                 'Signature' => ['type' => 'string'],
                 'Timestamp' => ['type' => 'integer'],
             ],
-        ],
-    ],
-
-    'scramble' => [
-        'extensions' => [
-            QueryBuilderExtension::class,
-            PaginationExtension::class,
         ],
     ],
 ];

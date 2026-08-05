@@ -1,4 +1,5 @@
 import type { Contract } from "./types";
+import { isRecord } from "./utils";
 
 const SCHEMA_REF_PREFIX = "#/components/schemas/";
 
@@ -230,6 +231,3 @@ function objectExample(
     );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}

@@ -2,6 +2,7 @@ import { useId, useMemo } from "react";
 import { FormFieldFrame } from "@lattice-php/lattice/form";
 import { Button, Input, NativeSelect, Textarea } from "@lattice-php/lattice/ui";
 import { exampleFromSchema } from "./schema-example";
+import { isRecord, prettyJson } from "./utils";
 
 type Scalar = string | number | boolean;
 
@@ -563,10 +564,6 @@ function encodeScalar(value: unknown): string {
     return isScalar(value) ? `${typeof value}:${String(value)}` : "";
 }
 
-function prettyJson(value: unknown): string {
-    return JSON.stringify(value, null, 2) ?? "";
-}
-
 function isScalarKind(value: unknown): value is "string" | "number" | "integer" | "boolean" {
     return typeof value === "string" && ["string", "number", "integer", "boolean"].includes(value);
 }
@@ -581,8 +578,4 @@ function stringValue(value: unknown): string | null {
 
 function numberValue(value: unknown): number | null {
     return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
 }

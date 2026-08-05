@@ -1,4 +1,5 @@
 import type { BuiltRequest } from "./request-builder";
+import { isAbortError } from "./utils";
 
 export type ExecutedResponse = {
     kind: "response";
@@ -18,9 +19,8 @@ export type ExecutionError = {
 export async function executeRequest(
     request: BuiltRequest,
     signal: AbortSignal,
-    now: () => number = Date.now,
 ): Promise<ExecutedResponse | ExecutionError> {
-    const startedAt = now();
+    const startedAt = Date.now();
 
     try {
         const response = await fetch(request.url, {
@@ -35,14 +35,8 @@ export async function executeRequest(
             kind: "response",
             status: response.status,
             statusText: response.statusText,
-            durationMs: Math.max(0, now() - startedAt),
-            headers: Array.from(response.headers.entries()).sort(([left], [right]) => {
-                if (left < right) {
-                    return -1;
-                }
-
-                return left > right ? 1 : 0;
-            }),
+            durationMs: Math.max(0, Date.now() - startedAt),
+            headers: Array.from(response.headers.entries()),
             body,
             contentType: response.headers.get("content-type"),
         };
@@ -66,6 +60,3 @@ function formatBody(body: string): string {
     }
 }
 
-function isAbortError(error: unknown): error is { name: string } {
-    return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
-}

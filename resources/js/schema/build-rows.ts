@@ -1,6 +1,3 @@
-import { SchemaTree, isMirroredNode, isReferenceNode, isRegularNode } from "@stoplight/json-schema-tree";
-import type { MirroredRegularNode, RegularNode, SchemaNode } from "@stoplight/json-schema-tree";
-
 export type SchemaRow = {
     id: string;
     name: string | null;
@@ -12,103 +9,255 @@ export type SchemaRow = {
     isRecursive: boolean;
 };
 
-type RegularLikeNode = RegularNode | MirroredRegularNode;
+type Schema = Record<string, unknown>;
 
-function isRegularLike(node: SchemaNode): node is RegularLikeNode {
-    return isRegularNode(node) || (isMirroredNode(node) && "types" in node);
+const VALIDATION_KEYS = [
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "minLength",
+    "maxLength",
+    "pattern",
+    "minItems",
+    "maxItems",
+    "uniqueItems",
+    "minProperties",
+    "maxProperties",
+];
+
+function asSchema(value: unknown): Schema | null {
+    return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Schema) : null;
 }
 
-function typeLabel(node: SchemaNode): string {
-    if (isReferenceNode(node)) {
-        return node.value ?? "ref";
+function refName(ref: unknown): string | null {
+    if (typeof ref !== "string" || !ref.startsWith("#/components/schemas/")) {
+        return null;
     }
-    if (isRegularLike(node)) {
-        const types = node.types ?? [];
-        return types.length > 0 ? types.join(" | ") : (node.primaryType ?? "any");
-    }
-    return "any";
+    return ref.slice("#/components/schemas/".length);
 }
 
-function toRow(node: SchemaNode, name: string | null, required: Set<string>): SchemaRow {
-    const recursive = isMirroredNode(node);
-    const withData = isRegularLike(node) ? node : null;
-
-    return {
-        id: node.id,
-        name,
-        typeLabel: typeLabel(node),
-        required: name !== null && required.has(name),
-        description: (withData?.annotations?.description as string | undefined) ?? null,
-        details: withData === null ? [] : schemaDetails(withData),
-        children: recursive ? [] : childRows(node),
-        isRecursive: recursive,
-    };
+function lookupRef(ref: unknown, components: Schema | null): { name: string; schema: Schema } | null {
+    const name = refName(ref);
+    if (name === null) {
+        return null;
+    }
+    const schemas = asSchema(components?.schemas);
+    const target = asSchema(schemas?.[name]);
+    return target ? { name, schema: target } : null;
 }
 
-function schemaDetails(node: RegularLikeNode): string[] {
-    const details: string[] = [];
-    const fragment = node.originalFragment;
+function mergeInto(target: Schema, source: Schema): void {
+    for (const [key, value] of Object.entries(source)) {
+        if (key === "properties") {
+            target.properties = { ...asSchema(target.properties), ...asSchema(value) };
+        } else if (key === "required") {
+            const merged = new Set([
+                ...(Array.isArray(target.required) ? target.required : []),
+                ...(Array.isArray(value) ? value : []),
+            ]);
+            target.required = [...merged];
+        } else {
+            target[key] = value;
+        }
+    }
+}
 
-    if (node.format !== null) {
-        details.push(`format: ${node.format}`);
+function resolveSchema(schema: Schema, components: Schema | null, refs: Set<string>): Schema {
+    let current = schema;
+    while (current.$ref !== undefined) {
+        const resolved = lookupRef(current.$ref, components);
+        if (resolved === null || refs.has(resolved.name)) {
+            return resolved === null ? {} : current;
+        }
+        refs.add(resolved.name);
+        current = resolved.schema;
     }
 
-    if ("const" in fragment) {
-        details.push(`const: ${schemaValue(fragment.const)}`);
-    } else if (node.enum !== null) {
-        details.push(`enum: ${schemaValue(node.enum)}`);
+    if (!Array.isArray(current.allOf)) {
+        return current;
     }
 
-    if (node.annotations.default !== undefined) {
-        details.push(`default: ${schemaValue(node.annotations.default)}`);
+    const { allOf, ...rest } = current;
+    const merged: Schema = {};
+    for (const branch of allOf) {
+        const branchSchema = asSchema(branch);
+        if (branchSchema) {
+            mergeInto(merged, resolveSchema(branchSchema, components, refs));
+        }
     }
-    if (node.annotations.examples !== undefined) {
-        details.push(`examples: ${schemaValue(node.annotations.examples)}`);
+    mergeInto(merged, resolveSchema(rest, components, refs));
+    return merged;
+}
+
+function typeLabel(schema: Schema, components: Schema | null): string {
+    const types = Array.isArray(schema.type)
+        ? schema.type.filter((t): t is string => typeof t === "string")
+        : typeof schema.type === "string"
+          ? [schema.type]
+          : [];
+
+    if (types.length === 0) {
+        if (schema.properties !== undefined || schema.additionalProperties !== undefined) {
+            types.push("object");
+        } else if (schema.items !== undefined) {
+            types.push("array");
+        }
+    }
+    if (schema.nullable === true && !types.includes("null")) {
+        types.push("null");
     }
 
-    for (const [name, value] of Object.entries(node.validations)) {
-        if (!["readOnly", "writeOnly", "style"].includes(name)) {
-            details.push(`${name}: ${schemaValue(value)}`);
+    if (types.length === 0) {
+        if (Array.isArray(schema.oneOf)) {
+            return "oneOf";
+        }
+        if (Array.isArray(schema.anyOf)) {
+            return "anyOf";
+        }
+        return "any";
+    }
+
+    const items = asSchema(schema.items);
+    if (items && types[0] === "array") {
+        const itemLabel =
+            refName(items.$ref) ?? typeLabel(resolveSchema(items, components, new Set()), components);
+        if (itemLabel !== "any" && itemLabel !== "object") {
+            types[0] = `array[${itemLabel}]`;
         }
     }
 
-    if (node.deprecated) {
-        details.push("deprecated");
-    }
-    if (node.validations.readOnly === true) {
-        details.push("readOnly");
-    }
-    if (node.validations.writeOnly === true) {
-        details.push("writeOnly");
-    }
+    return types.join(" | ");
+}
 
-    return details;
+function branchLabel(branch: Schema, resolved: Schema, components: Schema | null): string {
+    if (typeof resolved.title === "string") {
+        return resolved.title;
+    }
+    return refName(branch.$ref) ?? typeLabel(resolved, components);
 }
 
 function schemaValue(value: unknown): string {
     return JSON.stringify(value) ?? String(value);
 }
 
-function childRows(node: SchemaNode): SchemaRow[] {
-    const children = (("children" in node ? node.children : null) ?? []) as SchemaNode[];
-    const required = new Set<string>(isRegularLike(node) ? (node.required ?? []) : []);
+function schemaDetails(schema: Schema): string[] {
+    const details: string[] = [];
 
-    return children.map((child) => {
-        const name = child.subpath.slice(-1)[0] ?? null;
-        return toRow(child, name, required);
-    });
+    if (typeof schema.format === "string") {
+        details.push(`format: ${schema.format}`);
+    }
+    if ("const" in schema) {
+        details.push(`const: ${schemaValue(schema.const)}`);
+    } else if (Array.isArray(schema.enum)) {
+        details.push(`enum: ${schemaValue(schema.enum)}`);
+    }
+    if (schema.default !== undefined) {
+        details.push(`default: ${schemaValue(schema.default)}`);
+    }
+    if (schema.examples !== undefined) {
+        details.push(`examples: ${schemaValue(schema.examples)}`);
+    }
+    for (const [key, value] of Object.entries(schema)) {
+        if (VALIDATION_KEYS.includes(key)) {
+            details.push(`${key}: ${schemaValue(value)}`);
+        }
+    }
+    if (schema.deprecated === true) {
+        details.push("deprecated");
+    }
+    if (schema.readOnly === true) {
+        details.push("readOnly");
+    }
+    if (schema.writeOnly === true) {
+        details.push("writeOnly");
+    }
+
+    return details;
 }
 
-export async function buildSchemaRows(schema: unknown, components: unknown): Promise<SchemaRow[]> {
-    const tree = new SchemaTree({
-        type: "object",
-        properties: { __schema: schema },
-        components,
-    }, { mergeAllOf: true });
-    tree.populate();
+function pointerSegment(key: string): string {
+    return key.replace(/~/g, "~0").replace(/\//g, "~1");
+}
 
-    const [wrapperNode] = tree.root.children as unknown as SchemaNode[];
-    const [schemaRow] = wrapperNode ? childRows(wrapperNode) : [];
+function toRow(
+    raw: unknown,
+    name: string | null,
+    id: string,
+    required: boolean,
+    components: Schema | null,
+    ancestors: Set<string>,
+): SchemaRow {
+    const schema = asSchema(raw) ?? {};
+    const refs = new Set<string>();
+    const resolved = resolveSchema(schema, components, refs);
+    const isRecursive = [...refs].some((ref) => ancestors.has(ref));
 
-    return schemaRow?.children ?? [];
+    return {
+        id,
+        name,
+        typeLabel: typeLabel(resolved, components),
+        required,
+        description: typeof resolved.description === "string" ? resolved.description : null,
+        details: schemaDetails(resolved),
+        children: isRecursive
+            ? []
+            : childRows(resolved, id, components, refs.size > 0 ? new Set([...ancestors, ...refs]) : ancestors),
+        isRecursive,
+    };
+}
+
+function childRows(schema: Schema, id: string, components: Schema | null, ancestors: Set<string>): SchemaRow[] {
+    const rows: SchemaRow[] = [];
+    const required = new Set(Array.isArray(schema.required) ? schema.required : []);
+
+    const properties = asSchema(schema.properties);
+    for (const [name, property] of Object.entries(properties ?? {})) {
+        rows.push(toRow(property, name, `${id}/properties/${pointerSegment(name)}`, required.has(name), components, ancestors));
+    }
+
+    const additional = asSchema(schema.additionalProperties);
+    if (additional) {
+        rows.push(toRow(additional, "additionalProperties", `${id}/additionalProperties`, false, components, ancestors));
+    }
+
+    const items = asSchema(schema.items);
+    if (items) {
+        const itemRefs = new Set<string>();
+        const resolvedItems = resolveSchema(items, components, itemRefs);
+        if ([...itemRefs].some((ref) => ancestors.has(ref))) {
+            rows.push(toRow(items, null, `${id}/items`, false, components, ancestors));
+        } else {
+            const itemAncestors = itemRefs.size > 0 ? new Set([...ancestors, ...itemRefs]) : ancestors;
+            rows.push(...childRows(resolvedItems, `${id}/items`, components, itemAncestors));
+        }
+    }
+
+    for (const combiner of ["oneOf", "anyOf"] as const) {
+        const branches = schema[combiner];
+        if (!Array.isArray(branches)) {
+            continue;
+        }
+        branches.forEach((branch, index) => {
+            const branchSchema = asSchema(branch) ?? {};
+            const row = toRow(branch, null, `${id}/${combiner}/${index}`, false, components, ancestors);
+            row.typeLabel = branchLabel(branchSchema, resolveSchema(branchSchema, components, new Set()), components);
+            rows.push(row);
+        });
+    }
+
+    return rows;
+}
+
+export function buildSchemaRows(schema: unknown, components: unknown): SchemaRow[] {
+    const root = asSchema(schema);
+    if (root === null) {
+        return [];
+    }
+    const componentsSchema = asSchema(components);
+    const refs = new Set<string>();
+    const resolved = resolveSchema(root, componentsSchema, refs);
+
+    return childRows(resolved, "#", componentsSchema, refs);
 }

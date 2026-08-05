@@ -11,6 +11,7 @@ const request: BuiltRequest = {
 
 afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
 });
 
 function mockFetch(response: Response): void {
@@ -87,9 +88,9 @@ describe("executeRequest", () => {
                 },
             }),
         );
-        const now = vi.fn().mockReturnValueOnce(100).mockReturnValueOnce(175);
+        const now = vi.spyOn(Date, "now").mockReturnValueOnce(100).mockReturnValueOnce(175);
 
-        await expect(executeRequest(request, new AbortController().signal, now)).resolves.toMatchObject({
+        await expect(executeRequest(request, new AbortController().signal)).resolves.toMatchObject({
             kind: "response",
             durationMs: 75,
             headers: [
@@ -103,9 +104,9 @@ describe("executeRequest", () => {
 
     it("clamps a negative elapsed duration to zero", async () => {
         mockFetch(new Response("ok"));
-        const now = vi.fn().mockReturnValueOnce(175).mockReturnValueOnce(100);
+        vi.spyOn(Date, "now").mockReturnValueOnce(175).mockReturnValueOnce(100);
 
-        await expect(executeRequest(request, new AbortController().signal, now)).resolves.toMatchObject({
+        await expect(executeRequest(request, new AbortController().signal)).resolves.toMatchObject({
             kind: "response",
             durationMs: 0,
         });
