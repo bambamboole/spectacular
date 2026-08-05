@@ -18,7 +18,6 @@ import {
     NativeSelect,
     SegmentedPills,
     Spinner,
-    Textarea,
 } from "@lattice-php/lattice/ui";
 import { SchemaView } from "../schema/SchemaView";
 import { executeRequest, type ExecutedResponse, type ExecutionError } from "./execute-request";
@@ -26,6 +25,7 @@ import { LiveResponsePanel, responseBadgeColor } from "./LiveResponsePanel";
 import { OperationHeader } from "./OperationHeader";
 import { operationToMarkdown } from "./operation-markdown";
 import { parameterAllowedValues, parameterTypeLabel } from "./parameter-schema";
+import { RequestBodyEditor } from "./RequestBodyEditor";
 import {
     buildRequest,
     isBearerAccessTokenScheme,
@@ -943,23 +943,15 @@ export function RequestPlayground({
                                 </FormFieldFrame>
                             ) : null}
                             {selectedContract !== null ? (
-                                <FormFieldFrame
-                                    id={`${idPrefix}-request-body`}
-                                    label="JSON body"
+                                <RequestBodyEditor
+                                    idPrefix={idPrefix}
+                                    schema={selectedContract.schema}
+                                    components={components}
+                                    value={values.body}
                                     required={requestBodyRequired}
                                     error={buildResult.errors?.body ?? undefined}
-                                >
-                                    {(controlProps) => (
-                                        <Textarea
-                                            {...controlProps}
-                                            value={values.body}
-                                            required={requestBodyRequired}
-                                            data-field-key="body"
-                                            onChange={(event) => updateBody(event.target.value)}
-                                            className="min-h-40 font-mono"
-                                        />
-                                    )}
-                                </FormFieldFrame>
+                                    onChange={updateBody}
+                                />
                             ) : null}
                         </section>
                     ) : null}

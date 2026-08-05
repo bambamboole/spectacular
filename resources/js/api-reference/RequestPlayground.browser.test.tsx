@@ -116,7 +116,7 @@ describe("RequestPlayground", () => {
         );
 
         const id = screen.getByLabelText("id");
-        const body = screen.getByLabelText("JSON body");
+        const bodyName = screen.getByLabelText("name");
         const snippet = screen.getByLabelText("Request snippet", { exact: true });
         const requestPanel = screen.getByRole("complementary", { name: "Request" });
         const referencePanel = screen.getByRole("complementary", { name: "Reference" });
@@ -139,7 +139,7 @@ describe("RequestPlayground", () => {
         await expect.element(markdownCopy).toHaveClass("ml-auto");
         await expect.element(screen.getByLabelText("status")).toBeVisible();
         await expect.element(screen.getByLabelText("X-Debug")).toBeVisible();
-        await expect.element(body).toBeVisible();
+        await expect.element(bodyName).toHaveValue("Desk");
         await expect.element(screen.getByRole("radio", { name: "cURL" })).toHaveAttribute("aria-checked", "true");
         await expect.element(snippet).toHaveAttribute("data-slot", "code-block");
         await expect.poll(() => document.querySelector(".cm-content")?.getAttribute("contenteditable")).toBe("false");
@@ -150,13 +150,13 @@ describe("RequestPlayground", () => {
 
         await id.fill("a/b");
         await screen.getByLabelText("status").selectOptions("archived");
-        await body.fill('{"name":"Lamp"}');
+        await bodyName.fill("Lamp");
         await screen.getByRole("radio", { name: "JavaScript" }).click();
 
         await expect.element(snippet).toHaveTextContent(
             'fetch("https://api.example.test/v1/widgets/a%2Fb?status=archived"',
         );
-        await expect.element(snippet).toHaveTextContent('\\"name\\":\\"Lamp\\"');
+        await expect.element(snippet).toHaveTextContent('\\"name\\": \\"Lamp\\"');
         await expect.element(snippet).toHaveTextContent("Bearer <YOUR_TOKEN>");
         await expect.element(snippet).not.toHaveTextContent(REAL_TOKEN);
 
@@ -181,7 +181,7 @@ describe("RequestPlayground", () => {
         await expect.element(screen.locator).not.toHaveTextContent(REAL_TOKEN);
     });
 
-    it("edits JSON request bodies as text", async () => {
+    it("edits JSON object request bodies as schema fields", async () => {
         const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200, statusText: "OK" }));
         vi.stubGlobal("fetch", fetchMock);
         const screen = await render(
@@ -199,12 +199,17 @@ describe("RequestPlayground", () => {
                         requestContract({
                             schema: {
                                 type: "object",
-                                required: ["name", "active", "launchDate", "address", "items"],
+                                required: ["name", "active", "launchDate", "publishedAt", "address", "items"],
                                 properties: {
                                     name: { type: "string", example: "Desk" },
                                     status: { type: "string", enum: ["draft", "confirmed"] },
                                     active: { type: "boolean", default: false },
                                     launchDate: { type: "string", format: "date", example: "2026-08-03" },
+                                    publishedAt: {
+                                        type: "string",
+                                        format: "date-time",
+                                        example: "2026-08-03T10:30:00Z",
+                                    },
                                     address: {
                                         type: "object",
                                         required: ["city"],
@@ -234,34 +239,66 @@ describe("RequestPlayground", () => {
             />,
         );
 
-        const body = screen.getByLabelText("JSON body");
-        await expect.element(body).toHaveValue(
-            JSON.stringify(
-                {
-                    name: "Desk",
-                    active: false,
-                    launchDate: "2026-08-03",
-                    address: { city: "Berlin" },
-                    items: [{ sku: "SKU-1", quantity: 1 }],
-                },
-                null,
-                2,
-            ),
-        );
+        await expect.element(screen.getByLabelText("name")).toHaveValue("Desk");
+        await expect.element(screen.getByLabelText("status")).toHaveValue("");
+        await expect.element(screen.getByLabelText("active")).toHaveValue("false");
+        await expect.element(screen.getByLabelText("launchDate")).toHaveValue("2026-08-03");
+        await expect.element(screen.getByLabelText("publishedAt")).toHaveValue("2026-08-03T10:30:00Z");
+        await expect.element(screen.getByLabelText("address.city")).toHaveValue("Berlin");
+        await expect.element(screen.getByLabelText("items[0].sku")).toHaveValue("SKU-1");
+        await expect.element(screen.getByLabelText("items[0].quantity")).toHaveValue(1);
 
-        await body.fill("{");
-        await expect.element(screen.getByText("Enter a valid JSON request body.")).toBeVisible();
         await screen.getByRole("button", { name: "Execute" }).click();
-        expect(fetchMock).not.toHaveBeenCalled();
-        await body.fill('{"name":"Lamp","active":true,"items":[{"sku":"SKU-2","quantity":3}]}');
+        await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
+        expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).not.toHaveProperty("status");
+        fetchMock.mockClear();
+
+        await screen.getByLabelText("name").fill("Lamp");
+        await screen.getByLabelText("status").selectOptions("confirmed");
+        await screen.getByLabelText("active").selectOptions("true");
+        await screen.getByLabelText("items[0].sku").fill("SKU-2");
+        await screen.getByLabelText("items[0].quantity").fill("3");
+        await screen.getByRole("button", { name: "Add items item" }).click();
+        await screen.getByLabelText("items[1].sku").fill("SKU-3");
+        await screen.getByLabelText("items[1].quantity").fill("2");
         await screen.getByRole("button", { name: "Execute" }).click();
 
         await expect.poll(() => fetchMock.mock.calls.length).toBe(1);
         expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
             name: "Lamp",
+            status: "confirmed",
             active: true,
-            items: [{ sku: "SKU-2", quantity: 3 }],
+            launchDate: "2026-08-03",
+            publishedAt: "2026-08-03T10:30:00Z",
+            address: { city: "Berlin" },
+            items: [
+                { sku: "SKU-2", quantity: 3 },
+                { sku: "SKU-3", quantity: 2 },
+            ],
         });
+    });
+
+    it("keeps raw JSON editing for schemas without a finite field shape", async () => {
+        const screen = await render(
+            <RequestPlayground
+                operation={playgroundOperation({
+                    paramGroups: [],
+                    requests: [
+                        requestContract({
+                            schema: {
+                                type: "object",
+                                additionalProperties: true,
+                            },
+                        }),
+                    ],
+                })}
+                baseUrl="https://api.example.test"
+                token={null}
+                components={null}
+            />,
+        );
+
+        await expect.element(screen.getByLabelText("JSON body")).toBeVisible();
     });
 
     it("builds Laravel Query Builder filters, sorts, includes, and fields", async () => {
