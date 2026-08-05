@@ -26,13 +26,13 @@ final readonly class AsyncApiGenerator
     {
         /** @var array<string, mixed> $settings */
         $settings = config('spectacular.asyncapi', []);
-        $definitions = $this->messageDefinitions($settings);
+        $includeLaravelExtensions = (bool) ($settings['laravel_extensions'] ?? true);
+        $definitions = $this->messageDefinitions($settings, $includeLaravelExtensions);
 
         $channels = [];
         $channelDefinitions = [];
         $operations = [];
         $messages = [];
-        $includeLaravelExtensions = (bool) ($settings['laravel_extensions'] ?? true);
 
         foreach ($definitions as $definition) {
             $operationKey = $definition->key.'.send';
@@ -112,9 +112,8 @@ final readonly class AsyncApiGenerator
      * @param  array<string, mixed>  $settings
      * @return list<AsyncMessageDefinition>
      */
-    private function messageDefinitions(array $settings): array
+    private function messageDefinitions(array $settings, bool $includeLaravelExtensions): array
     {
-        $includeLaravelExtensions = (bool) ($settings['laravel_extensions'] ?? true);
         $messageDefinitions = collect($this->messageAttributedClasses($settings['scan_paths'] ?? []))
             ->map(function (ReflectionClass $class) use ($includeLaravelExtensions): ?AsyncMessageDefinition {
                 $attribute = $class->getAttributes(Message::class, ReflectionAttribute::IS_INSTANCEOF)[0]->newInstance();
@@ -129,22 +128,13 @@ final readonly class AsyncApiGenerator
             ->values()
             ->all();
 
+        $webhookSettings = is_array($settings['webhooks'] ?? null) ? $settings['webhooks'] : [];
+
         foreach ($this->webhooks->all() as $webhook) {
-            $messageDefinitions[] = $this->messages->fromWebhook($webhook, $this->webhookSettings($settings));
+            $messageDefinitions[] = $this->messages->fromWebhook($webhook, $webhookSettings);
         }
 
         return $messageDefinitions;
-    }
-
-    /**
-     * @param  array<string, mixed>  $settings
-     * @return array<string, mixed>
-     */
-    private function webhookSettings(array $settings): array
-    {
-        $webhooks = $settings['webhooks'] ?? [];
-
-        return is_array($webhooks) ? $webhooks : [];
     }
 
     /**

@@ -6,6 +6,7 @@ namespace Bambamboole\Spectacular\AsyncApi\Messages;
 use Bambamboole\LaravelWebhooks\WebhookEventDefinition;
 use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
 use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
+use Bambamboole\Spectacular\AsyncApi\Support\InvokesZeroArgMethods;
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -16,6 +17,8 @@ use Throwable;
 
 final readonly class MessageDefinitionFactory
 {
+    use InvokesZeroArgMethods;
+
     public function __construct(
         private PayloadSchemaFactory $payloads,
     ) {}
@@ -38,32 +41,17 @@ final readonly class MessageDefinitionFactory
             return null;
         }
 
-        $message = array_filter([
-            'name' => $this->broadcastName($event),
-            'title' => $attribute->title,
-            'summary' => $attribute->summary,
-            'description' => $attribute->description,
-            'tags' => array_map(fn (string $tag): array => ['name' => $tag], $attribute->tags),
-            'payload' => $this->payloads->forEvent($event->getName()),
-        ], fn (mixed $value): bool => $value !== null && $value !== []);
-
-        if ($includeLaravelExtensions) {
-            $message['x-laravel-event'] = $event->getName();
-            $message['x-laravel-broadcast-now'] = $event->implementsInterface(ShouldBroadcastNow::class);
-        }
-
-        if ($attribute->payload !== null) {
-            $message['x-spectacular-payload'] = $attribute->payload;
-        }
-
-        return new AsyncMessageDefinition(
-            key: $this->componentKey($event->getName()),
-            channels: array_map(fn (string $channel): AsyncChannelDefinition => new AsyncChannelDefinition(
-                key: $channel,
-                address: $channel,
-            ), $channels),
-            message: $message,
+        $message = $this->message(
+            $this->broadcastName($event),
+            $attribute,
+            $this->payloads->forEvent($event->getName()),
+            $includeLaravelExtensions ? [
+                'x-laravel-event' => $event->getName(),
+                'x-laravel-broadcast-now' => $event->implementsInterface(ShouldBroadcastNow::class),
+            ] : [],
         );
+
+        return $this->definition($event->getName(), $channels, $message);
     }
 
     /**
@@ -79,33 +67,18 @@ final readonly class MessageDefinitionFactory
             return null;
         }
 
-        $message = array_filter([
-            'name' => $this->notificationBroadcastName($notification),
-            'title' => $attribute->title,
-            'summary' => $attribute->summary,
-            'description' => $attribute->description,
-            'tags' => array_map(fn (string $tag): array => ['name' => $tag], $attribute->tags),
-            'payload' => $this->payloads->forNotification($notification->getName()),
-        ], fn (mixed $value): bool => $value !== null && $value !== []);
-
-        if ($includeLaravelExtensions) {
-            $message['x-laravel-notification'] = $notification->getName();
-            $message['x-laravel-event'] = BroadcastNotificationCreated::class;
-            $message['x-laravel-broadcast-now'] = false;
-        }
-
-        if ($attribute->payload !== null) {
-            $message['x-spectacular-payload'] = $attribute->payload;
-        }
-
-        return new AsyncMessageDefinition(
-            key: $this->componentKey($notification->getName()),
-            channels: array_map(fn (string $channel): AsyncChannelDefinition => new AsyncChannelDefinition(
-                key: $channel,
-                address: $channel,
-            ), $channels),
-            message: $message,
+        $message = $this->message(
+            $this->notificationBroadcastName($notification),
+            $attribute,
+            $this->payloads->forNotification($notification->getName()),
+            $includeLaravelExtensions ? [
+                'x-laravel-notification' => $notification->getName(),
+                'x-laravel-event' => BroadcastNotificationCreated::class,
+                'x-laravel-broadcast-now' => false,
+            ] : [],
         );
+
+        return $this->definition($notification->getName(), $channels, $message);
     }
 
     /**
@@ -113,26 +86,15 @@ final readonly class MessageDefinitionFactory
      */
     public function fromWebhook(WebhookEventDefinition $definition, array $webhooks = []): AsyncMessageDefinition
     {
-        $channel = $webhooks['channel'] ?? [];
-        $channel = is_array($channel) ? $channel : [];
-        $channelKey = is_string($channel['key'] ?? null) ? $channel['key'] : 'webhooks';
-        $channelAddress = is_string($channel['address'] ?? null) ? $channel['address'] : '{webhookUrl}';
-        $data = $this->payloads->forMethod($definition->class, 'webhookPayload');
         $properties = [
             'id' => ['type' => 'string', 'format' => 'uuid'],
             'event' => ['type' => 'string', 'enum' => [$definition->name]],
             'createdAt' => ['type' => 'string', 'format' => 'date-time'],
-            'data' => $data,
+            'data' => $this->payloads->forMethod($definition->class, 'webhookPayload'),
         ];
 
-        $event = new ReflectionClass($definition->class);
-
-        if ($event->hasMethod('webhookLinks')) {
-            $method = $event->getMethod('webhookLinks');
-
-            if ($method->isPublic() && $method->getNumberOfRequiredParameters() === 0) {
-                $properties['links'] = $this->payloads->forMethod($definition->class, 'webhookLinks');
-            }
+        if ($this->publicZeroArgMethod(new ReflectionClass($definition->class), 'webhookLinks') !== null) {
+            $properties['links'] = $this->payloads->forMethod($definition->class, 'webhookLinks');
         }
 
         $message = array_filter([
@@ -155,11 +117,57 @@ final readonly class MessageDefinitionFactory
             key: $definition->name,
             channels: [
                 new AsyncChannelDefinition(
-                    key: $channelKey,
-                    address: $channelAddress,
+                    key: $this->stringSetting($webhooks['channel']['key'] ?? null, 'webhooks'),
+                    address: $this->stringSetting($webhooks['channel']['address'] ?? null, '{webhookUrl}'),
                     kind: 'webhook',
                 ),
             ],
+            message: $message,
+        );
+    }
+
+    private function stringSetting(mixed $value, string $default): string
+    {
+        return is_string($value) ? $value : $default;
+    }
+
+    /**
+     * @param  array<string, mixed>  $laravelExtensions
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function message(string $name, Message $attribute, array $payload, array $laravelExtensions): array
+    {
+        $message = array_filter([
+            'name' => $name,
+            'title' => $attribute->title,
+            'summary' => $attribute->summary,
+            'description' => $attribute->description,
+            'tags' => array_map(fn (string $tag): array => ['name' => $tag], $attribute->tags),
+            'payload' => $payload,
+        ], fn (mixed $value): bool => $value !== null && $value !== []);
+
+        $message = array_merge($message, $laravelExtensions);
+
+        if ($attribute->payload !== null) {
+            $message['x-spectacular-payload'] = $attribute->payload;
+        }
+
+        return $message;
+    }
+
+    /**
+     * @param  list<string>  $channels
+     * @param  array<string, mixed>  $message
+     */
+    private function definition(string $class, array $channels, array $message): AsyncMessageDefinition
+    {
+        return new AsyncMessageDefinition(
+            key: $this->componentKey($class),
+            channels: array_map(fn (string $channel): AsyncChannelDefinition => new AsyncChannelDefinition(
+                key: $channel,
+                address: $channel,
+            ), $channels),
             message: $message,
         );
     }
@@ -188,21 +196,7 @@ final readonly class MessageDefinitionFactory
      */
     private function inferChannels(ReflectionClass $event): array
     {
-        if (! $event->hasMethod('broadcastOn')) {
-            return [];
-        }
-
-        $method = $event->getMethod('broadcastOn');
-
-        if (! $method->isPublic() || $method->getNumberOfRequiredParameters() > 0) {
-            return [];
-        }
-
-        try {
-            return $this->normalizeChannels($method->invoke($event->newInstanceWithoutConstructor()));
-        } catch (Throwable) {
-            return [];
-        }
+        return $this->normalizeChannels($this->invokeZeroArgMethod($event, 'broadcastOn'));
     }
 
     /**
@@ -291,23 +285,9 @@ final readonly class MessageDefinitionFactory
      */
     private function broadcastName(ReflectionClass $event): string
     {
-        if (! $event->hasMethod('broadcastAs')) {
-            return $event->getName();
-        }
+        $name = $this->invokeZeroArgMethod($event, 'broadcastAs');
 
-        $method = $event->getMethod('broadcastAs');
-
-        if (! $method->isPublic() || $method->getNumberOfRequiredParameters() > 0) {
-            return $event->getName();
-        }
-
-        try {
-            $name = $method->invoke($event->newInstanceWithoutConstructor());
-
-            return is_string($name) && $name !== '' ? $name : $event->getName();
-        } catch (Throwable) {
-            return $event->getName();
-        }
+        return is_string($name) && $name !== '' ? $name : $event->getName();
     }
 
     /**
@@ -315,23 +295,9 @@ final readonly class MessageDefinitionFactory
      */
     private function notificationBroadcastName(ReflectionClass $notification): string
     {
-        if (! $notification->hasMethod('broadcastAs')) {
-            return BroadcastNotificationCreated::class;
-        }
+        $name = $this->invokeZeroArgMethod($notification, 'broadcastAs');
 
-        $method = $notification->getMethod('broadcastAs');
-
-        if (! $method->isPublic() || $method->getNumberOfRequiredParameters() > 0) {
-            return BroadcastNotificationCreated::class;
-        }
-
-        try {
-            $name = $method->invoke($notification->newInstanceWithoutConstructor());
-
-            return is_string($name) && $name !== '' ? $name : BroadcastNotificationCreated::class;
-        } catch (Throwable) {
-            return BroadcastNotificationCreated::class;
-        }
+        return is_string($name) && $name !== '' ? $name : BroadcastNotificationCreated::class;
     }
 
     private function componentKey(string $class): string
