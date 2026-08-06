@@ -6,10 +6,10 @@ namespace Workbench\App\Pages;
 
 use Bambamboole\Spectacular\Doc\Lattice\ApiReference;
 use Illuminate\Http\Request;
-use Lattice\Lattice\Attributes\AsPage;
-use Lattice\Lattice\Core\PageSchema;
-use Lattice\Lattice\Http\Page;
-use Lattice\Lattice\Ui\Enums\PageContainer;
+use Lattice\Core\Attributes\AsPage;
+use Lattice\Core\Enums\PageContainer;
+use Lattice\Http\Page;
+use Lattice\Ui\PageSchema;
 
 #[AsPage(route: '/', name: 'home')]
 final class ApiReferencePage extends Page
