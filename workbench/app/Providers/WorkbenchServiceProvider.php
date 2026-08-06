@@ -7,12 +7,9 @@ namespace Workbench\App\Providers;
 use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy;
 use Illuminate\Auth\GenericUser;
-use Illuminate\Contracts\Http\Kernel;
-use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
-use Inertia\Middleware as InertiaMiddleware;
 
 final class WorkbenchServiceProvider extends ServiceProvider
 {
@@ -27,8 +24,6 @@ final class WorkbenchServiceProvider extends ServiceProvider
             dirname(__DIR__, 2).'/app/Events',
         ]);
 
-        config(['lattice.discover' => [dirname(__DIR__)]]);
-
         config(['scramble.security_strategy' => MiddlewareAuthSecurityStrategy::class]);
 
         config()->set('auth.defaults.guard', 'workbench');
@@ -40,7 +35,7 @@ final class WorkbenchServiceProvider extends ServiceProvider
         $this->app->forgetInstance(WebhookEventRegistry::class);
     }
 
-    public function boot(Kernel $kernel): void
+    public function boot(): void
     {
         Auth::viaRequest('workbench-token', function (Request $request): ?GenericUser {
             $token = (string) config('services.spectacular.demo_token', 'workbench-token');
@@ -49,9 +44,5 @@ final class WorkbenchServiceProvider extends ServiceProvider
                 ? new GenericUser(['id' => 1])
                 : null;
         });
-
-        if ($kernel instanceof HttpKernel) {
-            $kernel->appendMiddlewareToGroup('web', InertiaMiddleware::class);
-        }
     }
 }

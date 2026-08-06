@@ -13,12 +13,11 @@ seeders:
   - Workbench\Database\Seeders\DatabaseSeeder
 
 workbench:
-  start: '/'
+  start: '/api/users'
   welcome: false
   install: true
   discovers:
     api: true
-    views: true
   build:
     - create-sqlite-db
     - migrate:fresh:
