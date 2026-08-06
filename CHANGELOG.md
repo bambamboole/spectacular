@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/bambamboole/spectacular/compare/0.9.0...0.10.0) (2026-08-06)
+
+
+### Miscellaneous Chores
+
+* release lattice 0.41 upgrade ([dcb0709](https://github.com/bambamboole/spectacular/commit/dcb0709f9c792a9d6b24498624334ca0cea1acc6))
+
 ## [0.9.0](https://github.com/bambamboole/spectacular/compare/0.8.0...0.9.0) (2026-08-05)
 
 
