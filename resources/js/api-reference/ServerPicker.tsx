@@ -1,4 +1,4 @@
-import { NativeSelect } from "@lattice-php/lattice/ui";
+import { NativeSelect } from "@lattice-php/ui";
 import type { Server } from "./types";
 
 function serverLabel(server: Server): string {

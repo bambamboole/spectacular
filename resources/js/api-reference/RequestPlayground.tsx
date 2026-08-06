@@ -6,7 +6,7 @@ import {
     useState,
     type FormEvent,
 } from "react";
-import { FormFieldFrame } from "@lattice-php/lattice/form";
+import { FormFieldFrame } from "@lattice-php/form";
 import {
     Badge,
     Button,
@@ -17,7 +17,7 @@ import {
     NativeSelect,
     SegmentedPills,
     Spinner,
-} from "@lattice-php/lattice/ui";
+} from "@lattice-php/ui";
 import { SchemaView } from "../schema/SchemaView";
 import { executeRequest, type ExecutedResponse, type ExecutionError } from "./execute-request";
 import { LiveResponsePanel, responseBadgeColor } from "./LiveResponsePanel";

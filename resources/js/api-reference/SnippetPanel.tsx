@@ -1,4 +1,4 @@
-import { CodeBlock, SegmentedPills } from "@lattice-php/lattice/ui";
+import { CodeBlock, SegmentedPills } from "@lattice-php/ui";
 
 export type SnippetLanguage = "curl" | "javascript";
 

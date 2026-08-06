@@ -1,10 +1,10 @@
-import { createPlugin, lazyComponent } from "@lattice-php/lattice";
+import { lazyComponent, type Plugin } from "@lattice-php/core/registry";
 
-export default createPlugin({
+export default {
     name: "spectacular",
     components: {
         "spectacular.api-reference": lazyComponent(
             () => import("./api-reference/ApiReference"),
         ),
     },
-});
+} satisfies Plugin;

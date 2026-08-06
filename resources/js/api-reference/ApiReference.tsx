@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RendererComponent } from "@lattice-php/lattice";
-import { Icon } from "@lattice-php/lattice/icons";
-import { Badge, CopyButton } from "@lattice-php/lattice/ui";
+import { Icon } from "@lattice-php/ui/icons";
+import { Badge, CopyButton } from "@lattice-php/ui";
 import { httpMethodColor } from "./http-method-color";
 import { operationToMarkdown } from "./operation-markdown";
 import { OperationView } from "./OperationView";
