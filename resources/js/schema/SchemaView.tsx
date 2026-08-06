@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { buildSchemaRows, type SchemaRow } from "./build-rows";
-import { Icon } from "@lattice-php/lattice/icons";
+import { Icon } from "@lattice-php/ui/icons";
 
 function Row({ row, depth, expandDepth }: { row: SchemaRow; depth: number; expandDepth: number }): React.ReactNode {
     const [open, setOpen] = useState(depth < expandDepth);

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Bambamboole\Spectacular\Doc\Lattice\ApiReference;
-use Lattice\Lattice\Ui\Enums\Breakpoint;
+use Lattice\Ui\Enums\Breakpoint;
 
 it('serializes the spectacular.api-reference node', function (): void {
     $node = ApiReference::make()->url('/openapi.json')->jsonSerialize();

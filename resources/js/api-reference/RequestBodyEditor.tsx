@@ -1,6 +1,6 @@
 import { useId, useMemo } from "react";
-import { FormFieldFrame } from "@lattice-php/lattice/form";
-import { Button, Input, NativeSelect, Textarea } from "@lattice-php/lattice/ui";
+import { FormFieldFrame } from "@lattice-php/form";
+import { Button, Input, NativeSelect, Textarea } from "@lattice-php/ui";
 import { exampleFromSchema } from "./schema-example";
 import { isRecord, prettyJson } from "./utils";
 

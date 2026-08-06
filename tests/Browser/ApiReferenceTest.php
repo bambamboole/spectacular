@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\ServiceProvider as InertiaServiceProvider;
-use Lattice\Lattice\LatticeServiceProvider;
+use Lattice\LatticeServiceProvider;
 use Workbench\App\Pages\ApiReferencePage;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
