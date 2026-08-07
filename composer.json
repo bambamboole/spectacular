@@ -19,13 +19,13 @@
     ],
     "require": {
         "php": "^8.4",
-        "bambamboole/laravel-webhooks": ">=0.3 <1.0.0",
         "dedoc/scramble": "^0.13.30",
         "illuminate/support": "^13.0",
         "spatie/laravel-query-builder": "^7.0"
     },
     "require-dev": {
         "bambamboole/extended-testbench": "^0.6",
+        "bambamboole/laravel-webhooks": ">=0.3 <1.0.0",
         "larastan/larastan": "^3.10",
         "laravel/pint": "^1.29",
         "pestphp/pest": "^5.0",
@@ -34,6 +34,7 @@
         "rector/rector": "^2.0"
     },
     "suggest": {
+        "bambamboole/laravel-webhooks": "Document webhook events alongside broadcasts in the generated AsyncAPI (>=0.3).",
         "lattice-php/api-reference": "Render the generated OpenAPI documents as a browsable API reference (Lattice component, ^0.42)."
     },
     "autoload": {

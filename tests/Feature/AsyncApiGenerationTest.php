@@ -5,7 +5,9 @@ use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Bambamboole\Spectacular\AsyncApi\AsyncApiGenerator;
 use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
 use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
+use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\SpectacularServiceProvider;
+use Bambamboole\Spectacular\Support\ClassDiscoverer;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\ImmediateBroadcast;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidBroadcastNotification;
@@ -350,6 +352,16 @@ it('writes the generated document to stdout or to a file path', function (): voi
         ->toBe(app(AsyncApiGenerator::class)->generate());
 
     unlink($path);
+});
+
+it('documents broadcasts without the laravel-webhooks package', function (): void {
+    configureFixtureAsyncApi();
+
+    $document = (new AsyncApiGenerator(new ClassDiscoverer, app(MessageDefinitionFactory::class)))->generate();
+
+    expect($document['components']['messages'])->toHaveKey('Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast')
+        ->and($document['components']['messages'])->not->toHaveKey('invoice.paid')
+        ->and($document['channels'])->not->toHaveKey('webhooks');
 });
 
 it('matches the workbench AsyncAPI fixture', function (): void {
