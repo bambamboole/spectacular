@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.11.0](https://github.com/bambamboole/spectacular/compare/0.10.0...0.11.0) (2026-08-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* extract the Lattice API reference into lattice-php/api-reference
+
+### Code Refactoring
+
+* extract the Lattice API reference into lattice-php/api-reference ([7e25515](https://github.com/bambamboole/spectacular/commit/7e25515b567fdfc22bb5b6be5de5ad7b5ca66555))
+
 ## [0.10.0](https://github.com/bambamboole/spectacular/compare/0.9.0...0.10.0) (2026-08-06)
 
 
