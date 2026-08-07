@@ -297,59 +297,22 @@ php artisan spectacular:asyncapi --pretty=false   # compact JSON
 
 ![Spectacular API reference](.github/assets/api-reference.png)
 
-Spectacular ships a [Lattice](https://latticephp.com) component (`lattice-php/lattice` `^0.38`, install separately)
-that renders a generated OpenAPI document as a browsable API reference. Its frontend is auto-discovered by Lattice's
-Vite plugin — no manual `registry.ts` registration needed — but Spectacular ships raw `.ts`/`.tsx` compiled by your
-own app's Vite build, not a published npm package, so its runtime dependencies won't be installed automatically.
-Add them to your app's `package.json`:
+The interactive API reference viewer lives in [`lattice-php/api-reference`](https://github.com/lattice-php/api-reference),
+a first-party [Lattice](https://latticephp.com) component package. It renders any generated OpenAPI document as a
+browsable reference with a request playground — see the
+[docs page with a live demo](https://latticephp.com/packages/api-reference/):
 
 ```bash
-npm install @stoplight/json-schema-tree
+composer require lattice-php/api-reference
 ```
-
-`@stoplight/json-schema-tree` resolves local `$ref`s and turns the schema into the tree the viewer renders. If it is
-missing, Vite reports a build-time "cannot resolve module" error.
-
-If your app doesn't already render Lattice icons elsewhere, you'll also need an SVG sprite for the viewer's copy
-button and expand/collapse chevrons to actually be visible (the components render without one, just with empty
-icons — nothing errors or warns):
-
-```bash
-npm install -D @lattice-php/vite-svg-sprite
-```
-
-```ts
-// vite.config.ts
-import { svgSprite } from "@lattice-php/vite-svg-sprite";
-
-export default defineConfig({
-    plugins: [
-        // ...your other plugins
-        svgSprite({ iconDirs: ["node_modules/@lattice-php/lattice/resources/icons"] }),
-    ],
-});
-```
-
-Then pass the sprite to your `<Provider>`:
-
-```tsx
-import sprite from "virtual:svg-sprite";
-
-<Provider registry={registry} sprite={sprite}>
-    {/* ...your app */}
-</Provider>;
-```
-
-See [`@lattice-php/vite-svg-sprite`](https://www.npmjs.com/package/@lattice-php/vite-svg-sprite) for merging in your
-own icons alongside Lattice's.
 
 ```php
-use Bambamboole\Spectacular\Doc\Lattice\ApiReference;
 use Dedoc\Scramble\Generator;
 use Illuminate\Support\Facades\Cache;
-use Lattice\Lattice\Attributes\AsPage;
-use Lattice\Lattice\Core\PageSchema;
-use Lattice\Lattice\Http\Page;
+use Lattice\ApiReference\ApiReference;
+use Lattice\Core\Attributes\AsPage;
+use Lattice\Http\Page;
+use Lattice\Ui\PageSchema;
 
 #[AsPage(route: 'docs', name: 'docs', middleware: ['auth'])]
 final class ApiDocsPage extends Page

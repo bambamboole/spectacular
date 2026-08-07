@@ -2,34 +2,15 @@
 
 declare(strict_types=1);
 
-use Bambamboole\Spectacular\Doc\Lattice\ApiReference;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Lattice\Core\Enums\PageContainer;
-use Lattice\Ui\PageSchema;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\User;
-use Workbench\App\Pages\ApiReferencePage;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
 uses(LazilyRefreshDatabase::class);
 
-it('uses the full-width page container', function (): void {
-    expect(app(ApiReferencePage::class)->container())->toBe(PageContainer::Default);
-});
-
-it('uses the current workbench origin for API requests', function (): void {
-    $schema = app(ApiReferencePage::class)->render(PageSchema::make(), app(Request::class));
-    $reference = $schema->renderable()[0];
-
-    expect($reference)->toBeInstanceOf(ApiReference::class)
-        ->and($reference->jsonSerialize()['props']['spec']['servers'])->toBe([
-            ['url' => '/api'],
-        ]);
-});
-
-it('accepts the bearer token configured by the API reference', function (): void {
+it('accepts the configured bearer token', function (): void {
     app()->register(WorkbenchServiceProvider::class);
 
     $this->withHeader('Authorization', 'Bearer workbench-token')
@@ -37,7 +18,7 @@ it('accepts the bearer token configured by the API reference', function (): void
         ->assertUnprocessable();
 });
 
-it('stores users from the API reference', function (): void {
+it('stores users', function (): void {
     app()->register(WorkbenchServiceProvider::class);
 
     $this->withHeader('Authorization', 'Bearer workbench-token')
