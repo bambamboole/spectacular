@@ -215,8 +215,9 @@ channels that cannot be inferred.
 
 ### Webhook events
 
-Use Laravel Webhooks' `#[WebhookEvent]` attribute on outbound webhook event classes you want listed in the AsyncAPI
-document:
+Webhook documentation is optional and needs [`bambamboole/laravel-webhooks`](https://github.com/bambamboole/laravel-webhooks)
+(install separately); without it, the AsyncAPI document simply contains no webhook channel. Use its `#[WebhookEvent]`
+attribute on outbound webhook event classes you want listed in the AsyncAPI document:
 
 ```php
 use Bambamboole\LaravelWebhooks\Attributes\WebhookEvent;

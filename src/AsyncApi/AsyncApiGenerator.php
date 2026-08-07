@@ -3,12 +3,12 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\AsyncApi;
 
-use Bambamboole\LaravelWebhooks\Support\ClassDiscoverer;
 use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Bambamboole\Spectacular\AsyncApi\Attributes\BroadcastNotification;
 use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
 use Bambamboole\Spectacular\AsyncApi\Messages\AsyncMessageDefinition;
 use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
+use Bambamboole\Spectacular\Support\ClassDiscoverer;
 use LogicException;
 use ReflectionAttribute;
 use ReflectionClass;
@@ -18,7 +18,7 @@ final readonly class AsyncApiGenerator
     public function __construct(
         private ClassDiscoverer $classes,
         private MessageDefinitionFactory $messages,
-        private WebhookEventRegistry $webhooks,
+        private ?WebhookEventRegistry $webhooks = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -130,7 +130,7 @@ final readonly class AsyncApiGenerator
 
         $webhookSettings = is_array($settings['webhooks'] ?? null) ? $settings['webhooks'] : [];
 
-        foreach ($this->webhooks->all() as $webhook) {
+        foreach ($this->webhooks?->all() ?? [] as $webhook) {
             $messageDefinitions[] = $this->messages->fromWebhook($webhook, $webhookSettings);
         }
 

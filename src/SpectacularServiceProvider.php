@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular;
 
+use Bambamboole\LaravelWebhooks\WebhookEventRegistry;
 use Bambamboole\Spectacular\AsyncApi\AsyncApiGenerator;
 use Bambamboole\Spectacular\AsyncApi\Console\GenerateAsyncApiCommand;
 use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
@@ -10,7 +11,9 @@ use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
 use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\QueryBuilderExtension;
+use Bambamboole\Spectacular\Support\ClassDiscoverer;
 use Dedoc\Scramble\Scramble;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
 final class SpectacularServiceProvider extends ServiceProvider
@@ -22,7 +25,11 @@ final class SpectacularServiceProvider extends ServiceProvider
 
         $this->app->singleton(PayloadSchemaFactory::class);
         $this->app->singleton(MessageDefinitionFactory::class);
-        $this->app->singleton(AsyncApiGenerator::class);
+        $this->app->singleton(AsyncApiGenerator::class, fn (Application $app): AsyncApiGenerator => new AsyncApiGenerator(
+            new ClassDiscoverer,
+            $app->make(MessageDefinitionFactory::class),
+            class_exists(WebhookEventRegistry::class) ? $app->make(WebhookEventRegistry::class) : null,
+        ));
 
         Scramble::registerExtension(QueryBuilderExtension::class);
         Scramble::registerExtension(PaginationExtension::class);
