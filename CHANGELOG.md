@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0](https://github.com/bambamboole/spectacular/compare/0.11.0...0.12.0) (2026-08-10)
+
+
+### Features
+
+* add OpenAPI test validation ([25e2685](https://github.com/bambamboole/spectacular/commit/25e268577f0ccd3ec69281e60d494ca7a50649f2))
+* add OpenAPI test validation ([9b68781](https://github.com/bambamboole/spectacular/commit/9b68781aea9c9d9a9c0f7b5ba6d0f64dc84fbe7a))
+
 ## [0.11.0](https://github.com/bambamboole/spectacular/compare/0.10.0...0.11.0) (2026-08-07)
 
 
