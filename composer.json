@@ -21,7 +21,10 @@
         "php": "^8.4",
         "dedoc/scramble": "^0.13.30",
         "illuminate/support": "^13.0",
-        "spatie/laravel-query-builder": "^7.0"
+        "league/openapi-psr7-validator": "^0.24",
+        "nyholm/psr7": "^1.8",
+        "spatie/laravel-query-builder": "^7.0",
+        "symfony/psr-http-message-bridge": "^8.0"
     },
     "require-dev": {
         "bambamboole/extended-testbench": "^0.6",
