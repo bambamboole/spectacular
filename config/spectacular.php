@@ -2,6 +2,11 @@
 declare(strict_types=1);
 
 return [
+    'openapi' => [
+        'validation' => [
+            'path' => base_path('openapi.json'),
+        ],
+    ],
     'asyncapi' => [
         'version' => '3.0.0',
         'default_content_type' => 'application/json',
