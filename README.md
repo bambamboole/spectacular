@@ -34,8 +34,9 @@ This writes `config/spectacular.php`.
 ## OpenAPI
 
 Spectacular ships two Scramble [operation extensions](https://scramble.dedoc.co/usage/extending),
-`QueryBuilderExtension` and `PaginationExtension`. The service provider registers them for you; add your own through
-Scramble's native `scramble.extensions` config.
+`QueryBuilderExtension` and `PaginationExtension`, along with operation transformers that document validation errors and
+laravel-data request bodies. The service provider registers them for you; add your own through Scramble's native
+`scramble.extensions` config.
 
 ### Query builder parameters
 
@@ -101,6 +102,45 @@ for each declared mode.
 
 `per_page` defaults to the model's page size. Supplied integers are clamped between `1` and `max`, which defaults to
 `100`.
+
+### Validation errors
+
+Scramble infers a `422` only where it can see validation happen inside the controller — a `validate()` call or a Form
+Request. Spectacular documents one on every `POST`, `PUT` and `PATCH` operation instead, referencing a single
+`ValidationException` response component with Laravel's `message` and `errors` body. An operation that already documents
+a `422` is left untouched.
+
+### laravel-data request bodies
+
+When `spatie/laravel-data` is installed, an action that takes a `Data` object gets its request body documented — without
+it such endpoints appear to accept nothing at all, because the validation happens while the container resolves the
+argument rather than in the controller body.
+
+```php
+final class StoreArticleData extends Data
+{
+    public function __construct(
+        /** Headline of the article. */
+        public string $title,
+        /** Teaser shown in listings. */
+        public ?string $summary = null,
+        /** Whether the article is publicly visible. Defaults to false. */
+        #[MapInputName('is_published')]
+        public bool $isPublished = false,
+    ) {}
+}
+```
+
+The docblock above a promoted property becomes that field's `description`, so a payload is described where it is
+declared instead of in a per-endpoint attribute.
+
+Which fields are mandatory is taken from the properties themselves, not from the generated rules: a property carrying a
+default or a nullable type may be left out, even though its rules say `required` once it is present. An optional object
+holding a mandatory field also stays optional — only `title` is required above, and an omitted `summary` is not an
+error. A `Data` class that nests itself is expanded once and then documented as an unconstrained array, which keeps a
+tree-shaped payload from recursing forever.
+
+A `Data` class declaring its own `rules()` method is left to Scramble, which reads that method directly.
 
 ### Generating the document
 

@@ -11,10 +11,15 @@ use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
 use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\QueryBuilderExtension;
+use Bambamboole\Spectacular\OpenApi\LaravelData\DataParametersExtractor;
+use Bambamboole\Spectacular\OpenApi\LaravelData\DataRequiredFieldsTransformer;
+use Bambamboole\Spectacular\OpenApi\Transformers\ValidationErrorResponses;
 use Bambamboole\Spectacular\Support\ClassDiscoverer;
+use Dedoc\Scramble\Configuration\ParametersExtractors;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
+use Spatie\LaravelData\Data;
 
 final class SpectacularServiceProvider extends ServiceProvider
 {
@@ -33,6 +38,14 @@ final class SpectacularServiceProvider extends ServiceProvider
 
         Scramble::registerExtension(QueryBuilderExtension::class);
         Scramble::registerExtension(PaginationExtension::class);
+
+        Scramble::configure()->withOperationTransformers(ValidationErrorResponses::class);
+
+        if (class_exists(Data::class)) {
+            Scramble::configure()
+                ->withParametersExtractors(fn (ParametersExtractors $extractors): ParametersExtractors => $extractors->prepend(DataParametersExtractor::class))
+                ->withOperationTransformers(DataRequiredFieldsTransformer::class);
+        }
     }
 
     public function boot(): void
