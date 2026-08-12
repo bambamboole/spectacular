@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/bambamboole/spectacular/compare/0.13.0...0.13.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **openapi:** configure scramble on boot instead of register ([182b3fc](https://github.com/bambamboole/spectacular/commit/182b3fc5ca8a9d9e3580fc76523a061c968c0dba))
+
 ## [0.13.0](https://github.com/bambamboole/spectacular/compare/0.12.0...0.13.0) (2026-08-12)
 
 
