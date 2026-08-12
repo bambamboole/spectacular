@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.13.0](https://github.com/bambamboole/spectacular/compare/0.12.0...0.13.0) (2026-08-12)
+
+
+### Features
+
+* **openapi:** declare authentication modes from configuration ([f3aaa01](https://github.com/bambamboole/spectacular/commit/f3aaa01f1902a54312401a13016a7b7f039a121d))
+* **openapi:** document validation errors and laravel-data request bodies ([6ee06b9](https://github.com/bambamboole/spectacular/commit/6ee06b995716a0967f29d34d4ca62cfb3f93c80a))
+* **openapi:** validation errors, laravel-data request bodies, configurable auth modes ([6eed186](https://github.com/bambamboole/spectacular/commit/6eed18662e2af34b8f2097d32f63bad71b3e8e8d))
+
 ## [0.12.0](https://github.com/bambamboole/spectacular/compare/0.11.0...0.12.0) (2026-08-10)
 
 
