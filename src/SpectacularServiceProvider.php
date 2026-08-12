@@ -11,8 +11,10 @@ use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
 use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\QueryBuilderExtension;
+use Bambamboole\Spectacular\OpenApi\Info\DocumentsConfiguredInfo;
 use Bambamboole\Spectacular\OpenApi\LaravelData\DataParametersExtractor;
 use Bambamboole\Spectacular\OpenApi\LaravelData\DataRequiredFieldsTransformer;
+use Bambamboole\Spectacular\OpenApi\RateLimiting\RateLimitResponses;
 use Bambamboole\Spectacular\OpenApi\Security\DocumentsConfiguredSecurity;
 use Bambamboole\Spectacular\OpenApi\Security\MarksUnauthenticatedRoutesPublic;
 use Bambamboole\Spectacular\OpenApi\Security\SecurityConfig;
@@ -65,7 +67,12 @@ final class SpectacularServiceProvider extends ServiceProvider
      */
     private function configureScramble(): void
     {
-        Scramble::configure()->withOperationTransformers(ValidationErrorResponses::class);
+        Scramble::configure()
+            ->withDocumentTransformers(DocumentsConfiguredInfo::class)
+            ->withOperationTransformers([
+                ValidationErrorResponses::class,
+                RateLimitResponses::class,
+            ]);
 
         if (SecurityConfig::schemes() !== []) {
             Scramble::configure()

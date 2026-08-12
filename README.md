@@ -34,9 +34,9 @@ This writes `config/spectacular.php`.
 ## OpenAPI
 
 Spectacular ships two Scramble [operation extensions](https://scramble.dedoc.co/usage/extending),
-`QueryBuilderExtension` and `PaginationExtension`, along with operation transformers that document validation errors and
-laravel-data request bodies. The service provider registers them for you; add your own through Scramble's native
-`scramble.extensions` config.
+`QueryBuilderExtension` and `PaginationExtension`, along with transformers that document validation errors, rate limits,
+laravel-data request bodies and the info object. The service provider registers them for you; add your own through
+Scramble's native `scramble.extensions` config.
 
 ### Query builder parameters
 
@@ -69,6 +69,27 @@ Laravel `JsonApiResource` sparse fieldsets are handled separately by Scramble.
 
 Filter, sort and include names honour the relevant `config/query-builder.php` settings, so a customised query-builder
 config is reflected in the generated document.
+
+#### Filter schemas and matching
+
+The `AllowedFilter` factory a filter was declared with decides both how it is described and whether the model can type
+it. `exact`, `belongsTo` and `operator` compare a whole column value, so the schema comes from the model named in
+`QueryBuilder::for()`:
+
+| The column | Documented as |
+| --- | --- |
+| A backed enum cast | `string` or `integer` with the case values as `enum` |
+| A `boolean` cast | `boolean` |
+| An `integer` cast | `integer` |
+| A `float`, `double` or `decimal:n` cast | `number` |
+| A `date` or `datetime` cast | `string` with `format: date` / `date-time` |
+| The model's own key | Its key type, `format: uuid` with `HasUuids` |
+| A `*_id` naming a `BelongsTo` relation | The related model's key |
+
+`AllowedFilter::trashed()` documents the `with`, `only` and empty values it accepts. Text matching (`partial`,
+`beginsWith`, `endsWith`) stays a `string` whatever the column holds, because a client sends a fragment rather than a
+value. A filter whose semantics Spectacular cannot know (`callback`, `custom`) and a chain opened with something other
+than a model class stay untyped.
 
 ### Pagination parameters
 
@@ -167,6 +188,50 @@ Scramble infers a `422` only where it can see validation happen inside the contr
 Request. Spectacular documents one on every `POST`, `PUT` and `PATCH` operation instead, referencing a single
 `ValidationException` response component with Laravel's `message` and `errors` body. An operation that already documents
 a `422` is left untouched.
+
+### Rate limits
+
+Throttling happens in middleware, which no controller body reveals — without it an endpoint reads as if a client could
+call it as often as it likes. A route carrying one of the configured middleware patterns documents its request budget on
+every success response, plus a shared `ThrottleRequestsException` response for an exhausted limit:
+
+```php
+// config/spectacular.php
+'rate_limiting' => [
+    'middleware' => ['throttle', 'throttle:*'],
+    'headers' => [
+        'X-RateLimit-Limit' => 'The maximum number of requests allowed in the current window.',
+        'X-RateLimit-Remaining' => 'The number of requests left in the current window.',
+    ],
+    'exhausted_headers' => [
+        'Retry-After' => 'Seconds to wait before sending another request.',
+        'X-RateLimit-Reset' => 'Seconds until the current window resets.',
+    ],
+],
+```
+
+The defaults describe what Laravel's own `throttle` middleware returns. An app throttling through a middleware of its
+own adds that alias to `middleware`; one that sets a further header while the limit holds moves it from
+`exhausted_headers` into `headers`. Header values are documented as integers. An operation that already documents a
+`429` is left untouched, and leaving `middleware` or `headers` empty keeps rate limits undocumented.
+
+### The info object
+
+Scramble resolves the document title from `scramble.ui.title` and the version and description from `scramble.info`.
+What OpenAPI offers beyond those three is only available here:
+
+```php
+// config/spectacular.php
+'info' => [
+    'description' => 'What this API is for.',
+    'terms_of_service' => 'https://acme.test/terms',
+    'contact' => ['name' => 'API support', 'email' => 'api@acme.test'],
+    'license' => ['name' => 'MIT', 'identifier' => 'MIT'],
+],
+```
+
+Anything set here wins over what Scramble resolved; anything left out keeps it. A licence needs a `name` to be
+documented at all, and OpenAPI allows an SPDX `identifier` or a `url` but not both — given both, the `url` is dropped.
 
 ### laravel-data request bodies
 

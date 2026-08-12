@@ -12,4 +12,6 @@ Route::get('api/roles', RolesController::class)->name('api.roles.index');
 Route::get('api/users', UsersController::class)->name('api.users.index');
 Route::post('api/users', StoreUserController::class)->middleware('auth')->name('api.users.store');
 Route::get('api/users/{user}', ShowUserController::class)->middleware('auth')->name('api.users.show');
-Route::get('api/categories', CategoriesController::class)->name('api.categories.index');
+Route::get('api/categories', CategoriesController::class)
+    ->middleware('throttle:60,1')
+    ->name('api.categories.index');

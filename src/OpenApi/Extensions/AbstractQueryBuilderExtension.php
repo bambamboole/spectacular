@@ -12,6 +12,7 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
+use PhpParser\Node\Scalar\String_;
 use PhpParser\NodeFinder;
 use Spatie\QueryBuilder\QueryBuilder as SpatieQueryBuilder;
 
@@ -51,14 +52,43 @@ abstract class AbstractQueryBuilderExtension extends OperationExtension
 
     protected function isQueryBuilderChain(Expr $expression): bool
     {
+        return $this->subjectCall($expression) !== null;
+    }
+
+    /**
+     * The class the chain was opened with, when `for()` names one statically —
+     * `QueryBuilder::for(User::class)` filters users.
+     *
+     * @return class-string|null
+     */
+    protected function subjectModelClass(Expr $expression): ?string
+    {
+        $argument = $this->subjectCall($expression)?->args[0]->value ?? null;
+
+        if ($argument instanceof Expr\ClassConstFetch
+            && $argument->name instanceof Identifier
+            && $argument->name->name === 'class'
+            && $argument->class instanceof Name) {
+            $class = $this->resolvedClassName($argument->class);
+
+            return class_exists($class) ? $class : null;
+        }
+
+        return $argument instanceof String_ && class_exists($argument->value) ? $argument->value : null;
+    }
+
+    private function subjectCall(Expr $expression): ?Expr\StaticCall
+    {
         if ($expression instanceof Expr\MethodCall) {
-            return $this->isQueryBuilderChain($expression->var);
+            return $this->subjectCall($expression->var);
         }
 
         return $expression instanceof Expr\StaticCall
             && $this->methodName($expression->name) === 'for'
             && ($this->isClassName($expression->class, SpatieQueryBuilder::class)
-                || $this->isClassName($expression->class, SpectacularQueryBuilder::class));
+                || $this->isClassName($expression->class, SpectacularQueryBuilder::class))
+                ? $expression
+                : null;
     }
 
     protected function isClassName(Name|Expr $class, string $expected): bool

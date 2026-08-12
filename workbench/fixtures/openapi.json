@@ -35,6 +35,43 @@
                         }
                     },
                     {
+                        "name": "filter[name]",
+                        "in": "query",
+                        "description": "Filter by `name`. Matches values containing the given text, case-insensitively.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[status]",
+                        "in": "query",
+                        "description": "Filter by `status`. Matches the exact value.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "draft",
+                                "published",
+                                "archived"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "filter[is_visible]",
+                        "in": "query",
+                        "description": "Filter by `is_visible`. Matches the exact value.",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "filter[parent_id]",
+                        "in": "query",
+                        "description": "Filter by `parent_id`. Matches the exact value.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
                         "name": "page",
                         "in": "query",
                         "description": "The page number to retrieve.",
@@ -182,7 +219,24 @@
                                     ]
                                 }
                             }
+                        },
+                        "headers": {
+                            "X-RateLimit-Limit": {
+                                "description": "The maximum number of requests allowed in the current window.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-RateLimit-Remaining": {
+                                "description": "The number of requests left in the current window.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            }
                         }
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/ThrottleRequestsException"
                     }
                 },
                 "security": []
@@ -624,7 +678,7 @@
                     {
                         "name": "filter[name]",
                         "in": "query",
-                        "description": "Filter by `name`.",
+                        "description": "Filter by `name`. Matches values containing the given text, case-insensitively.",
                         "schema": {
                             "type": "string"
                         }
@@ -632,7 +686,7 @@
                     {
                         "name": "filter[email]",
                         "in": "query",
-                        "description": "Filter by `email`.",
+                        "description": "Filter by `email`. Matches the exact value.",
                         "schema": {
                             "type": "string"
                         }
@@ -1035,6 +1089,12 @@
                     "name": {
                         "type": "string"
                     },
+                    "status": {
+                        "$ref": "#/components/schemas/CategoryStatus"
+                    },
+                    "is_visible": {
+                        "type": "boolean"
+                    },
                     "parent": {
                         "anyOf": [
                             {
@@ -1054,9 +1114,20 @@
                 },
                 "required": [
                     "id",
-                    "name"
+                    "name",
+                    "status",
+                    "is_visible"
                 ],
                 "title": "CategoryResource"
+            },
+            "CategoryStatus": {
+                "type": "string",
+                "enum": [
+                    "draft",
+                    "published",
+                    "archived"
+                ],
+                "title": "CategoryStatus"
             },
             "RoleResource": {
                 "type": "object",
@@ -1206,6 +1277,51 @@
                             "required": [
                                 "message"
                             ]
+                        }
+                    }
+                }
+            },
+            "ThrottleRequestsException": {
+                "description": "Rate limit exceeded",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                },
+                "headers": {
+                    "X-RateLimit-Limit": {
+                        "description": "The maximum number of requests allowed in the current window.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    "X-RateLimit-Remaining": {
+                        "description": "The number of requests left in the current window.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    "Retry-After": {
+                        "description": "Seconds to wait before sending another request.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    "X-RateLimit-Reset": {
+                        "description": "Seconds until the current window resets.",
+                        "schema": {
+                            "type": "integer"
                         }
                     }
                 }

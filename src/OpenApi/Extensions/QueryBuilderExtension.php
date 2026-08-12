@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Extensions;
 
+use Bambamboole\Spectacular\OpenApi\Filters\FilterKind;
+use Bambamboole\Spectacular\OpenApi\Filters\FilterSchemaFactory;
 use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\Schema;
@@ -27,6 +29,8 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         'allowedIncludes',
         'allowedSorts',
     ];
+
+    private ?FilterSchemaFactory $filterSchemas = null;
 
     public function handle(Operation $operation, RouteInfo $routeInfo): void
     {
@@ -58,12 +62,29 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
      */
     private function filterParameters(Expr\MethodCall $call): array
     {
+        $model = $this->subjectModelClass($call->var);
+
         return array_map(
-            fn (string $filter): Parameter => Parameter::make($this->nestedParameterName('filter', $filter), 'query')
-                ->description("Filter by `{$filter}`.")
-                ->setSchema(Schema::fromType(new StringType)),
-            $this->argumentNames($call->args, AllowedFilter::class, 'trashed'),
+            function (array $declaration) use ($model): Parameter {
+                ['name' => $name, 'factory' => $factory] = $declaration;
+                $kind = FilterKind::tryFromFactory($factory);
+
+                return Parameter::make($this->nestedParameterName('filter', $name), 'query')
+                    ->description($this->filterDescription($name, $kind))
+                    ->setSchema(Schema::fromType($this->filterSchemas()->make($model, $name, $kind)));
+            },
+            $this->argumentDeclarations($call->args, AllowedFilter::class, 'trashed'),
         );
+    }
+
+    private function filterDescription(string $name, FilterKind $kind): string
+    {
+        return implode(' ', array_filter(["Filter by `{$name}`.", $kind->matching()]));
+    }
+
+    private function filterSchemas(): FilterSchemaFactory
+    {
+        return $this->filterSchemas ??= new FilterSchemaFactory;
     }
 
     /**
@@ -147,44 +168,57 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
      */
     private function argumentNames(array $arguments, string $allowedClass, ?string $defaultFactoryName = null): array
     {
-        $names = [];
+        return $this->uniqueStrings(array_column(
+            $this->argumentDeclarations($arguments, $allowedClass, $defaultFactoryName),
+            'name',
+        ));
+    }
+
+    /**
+     * @param  list<Arg>  $arguments
+     * @param  class-string  $allowedClass
+     * @return list<array{name: string, factory: string|null}>
+     */
+    private function argumentDeclarations(array $arguments, string $allowedClass, ?string $defaultFactoryName = null): array
+    {
+        $declarations = [];
 
         foreach ($arguments as $argument) {
-            $names = [
-                ...$names,
-                ...$this->argumentExpressionNames($argument->value, $allowedClass, $defaultFactoryName),
+            $declarations = [
+                ...$declarations,
+                ...$this->argumentExpressionDeclarations($argument->value, $allowedClass, $defaultFactoryName),
             ];
         }
 
-        return $this->uniqueStrings($names);
+        return $this->uniqueDeclarations($declarations);
     }
 
     /**
      * @param  class-string  $allowedClass
-     * @return list<string>
+     * @return list<array{name: string, factory: string|null}>
      */
-    private function argumentExpressionNames(Expr $expression, string $allowedClass, ?string $defaultFactoryName = null): array
+    private function argumentExpressionDeclarations(Expr $expression, string $allowedClass, ?string $defaultFactoryName = null): array
     {
         if ($expression instanceof String_) {
-            return [$expression->value];
+            return [['name' => $expression->value, 'factory' => null]];
         }
 
         if ($expression instanceof Expr\Array_) {
-            $names = [];
+            $declarations = [];
 
             foreach ($expression->items as $item) {
-                $names = [
-                    ...$names,
-                    ...$this->argumentExpressionNames($item->value, $allowedClass, $defaultFactoryName),
+                $declarations = [
+                    ...$declarations,
+                    ...$this->argumentExpressionDeclarations($item->value, $allowedClass, $defaultFactoryName),
                 ];
             }
 
-            return $names;
+            return $declarations;
         }
 
-        $factoryName = $this->factoryName($expression, $allowedClass, $defaultFactoryName);
+        $declaration = $this->factoryDeclaration($expression, $allowedClass, $defaultFactoryName);
 
-        return $factoryName === null ? [] : [$factoryName];
+        return $declaration === null ? [] : [$declaration];
     }
 
     /**
@@ -209,9 +243,9 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             return $names;
         }
 
-        $factoryName = $this->factoryName($expression, AllowedInclude::class);
+        $declaration = $this->factoryDeclaration($expression, AllowedInclude::class);
 
-        return $factoryName === null ? [] : [$factoryName];
+        return $declaration === null ? [] : [$declaration['name']];
     }
 
     /**
@@ -242,26 +276,28 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 
     /**
      * @param  class-string  $allowedClass
+     * @return array{name: string, factory: string|null}|null
      */
-    private function factoryName(Expr $expression, string $allowedClass, ?string $defaultFactoryName = null): ?string
+    private function factoryDeclaration(Expr $expression, string $allowedClass, ?string $defaultFactoryName = null): ?array
     {
         if ($expression instanceof Expr\MethodCall) {
-            return $this->factoryName($expression->var, $allowedClass, $defaultFactoryName);
+            return $this->factoryDeclaration($expression->var, $allowedClass, $defaultFactoryName);
         }
 
         if (! $expression instanceof Expr\StaticCall || ! $this->isClassName($expression->class, $allowedClass)) {
             return null;
         }
 
+        $factory = $this->methodName($expression->name);
         $name = $this->firstStringArgument($expression->args);
 
         if ($name !== null) {
-            return $name;
+            return ['name' => $name, 'factory' => $factory];
         }
 
-        $methodName = $this->methodName($expression->name);
-
-        return $methodName === $defaultFactoryName ? $defaultFactoryName : null;
+        return $factory === $defaultFactoryName && $factory !== null
+            ? ['name' => $factory, 'factory' => $factory]
+            : null;
     }
 
     /**
@@ -295,6 +331,21 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     private function uniqueStrings(array $values): array
     {
         return array_values(array_unique($values));
+    }
+
+    /**
+     * @param  list<array{name: string, factory: string|null}>  $declarations
+     * @return list<array{name: string, factory: string|null}>
+     */
+    private function uniqueDeclarations(array $declarations): array
+    {
+        $unique = [];
+
+        foreach ($declarations as $declaration) {
+            $unique[$declaration['name']] ??= $declaration;
+        }
+
+        return array_values($unique);
     }
 
     /**

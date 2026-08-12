@@ -6,6 +6,7 @@ namespace Workbench\App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 use Workbench\App\Http\Resources\CategoryResource;
 use Workbench\App\Models\Category;
@@ -22,6 +23,12 @@ class CategoriesController
     public function __invoke(Request $request): AnonymousResourceCollection
     {
         $categories = QueryBuilder::for(Category::class)
+            ->allowedFilters(
+                'name',
+                AllowedFilter::exact('status'),
+                AllowedFilter::exact('is_visible'),
+                AllowedFilter::exact('parent_id'),
+            )
             ->with('parent', 'children')
             ->paginate($request->integer('per_page', 15));
 
