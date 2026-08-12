@@ -34,8 +34,9 @@ This writes `config/spectacular.php`.
 ## OpenAPI
 
 Spectacular ships two Scramble [operation extensions](https://scramble.dedoc.co/usage/extending),
-`QueryBuilderExtension` and `PaginationExtension`. The service provider registers them for you; add your own through
-Scramble's native `scramble.extensions` config.
+`QueryBuilderExtension` and `PaginationExtension`, along with operation transformers that document validation errors and
+laravel-data request bodies. The service provider registers them for you; add your own through Scramble's native
+`scramble.extensions` config.
 
 ### Query builder parameters
 
@@ -101,6 +102,103 @@ for each declared mode.
 
 `per_page` defaults to the model's page size. Supplied integers are clamped between `1` and `max`, which defaults to
 `100`.
+
+### Authentication modes
+
+Inside your own app the reference can borrow a token from the session. A public reference cannot, so the document has to
+state how a reader is meant to authenticate. Declare the modes in config instead of assembling scheme objects:
+
+```php
+// config/spectacular.php
+'openapi' => [
+    'security' => [
+        'middleware' => ['auth:api'],
+        'schemes' => [
+            'bearer' => [
+                'type' => 'http',
+                'scheme' => 'bearer',
+                'description' => 'A personal access token.',
+            ],
+            'oauth2' => [
+                'type' => 'oauth2',
+                'flows' => [
+                    'authorizationCode' => [
+                        'authorization_url' => '/oauth/authorize',
+                        'token_url' => '/oauth/token',
+                        'scopes' => ApiScopes::class,
+                    ],
+                    'clientCredentials' => ['token_url' => '/oauth/token'],
+                ],
+            ],
+        ],
+    ],
+],
+```
+
+Each entry becomes an entry in `components.securitySchemes` and a document-level requirement; several entries read as
+alternatives, so a client picks one. Supported types are `http`, `apiKey`, `oauth2`, `openIdConnect` and `mutualTLS`.
+Relative URLs are resolved against the app URL, absolute ones are kept — handy when authorization lives on a separate
+identity host.
+
+Scopes are usually derived from the app itself, which a cached config file cannot hold. Besides a literal
+`['scope' => 'description']` map, `scopes` accepts an invokable class-string that is resolved through the container and
+returns one:
+
+```php
+final class ApiScopes
+{
+    public function __construct(private PermissionRepository $permissions) {}
+
+    /** @return array<string, string> */
+    public function __invoke(): array
+    {
+        return $this->permissions->apiScopes();
+    }
+}
+```
+
+A route carrying none of the `middleware` patterns is documented as public (`security: []`). Operations that already
+declare their own requirement — per-endpoint scopes, for instance — are left untouched. Leave `schemes` empty to keep
+documenting security yourself.
+
+### Validation errors
+
+Scramble infers a `422` only where it can see validation happen inside the controller — a `validate()` call or a Form
+Request. Spectacular documents one on every `POST`, `PUT` and `PATCH` operation instead, referencing a single
+`ValidationException` response component with Laravel's `message` and `errors` body. An operation that already documents
+a `422` is left untouched.
+
+### laravel-data request bodies
+
+When `spatie/laravel-data` is installed, an action that takes a `Data` object gets its request body documented — without
+it such endpoints appear to accept nothing at all, because the validation happens while the container resolves the
+argument rather than in the controller body.
+
+```php
+final class StoreArticleData extends Data
+{
+    public function __construct(
+        /** Headline of the article. */
+        public string $title,
+        /** Teaser shown in listings. */
+        public ?string $summary = null,
+        /** Whether the article is publicly visible. Defaults to false. */
+        #[MapInputName('is_published')]
+        public bool $isPublished = false,
+    ) {}
+}
+```
+
+The docblock above a promoted property becomes that field's `description`, so a payload is described where it is
+declared instead of in a per-endpoint attribute.
+
+Which fields are mandatory is taken from the properties themselves, not from the generated rules: a property carrying a
+default or a nullable type may be left out, even though its rules say `required` once it is present. An optional object
+holding a mandatory field also stays optional — only `title` is required above, and an omitted `summary` is not an
+error. A `Data` class that nests itself is expanded once and then documented as an unconstrained array, which keeps a
+tree-shaped payload from recursing forever.
+
+A `Data` class declaring its own `rules()` method is left to Scramble, which reads that method directly.
 
 ### Generating the document
 

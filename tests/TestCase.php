@@ -10,6 +10,7 @@ use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\ScrambleServiceProvider;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\TestCase as BaseTestCase;
+use Spatie\LaravelData\LaravelDataServiceProvider;
 use Spatie\QueryBuilder\QueryBuilderServiceProvider;
 
 abstract class TestCase extends BaseTestCase
@@ -49,6 +50,7 @@ abstract class TestCase extends BaseTestCase
     {
         return [
             WebhooksServiceProvider::class,
+            LaravelDataServiceProvider::class,
             ScrambleServiceProvider::class,
             QueryBuilderServiceProvider::class,
             SpectacularServiceProvider::class,
