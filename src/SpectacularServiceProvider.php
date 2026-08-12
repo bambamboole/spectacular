@@ -41,7 +41,30 @@ final class SpectacularServiceProvider extends ServiceProvider
 
         Scramble::registerExtension(QueryBuilderExtension::class);
         Scramble::registerExtension(PaginationExtension::class);
+    }
 
+    public function boot(): void
+    {
+        $this->configureScramble();
+
+        $this->publishes([
+            __DIR__.'/../config/spectacular.php' => config_path('spectacular.php'),
+        ], 'spectacular-config');
+
+        $this->commands([
+            GenerateAsyncApiCommand::class,
+            GenerateOpenApiCommand::class,
+        ]);
+    }
+
+    /**
+     * Scramble keeps its generator configuration in a container singleton that its
+     * own provider binds while registering. Package discovery may register this
+     * provider first, so configuring Scramble here rather than in register() is
+     * what keeps these transformers on the instance the generator later uses.
+     */
+    private function configureScramble(): void
+    {
         Scramble::configure()->withOperationTransformers(ValidationErrorResponses::class);
 
         if (SecurityConfig::schemes() !== []) {
@@ -55,18 +78,6 @@ final class SpectacularServiceProvider extends ServiceProvider
                 ->withParametersExtractors(fn (ParametersExtractors $extractors): ParametersExtractors => $extractors->prepend(DataParametersExtractor::class))
                 ->withOperationTransformers(DataRequiredFieldsTransformer::class);
         }
-    }
-
-    public function boot(): void
-    {
-        $this->publishes([
-            __DIR__.'/../config/spectacular.php' => config_path('spectacular.php'),
-        ], 'spectacular-config');
-
-        $this->commands([
-            GenerateAsyncApiCommand::class,
-            GenerateOpenApiCommand::class,
-        ]);
     }
 
     private function mergeAsyncApiWebhookConfigDefaults(): void
