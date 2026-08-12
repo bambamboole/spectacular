@@ -103,6 +103,64 @@ for each declared mode.
 `per_page` defaults to the model's page size. Supplied integers are clamped between `1` and `max`, which defaults to
 `100`.
 
+### Authentication modes
+
+Inside your own app the reference can borrow a token from the session. A public reference cannot, so the document has to
+state how a reader is meant to authenticate. Declare the modes in config instead of assembling scheme objects:
+
+```php
+// config/spectacular.php
+'openapi' => [
+    'security' => [
+        'middleware' => ['auth:api'],
+        'schemes' => [
+            'bearer' => [
+                'type' => 'http',
+                'scheme' => 'bearer',
+                'description' => 'A personal access token.',
+            ],
+            'oauth2' => [
+                'type' => 'oauth2',
+                'flows' => [
+                    'authorizationCode' => [
+                        'authorization_url' => '/oauth/authorize',
+                        'token_url' => '/oauth/token',
+                        'scopes' => ApiScopes::class,
+                    ],
+                    'clientCredentials' => ['token_url' => '/oauth/token'],
+                ],
+            ],
+        ],
+    ],
+],
+```
+
+Each entry becomes an entry in `components.securitySchemes` and a document-level requirement; several entries read as
+alternatives, so a client picks one. Supported types are `http`, `apiKey`, `oauth2`, `openIdConnect` and `mutualTLS`.
+Relative URLs are resolved against the app URL, absolute ones are kept — handy when authorization lives on a separate
+identity host.
+
+Scopes are usually derived from the app itself, which a cached config file cannot hold. Besides a literal
+`['scope' => 'description']` map, `scopes` accepts an invokable class-string that is resolved through the container and
+returns one:
+
+```php
+final class ApiScopes
+{
+    public function __construct(private PermissionRepository $permissions) {}
+
+    /** @return array<string, string> */
+    public function __invoke(): array
+    {
+        return $this->permissions->apiScopes();
+    }
+}
+```
+
+A route carrying none of the `middleware` patterns is documented as public (`security: []`). Operations that already
+declare their own requirement — per-endpoint scopes, for instance — are left untouched. Leave `schemes` empty to keep
+documenting security yourself.
+
 ### Validation errors
 
 Scramble infers a `422` only where it can see validation happen inside the controller — a `validate()` call or a Form
