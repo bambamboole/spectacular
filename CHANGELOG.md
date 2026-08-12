@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/bambamboole/spectacular/compare/0.13.1...0.14.0) (2026-08-12)
+
+
+### Features
+
+* **openapi:** type filters, document rate limits and the full info object ([fbe5cb3](https://github.com/bambamboole/spectacular/commit/fbe5cb3ba68f149117ec2bc828bd6dc21b396112))
+
 ## [0.13.1](https://github.com/bambamboole/spectacular/compare/0.13.0...0.13.1) (2026-08-12)
 
 
