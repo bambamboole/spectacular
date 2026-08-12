@@ -21,7 +21,9 @@ it('documents a validation error on writing endpoints', function (string $method
 it('leaves reading and deleting endpoints alone', function (string $method): void {
     RouteFacade::{$method}('api/widgets', WidgetsController::class);
 
-    expect(array_keys(generatedWidgetsOperation($method)['responses'] ?? []))->not->toContain('422');
+    $codes = array_map(strval(...), array_keys(generatedWidgetsOperation($method)['responses'] ?? []));
+
+    expect($codes)->not->toBeEmpty()->and($codes)->not->toContain('422');
 })->with(['get', 'delete']);
 
 it('describes the validation error body once for the whole document', function (): void {
@@ -41,10 +43,9 @@ it('does not add a second validation error to an endpoint that already documents
     Scramble::routes(fn (Route $route): bool => $route->uri() === 'api/users' && $route->methods()[0] === 'POST');
     $document = app(Generator::class)();
 
-    $responses = data_get($document, 'paths./users.post.responses', []);
-    $validationErrors = array_filter(array_keys($responses), fn (string $code): bool => $code === '422');
+    $codes = array_map(strval(...), array_keys(data_get($document, 'paths./users.post.responses', [])));
 
-    expect($validationErrors)->toHaveCount(1);
+    expect(array_filter($codes, fn (string $code): bool => $code === '422'))->toHaveCount(1);
 });
 
 /**
