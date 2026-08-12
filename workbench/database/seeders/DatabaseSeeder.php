@@ -8,6 +8,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Workbench\App\Enums\CategoryStatus;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Role;
 use Workbench\App\Models\User;
@@ -40,6 +41,8 @@ class DatabaseSeeder extends Seeder
                 $parentId = Category::query()->create([
                     'name' => "Category {$chain}.{$level}",
                     'parent_id' => $parentId,
+                    'status' => CategoryStatus::cases()[($chain - 1) % 3],
+                    'is_visible' => $level < 4,
                 ])->getKey();
             }
         }

@@ -37,11 +37,11 @@ it('documents supported spatie query builder parameters from the route action', 
         ->and($parameters['filter[name]']['schema'])
         ->toBe(['type' => 'string'])
         ->and($parameters['filter[name]']['description'])
-        ->toBe('Filter by `name`.')
+        ->toBe('Filter by `name`. Matches values containing the given text, case-insensitively.')
         ->and($parameters['filter[email]']['schema'])
         ->toBe(['type' => 'string'])
         ->and($parameters['filter[email]']['description'])
-        ->toBe('Filter by `email`.')
+        ->toBe('Filter by `email`. Matches the exact value.')
         ->and($parameters['sort'])
         ->toMatchArray([
             'in' => 'query',
@@ -70,6 +70,53 @@ it('documents supported spatie query builder parameters from the route action', 
                 ],
             ],
         ]);
+});
+
+it('types an exact filter from the model it filters', function (): void {
+    $parameters = generatedOperationParametersForUri('api/categories');
+
+    expect($parameters['filter[status]']['schema'])
+        ->toBe(['type' => 'string', 'enum' => ['draft', 'published', 'archived']])
+        ->and($parameters['filter[is_visible]']['schema'])
+        ->toBe(['type' => 'boolean'])
+        ->and($parameters['filter[parent_id]']['schema'])
+        ->toBe(['type' => 'integer'])
+        ->and($parameters['filter[name]']['schema'])
+        ->toBe(['type' => 'string']);
+});
+
+it('describes how each filter kind matches', function (): void {
+    RouteFacade::get('api/filter-kinds-users', FilterKindsUsersController::class)->name('api.filter-kinds-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/filter-kinds-users');
+
+    expect($parameters['filter[name]']['description'])
+        ->toBe('Filter by `name`. Matches values starting with the given text, case-insensitively.')
+        ->and($parameters['filter[email]']['description'])
+        ->toBe('Filter by `email`. Matches values ending with the given text, case-insensitively.')
+        ->and($parameters['filter[id]']['description'])
+        ->toBe('Filter by `id`. Matches the exact value.')
+        ->and($parameters['filter[trashed]'])
+        ->toMatchArray([
+            'description' => 'Filter by `trashed`. Includes soft deleted records with `with`, returns only them with `only`.',
+            'schema' => ['type' => 'string', 'enum' => ['with', 'only', '']],
+        ]);
+});
+
+it('leaves a text matching filter a string even on a typed column', function (): void {
+    RouteFacade::get('api/partial-key-users', PartialKeyUsersController::class)->name('api.partial-key-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/partial-key-users');
+
+    expect($parameters['filter[id]']['schema'])->toBe(['type' => 'string']);
+});
+
+it('leaves a filter untyped when the query builder subject is dynamic', function (): void {
+    RouteFacade::get('api/dynamic-subject-users', DynamicSubjectUsersController::class)->name('api.dynamic-subject-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/dynamic-subject-users');
+
+    expect($parameters['filter[id]']['schema'])->toBe(['type' => 'string']);
 });
 
 it('documents an example for the required user path parameter', function (): void {
@@ -542,6 +589,43 @@ final class SimplePaginatedUsersController
     {
         return UserResource::collection(QueryBuilder::for(User::class)
             ->simplePaginate($request->integer('per_page', 15)));
+    }
+}
+
+final class FilterKindsUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(QueryBuilder::for(User::class)
+            ->allowedFilters(
+                AllowedFilter::beginsWith('name'),
+                AllowedFilter::endsWith('email'),
+                AllowedFilter::exact('id'),
+                AllowedFilter::trashed(),
+            )
+            ->get());
+    }
+}
+
+final class PartialKeyUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(QueryBuilder::for(User::class)
+            ->allowedFilters(AllowedFilter::partial('id'))
+            ->get());
+    }
+}
+
+final class DynamicSubjectUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        $subject = User::query();
+
+        return UserResource::collection(QueryBuilder::for($subject)
+            ->allowedFilters(AllowedFilter::exact('id'))
+            ->get());
     }
 }
 

@@ -8,6 +8,44 @@ return [
         ],
 
         /*
+         * The document's info object. Scramble already resolves the title from
+         * `scramble.ui.title` and the version and description from `scramble.info`;
+         * everything set here wins over those, and what OpenAPI offers beyond them
+         * is only available here.
+         *
+         *  'info' => [
+         *      'title' => 'Acme API',
+         *      'version' => '2.1.0',
+         *      'description' => 'What this API is for.',
+         *      'terms_of_service' => 'https://acme.test/terms',
+         *      'contact' => ['name' => 'API support', 'email' => 'api@acme.test', 'url' => 'https://acme.test/support'],
+         *      // An SPDX `identifier` or a `url`, never both.
+         *      'license' => ['name' => 'MIT', 'identifier' => 'MIT'],
+         *  ],
+         */
+        'info' => [],
+
+        /*
+         * How the documented API is rate limited. A route carrying one of the
+         * `middleware` patterns documents `headers` on its success responses and a
+         * shared 429 response carrying `exhausted_headers` on top of them.
+         *
+         * Header values are documented as integers. Leave `middleware` or `headers`
+         * empty to document rate limiting yourself.
+         */
+        'rate_limiting' => [
+            'middleware' => ['throttle', 'throttle:*'],
+            'headers' => [
+                'X-RateLimit-Limit' => 'The maximum number of requests allowed in the current window.',
+                'X-RateLimit-Remaining' => 'The number of requests left in the current window.',
+            ],
+            'exhausted_headers' => [
+                'Retry-After' => 'Seconds to wait before sending another request.',
+                'X-RateLimit-Reset' => 'Seconds until the current window resets.',
+            ],
+        ],
+
+        /*
          * How the documented API is authenticated. Consumers of a public reference
          * have no session to borrow a token from, so the document has to state the
          * modes they can use.

@@ -20,6 +20,8 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->foreignId('parent_id')->nullable()->constrained('categories')->nullOnDelete();
+            $table->string('status')->default('draft');
+            $table->boolean('is_visible')->default(true);
             $table->timestamps();
         });
 

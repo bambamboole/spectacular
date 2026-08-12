@@ -8,17 +8,29 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Workbench\App\Enums\CategoryStatus;
 
 /**
  * @property int $id
  * @property string $name
  * @property int|null $parent_id
+ * @property CategoryStatus $status
+ * @property bool $is_visible
  * @property-read Category|null $parent
  * @property-read Collection<int, Category> $children
  */
 class Category extends Model
 {
     protected $guarded = [];
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'status' => CategoryStatus::class,
+            'is_visible' => 'boolean',
+        ];
+    }
 
     /** @return BelongsTo<Category, $this> */
     public function parent(): BelongsTo
