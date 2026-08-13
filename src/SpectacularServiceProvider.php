@@ -9,6 +9,7 @@ use Bambamboole\Spectacular\AsyncApi\Console\GenerateAsyncApiCommand;
 use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
+use Bambamboole\Spectacular\OpenApi\Extensions\ModelStateToSchemaExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\QueryBuilderExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\SpecEndpointExtension;
@@ -27,6 +28,7 @@ use Dedoc\Scramble\Scramble;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use Spatie\LaravelData\Data;
+use Spatie\ModelStates\State;
 
 final class SpectacularServiceProvider extends ServiceProvider
 {
@@ -45,6 +47,11 @@ final class SpectacularServiceProvider extends ServiceProvider
 
         Scramble::registerExtension(QueryBuilderExtension::class);
         Scramble::registerExtension(PaginationExtension::class);
+
+        if (class_exists(State::class)) {
+            Scramble::registerExtension(ModelStateToSchemaExtension::class);
+        }
+
         Scramble::registerExtension(SpecEndpointExtension::class);
 
         // The query builder and pagination extensions replace the operation parameters
