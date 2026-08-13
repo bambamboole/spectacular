@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\LaravelData;
 
+use Bambamboole\Spectacular\Attributes\SpecProperty;
 use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\TypeTransformer;
 use Dedoc\Scramble\Support\OperationExtensions\ParameterExtractor\ParameterExtractor;
@@ -63,14 +64,36 @@ final readonly class DataParametersExtractor implements ParameterExtractor
 
         foreach ($parameters as $parameter) {
             $property = $properties[$parameter->name] ?? null;
-            $description = $property === null ? null : $this->propertyDescription($property);
+
+            if ($property === null) {
+                continue;
+            }
+
+            $attribute = $property->attributes->first(SpecProperty::class);
+            $description = $attribute->description ?? $this->propertyDescription($property);
 
             if ($description !== null) {
                 $parameter->description($description);
             }
+
+            if ($attribute?->tooltip !== null) {
+                $this->addTooltip($parameter, $attribute->tooltip);
+            }
         }
 
         return $parameters;
+    }
+
+    /**
+     * A body parameter ends up as a request body schema property, and Scramble copies
+     * only the description over — the tooltip has to be on the type to survive that.
+     * A data object documenting a GET endpoint keeps its parameters instead, where the
+     * tooltip belongs next to the parameter's own description.
+     */
+    private function addTooltip(Parameter $parameter, string $tooltip): void
+    {
+        $parameter->setExtensionProperty('tooltip', $tooltip);
+        $parameter->schema?->type->setExtensionProperty('tooltip', $tooltip);
     }
 
     /**

@@ -11,6 +11,8 @@ use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
 use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\QueryBuilderExtension;
+use Bambamboole\Spectacular\OpenApi\Extensions\SpecEndpointExtension;
+use Bambamboole\Spectacular\OpenApi\Extensions\SpecParameterExtension;
 use Bambamboole\Spectacular\OpenApi\Info\DocumentsConfiguredInfo;
 use Bambamboole\Spectacular\OpenApi\LaravelData\DataParametersExtractor;
 use Bambamboole\Spectacular\OpenApi\LaravelData\DataRequiredFieldsTransformer;
@@ -43,6 +45,13 @@ final class SpectacularServiceProvider extends ServiceProvider
 
         Scramble::registerExtension(QueryBuilderExtension::class);
         Scramble::registerExtension(PaginationExtension::class);
+        Scramble::registerExtension(SpecEndpointExtension::class);
+
+        // The query builder and pagination extensions replace the operation parameters
+        // they generate, so documenting a parameter has to happen after them. Scramble
+        // appends registered extensions as one batch in registration order, which holds
+        // that order no matter which of the two providers boots first.
+        Scramble::registerExtension(SpecParameterExtension::class);
     }
 
     public function boot(): void

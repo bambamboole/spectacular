@@ -33,10 +33,10 @@ This writes `config/spectacular.php`.
 
 ## OpenAPI
 
-Spectacular ships two Scramble [operation extensions](https://scramble.dedoc.co/usage/extending),
-`QueryBuilderExtension` and `PaginationExtension`, along with transformers that document validation errors, rate limits,
-laravel-data request bodies and the info object. The service provider registers them for you; add your own through
-Scramble's native `scramble.extensions` config.
+Spectacular ships Scramble [operation extensions](https://scramble.dedoc.co/usage/extending) for query builder
+parameters, pagination and its own documentation attributes, along with transformers that document validation errors,
+rate limits, laravel-data request bodies and the info object. The service provider registers them for you; add your own
+through Scramble's native `scramble.extensions` config.
 
 ### Query builder parameters
 
@@ -264,6 +264,66 @@ error. A `Data` class that nests itself is expanded once and then documented as 
 tree-shaped payload from recursing forever.
 
 A `Data` class declaring its own `rules()` method is left to Scramble, which reads that method directly.
+
+### Documentation attributes
+
+Three attributes document a payload field, a parameter and an endpoint. Each takes a `tooltip`: a short piece of HTML,
+links included, emitted as `x-tooltip` next to the `description` it belongs to, for an API reference to render beside
+the field.
+
+`#[SpecProperty]` documents a laravel-data payload field:
+
+```php
+use Bambamboole\Spectacular\Attributes\SpecProperty;
+
+final class StoreCategoryData extends Data
+{
+    public function __construct(
+        #[SpecProperty(
+            description: 'Display name of the category.',
+            tooltip: 'Shown in navigation. Read the <a href="/docs/categories">category guide</a>.',
+        )]
+        public string $name,
+        /** Publication state of the category. Drafts stay hidden. */
+        #[SpecProperty(tooltip: 'Only <code>published</code> categories appear in the storefront.')]
+        public CategoryStatus $status = CategoryStatus::Draft,
+    ) {}
+}
+```
+
+Docblocks stay a valid way to describe a field, and the two mix freely: `status` above keeps its docblock description
+and gains a tooltip. When a property carries both a docblock and a `description` in the attribute, the attribute wins.
+
+`#[SpecParameter]` documents a single parameter of an endpoint, selected by name. It is repeatable, and it reaches both
+path parameters and the query parameters Spectacular generates itself (`filter[…]`, `sort`, `include`, `page`,
+`per_page`, `cursor`) — which is what it takes to describe a filter in your own words:
+
+```php
+use Bambamboole\Spectacular\Attributes\SpecParameter;
+
+#[SpecParameter(
+    'filter[status]',
+    description: 'Filter by publication state.',
+    tooltip: 'One of <code>draft</code>, <code>published</code> or <code>archived</code>.',
+)]
+#[SpecParameter('user', description: 'Identifier of the user to load.')]
+public function __invoke(Request $request): AnonymousResourceCollection
+```
+
+A `default` can be documented alongside, and it lands on the parameter's schema. A path parameter needs no
+`#[PathParameter]` of Scramble's next to it.
+
+`#[SpecEndpoint]` adds a tooltip to the operation. Its title and description stay with Scramble's own `#[Endpoint]`:
+
+```php
+use Bambamboole\Spectacular\Attributes\SpecEndpoint;
+
+#[SpecEndpoint(tooltip: 'Creating a category requires the <code>categories:write</code> scope.')]
+public function __invoke(StoreCategoryData $data): CategoryResource
+```
+
+Response resources are not covered: a `JsonResource::toArray()` describes its fields through docblocks, and a PHP
+attribute cannot attach to a key of an array literal.
 
 ### Generating the document
 
