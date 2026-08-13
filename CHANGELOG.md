@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/bambamboole/spectacular/compare/0.14.0...0.15.0) (2026-08-13)
+
+
+### Features
+
+* **openapi:** documentation attributes with HTML tooltips ([19b8eea](https://github.com/bambamboole/spectacular/commit/19b8eeac465d72bb4b547ba5ed1796b58773d2da))
+
 ## [0.14.0](https://github.com/bambamboole/spectacular/compare/0.13.1...0.14.0) (2026-08-12)
 
 
