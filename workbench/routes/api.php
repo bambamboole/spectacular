@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Workbench\App\Http\Controllers\CategoriesController;
 use Workbench\App\Http\Controllers\RolesController;
 use Workbench\App\Http\Controllers\ShowUserController;
+use Workbench\App\Http\Controllers\StoreCategoryController;
 use Workbench\App\Http\Controllers\StoreUserController;
 use Workbench\App\Http\Controllers\UsersController;
 
@@ -15,3 +16,4 @@ Route::get('api/users/{user}', ShowUserController::class)->middleware('auth')->n
 Route::get('api/categories', CategoriesController::class)
     ->middleware('throttle:60,1')
     ->name('api.categories.index');
+Route::post('api/categories', StoreCategoryController::class)->name('api.categories.store');

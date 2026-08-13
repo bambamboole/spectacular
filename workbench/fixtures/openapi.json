@@ -45,7 +45,7 @@
                     {
                         "name": "filter[status]",
                         "in": "query",
-                        "description": "Filter by `status`. Matches the exact value.",
+                        "description": "Filter by publication state.",
                         "schema": {
                             "type": "string",
                             "enum": [
@@ -53,7 +53,8 @@
                                 "published",
                                 "archived"
                             ]
-                        }
+                        },
+                        "x-tooltip": "One of <code>draft</code>, <code>published</code> or <code>archived</code>."
                     },
                     {
                         "name": "filter[is_visible]",
@@ -239,7 +240,49 @@
                         "$ref": "#/components/responses/ThrottleRequestsException"
                     }
                 },
-                "security": []
+                "security": [],
+                "x-tooltip": "Browse the <a href=\"https://example.com/docs/categories\">category guide</a> for the full hierarchy."
+            },
+            "post": {
+                "operationId": "categories.store",
+                "tags": [
+                    "StoreCategory"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreCategoryData"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`CategoryResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CategoryResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [],
+                "x-tooltip": "Creating a category requires the <code>categories:write</code> scope."
             }
         },
         "/roles": {
@@ -393,11 +436,12 @@
                         "name": "user",
                         "in": "path",
                         "required": true,
-                        "description": "The user ID",
+                        "description": "Identifier of the user to load.",
                         "schema": {
                             "type": "integer"
                         },
-                        "example": 1
+                        "example": 1,
+                        "x-tooltip": "Accepts the numeric id only. See the <a href=\"https://example.com/docs/users\">user guide</a>."
                     },
                     {
                         "name": "include",
@@ -1153,6 +1197,36 @@
                     "type"
                 ],
                 "title": "RoleResource"
+            },
+            "StoreCategoryData": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Display name of the category.",
+                        "x-tooltip": "Shown in navigation. Read the <a href=\"https://example.com/docs/categories\">category guide</a>."
+                    },
+                    "status": {
+                        "description": "Publication state of the category. Drafts stay hidden.",
+                        "x-tooltip": "Only <code>published</code> categories appear in the storefront.",
+                        "$ref": "#/components/schemas/CategoryStatus"
+                    },
+                    "is_visible": {
+                        "type": "boolean",
+                        "description": "Whether the category is listed in public navigation."
+                    },
+                    "parent_id": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "description": "Category this one is nested under."
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "StoreCategoryData"
             },
             "UserResource": {
                 "type": "object",
