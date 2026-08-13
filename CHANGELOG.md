@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/bambamboole/spectacular/compare/0.15.0...0.16.0) (2026-08-13)
+
+
+### Features
+
+* **openapi:** document spatie model states as string enum schemas ([ae33e81](https://github.com/bambamboole/spectacular/commit/ae33e814f537894c76bb5d0d164639ba7500851c))
+
 ## [0.15.0](https://github.com/bambamboole/spectacular/compare/0.14.0...0.15.0) (2026-08-13)
 
 
