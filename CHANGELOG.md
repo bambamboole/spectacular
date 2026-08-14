@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.17.0](https://github.com/bambamboole/spectacular/compare/0.16.0...0.17.0) (2026-08-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **openapi:** derive state transition endpoints from routes, drop the config
+
+### Features
+
+* **openapi:** declare state transition endpoints with a StateEndpoint attribute ([c6f7088](https://github.com/bambamboole/spectacular/commit/c6f7088b56d54d160d6a4952807f6ca6ff29a5fb))
+* **openapi:** derive state transition endpoints from routes, drop the config ([f1fd8cd](https://github.com/bambamboole/spectacular/commit/f1fd8cd7c22bce6d349ced3635dffc61bea6f91b))
+* **openapi:** state transition endpoints for spatie model states ([65c652c](https://github.com/bambamboole/spectacular/commit/65c652c4428374f9ee16bf8686fb8162463ba8dd))
+
 ## [0.16.0](https://github.com/bambamboole/spectacular/compare/0.15.0...0.16.0) (2026-08-13)
 
 
