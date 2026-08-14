@@ -4,6 +4,7 @@ declare(strict_types=1);
 use Bambamboole\Spectacular\OpenApi\Filters\FilterKind;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterSchemaFactory;
 use Bambamboole\Spectacular\Tests\Fixtures\Filters\Invoice;
+use Bambamboole\Spectacular\Tests\Fixtures\ModelStates\Order;
 
 it('types an exact filter from the column it filters', function (string $name, array $schema): void {
     $type = new FilterSchemaFactory()->make(Invoice::class, $name, FilterKind::Exact);
@@ -21,6 +22,12 @@ it('types an exact filter from the column it filters', function (string $name, a
     'column the model says nothing about' => ['reference', ['type' => 'string']],
     'relation that is not a belongs to' => ['lines_id', ['type' => 'string']],
 ]);
+
+it('offers the state names of a model state cast', function (): void {
+    $type = new FilterSchemaFactory()->make(Order::class, 'status', FilterKind::Exact);
+
+    expect($type->toArray())->toBe(['type' => 'string', 'enum' => ['pending', 'shipped']]);
+});
 
 it('types a belongs to filter named after its relation', function (): void {
     $type = new FilterSchemaFactory()->make(Invoice::class, 'customer', FilterKind::BelongsTo);
