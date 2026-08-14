@@ -41,7 +41,15 @@ final readonly class ModelStateTransitions
             throw new InvalidArgumentException("[{$field}] on [{$modelClass}] is not a model-state field.");
         }
 
-        return new self($cast, self::resolveTransitions($cast));
+        return self::forStateClass($cast);
+    }
+
+    /**
+     * @param  class-string<State<Model>>  $baseStateClass
+     */
+    public static function forStateClass(string $baseStateClass): self
+    {
+        return new self($baseStateClass, self::resolveTransitions($baseStateClass));
     }
 
     /**

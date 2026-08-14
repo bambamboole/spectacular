@@ -109,7 +109,7 @@ final class SpectacularServiceProvider extends ServiceProvider
                 ->withOperationTransformers(DataRequiredFieldsTransformer::class);
         }
 
-        if (class_exists(State::class) && config('spectacular.openapi.state_transitions', []) !== []) {
+        if (class_exists(State::class) && config('spectacular.openapi.state_transitions.scan_paths', []) !== []) {
             Scramble::configure()->withDocumentTransformers(StateTransitionOperations::class);
         }
     }

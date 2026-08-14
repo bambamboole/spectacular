@@ -3,9 +3,11 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\ModelStates;
 
+use Bambamboole\Spectacular\Attributes\StateEndpoint;
 use Bambamboole\Spectacular\ModelStates\ModelStateTransitions;
 use Bambamboole\Spectacular\ModelStates\StateTransition;
 use Bambamboole\Spectacular\OpenApi\LaravelData\DataSchemaFactory;
+use Bambamboole\Spectacular\Support\ClassDiscoverer;
 use Dedoc\Scramble\Contracts\DocumentTransformer;
 use Dedoc\Scramble\OpenApiContext;
 use Dedoc\Scramble\Support\Generator\Components;
@@ -22,48 +24,71 @@ use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\Generator\TypeTransformer;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
+use ReflectionClass;
 use RuntimeException;
 use Spatie\LaravelData\Data;
+use Spatie\ModelStates\State;
 
 /**
  * Fans a templated state transition route out into one documented operation
  * per reachable target state, each carrying the exact request body its
- * transition expects. Runs as a document transformer because it must clone
- * the finished generic operation (security, shared error responses,
- * rate-limit headers, path parameters, and the resource response are already
- * attached) — operation transformers can only mutate the single operation
- * Scramble builds per route.
+ * transition expects. Endpoints are declared with the StateEndpoint attribute
+ * on a base state class, discovered from the configured scan paths. Runs as a
+ * document transformer because it must clone the finished generic operation
+ * (security, shared error responses, rate-limit headers, path parameters, and
+ * the resource response are already attached) — operation transformers can
+ * only mutate the single operation Scramble builds per route.
  */
 final readonly class StateTransitionOperations implements DocumentTransformer
 {
-    public function __construct(private TypeTransformer $typeTransformer) {}
+    public function __construct(
+        private TypeTransformer $typeTransformer,
+        private ClassDiscoverer $classes,
+    ) {}
 
     public function handle(OpenApi $document, OpenApiContext $context): void
     {
-        /** @var list<array{model: class-string<Model>, path: string, field?: string, label?: string, method?: string}> $endpoints */
-        $endpoints = config('spectacular.openapi.state_transitions', []);
-
-        foreach ($endpoints as $endpoint) {
-            $this->expand(
-                $document,
-                $endpoint['model'],
-                $endpoint['field'] ?? 'status',
-                $endpoint['path'],
-                $endpoint['label'] ?? (string) str(class_basename($endpoint['model']))->headline()->lower(),
-                $endpoint['method'] ?? 'patch',
-            );
+        foreach ($this->stateEndpoints() as [$stateClass, $endpoint]) {
+            $this->expand($document, $stateClass, $endpoint);
         }
     }
 
     /**
-     * @param  class-string<Model>  $modelClass
+     * @return list<array{class-string<State<Model>>, StateEndpoint}>
      */
-    private function expand(OpenApi $document, string $modelClass, string $field, string $template, string $label, string $method): void
+    private function stateEndpoints(): array
     {
-        [$index, $generic] = $this->findTemplatedOperation($document, $template, $method);
+        /** @var list<string> $scanPaths */
+        $scanPaths = config('spectacular.openapi.state_transitions.scan_paths', []);
+        $endpoints = [];
 
-        $transitions = ModelStateTransitions::for($modelClass, $field);
-        $conflict = $this->conflictResponse($document->components, $modelClass, $transitions);
+        foreach ($this->classes->classesIn($scanPaths) as $class) {
+            $attributes = new ReflectionClass($class)->getAttributes(StateEndpoint::class);
+
+            if ($attributes === []) {
+                continue;
+            }
+
+            if (! is_subclass_of($class, State::class)) {
+                throw new LogicException("[{$class}] carries the StateEndpoint attribute but is not a model state class.");
+            }
+
+            $endpoints[] = [$class, $attributes[0]->newInstance()];
+        }
+
+        return $endpoints;
+    }
+
+    /**
+     * @param  class-string<State<Model>>  $stateClass
+     */
+    private function expand(OpenApi $document, string $stateClass, StateEndpoint $endpoint): void
+    {
+        $label = $endpoint->label ?? self::labelFor($stateClass);
+        [$index, $generic] = $this->findTemplatedOperation($document, $endpoint->path, $endpoint->method);
+
+        $transitions = ModelStateTransitions::forStateClass($stateClass);
+        $conflict = $this->conflictResponse($document->components, $label, $transitions);
         $bodyFactory = new DataSchemaFactory($this->typeTransformer);
         $paths = [];
 
@@ -75,7 +100,7 @@ final readonly class StateTransitionOperations implements DocumentTransformer
             }
 
             $operation = clone $generic;
-            $operation->setPath(str_replace('{state}', $target, $template));
+            $operation->setPath(str_replace('{state}', $target, $endpoint->path));
             $operation->setOperationId("{$generic->operationId}-to.{$target}");
             $operation->summary("Transition {$label} to {$target}");
             $operation->description($this->describe($label, $target, $sources));
@@ -94,6 +119,17 @@ final readonly class StateTransitionOperations implements DocumentTransformer
         }
 
         array_splice($document->paths, $index, 1, $paths);
+    }
+
+    /**
+     * @param  class-string<State<Model>>  $stateClass
+     */
+    private static function labelFor(string $stateClass): string
+    {
+        $basename = class_basename($stateClass);
+        $trimmed = preg_replace('/State$/', '', $basename);
+
+        return (string) str($trimmed === null || $trimmed === '' ? $basename : $trimmed)->headline()->lower();
     }
 
     /**
@@ -146,12 +182,9 @@ final readonly class StateTransitionOperations implements DocumentTransformer
         return $dataClasses[0];
     }
 
-    /**
-     * @param  class-string<Model>  $modelClass
-     */
-    private function conflictResponse(Components $components, string $modelClass, ModelStateTransitions $transitions): Reference
+    private function conflictResponse(Components $components, string $label, ModelStateTransitions $transitions): Reference
     {
-        $reference = new Reference('responses', class_basename($modelClass).'TransitionDenied', $components);
+        $reference = new Reference('responses', str($label)->studly().'TransitionDenied', $components);
 
         if ($components->has($reference)) {
             return $reference;
