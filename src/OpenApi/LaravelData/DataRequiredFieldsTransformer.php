@@ -7,20 +7,21 @@ use Dedoc\Scramble\Contracts\OperationTransformer;
 use Dedoc\Scramble\OpenApiContext;
 use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
+use Dedoc\Scramble\Support\Generator\TypeTransformer;
 use Dedoc\Scramble\Support\RouteInfo;
 
 /**
- * Restates which body fields are mandatory once the request body schema exists.
- *
- * Two things upstream cannot know: a laravel-data property with a default or a
- * nullable type may be omitted even though its rules say `required` when present,
- * and Scramble promotes a nested object to required as soon as one of its own
- * properties is required — which turns an optional object carrying a mandatory
- * field into a mandatory object.
+ * Refines the request body schema once Scramble has registered it: restates
+ * which body fields are mandatory (a laravel-data property with a default or a
+ * nullable type may be omitted even though its rules say `required` when
+ * present) and promotes nested data classes to referenced component schemas.
  */
 final readonly class DataRequiredFieldsTransformer implements OperationTransformer
 {
-    public function __construct(private OpenApiContext $context) {}
+    public function __construct(
+        private OpenApiContext $context,
+        private TypeTransformer $typeTransformer,
+    ) {}
 
     public function handle(Operation $operation, RouteInfo $routeInfo): void
     {
@@ -43,9 +44,6 @@ final readonly class DataRequiredFieldsTransformer implements OperationTransform
             return;
         }
 
-        $type->setRequired(array_values(array_intersect(
-            DataObjects::requiredInputNames($dataClass),
-            array_keys($type->properties),
-        )));
+        new DataSchemaFactory($this->typeTransformer)->refineSchema($type, $dataClass, $components);
     }
 }
