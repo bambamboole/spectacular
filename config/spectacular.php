@@ -87,23 +87,6 @@ return [
             'schemes' => [],
         ],
 
-        /*
-         * Where to discover base state classes carrying the StateEndpoint
-         * attribute. Each annotated class declares a templated
-         * spatie/laravel-model-states transition route that is fanned out
-         * into one documented operation per reachable target state.
-         *
-         * A transition declares its request body by taking a laravel-data
-         * object in its custom Transition constructor after the model; the
-         * documented operation then requires exactly that body.
-         *
-         *  'state_transitions' => [
-         *      'scan_paths' => [app_path('States')],
-         *  ],
-         */
-        'state_transitions' => [
-            'scan_paths' => [],
-        ],
     ],
     'asyncapi' => [
         'version' => '3.0.0',

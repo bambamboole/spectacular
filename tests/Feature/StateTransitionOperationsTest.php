@@ -1,7 +1,6 @@
 <?php
 declare(strict_types=1);
 
-use Bambamboole\Spectacular\OpenApi\ModelStates\StateTransitionOperations;
 use Bambamboole\Spectacular\Tests\Fixtures\StateTransitions\Ticket;
 use Bambamboole\Spectacular\Tests\Fixtures\StateTransitions\TicketResource;
 use Dedoc\Scramble\Generator;
@@ -91,12 +90,14 @@ it('documents a shared 409 response referencing the state enum', function (): vo
         ->and($document['components']['schemas']['TicketState']['enum'])->toBe(['closed', 'open', 'resolved']);
 });
 
-it('rejects the attribute on a class that is not a model state', function (): void {
-    config()->set('spectacular.openapi.state_transitions.scan_paths', [__DIR__.'/../Fixtures/InvalidStateEndpoint']);
-    Scramble::configure()->withDocumentTransformers(StateTransitionOperations::class);
+it('leaves state routes without an annotated state class untouched', function (): void {
+    RouteFacade::patch('api/plain/{state}', fn (string $state): array => ['state' => $state]);
 
-    app(Generator::class)();
-})->throws(LogicException::class, 'is not a model state class');
+    Scramble::routes(fn (Route $route): bool => $route->uri() === 'api/plain/{state}');
+    $document = app(Generator::class)();
+
+    expect(array_keys(is_array($document) ? $document['paths'] : []))->toBe(['/plain/{state}']);
+});
 
 /**
  * @return array<string, mixed>
@@ -105,9 +106,6 @@ function generatedTicketTransitionsDocument(): array
 {
     RouteFacade::patch('api/tickets/{ticket}/transition-to/{state}', TicketTransitionDocsController::class);
 
-    config()->set('spectacular.openapi.state_transitions.scan_paths', [__DIR__.'/../Fixtures/StateTransitions']);
-
-    Scramble::configure()->withDocumentTransformers(StateTransitionOperations::class);
     Scramble::routes(fn (Route $route): bool => str_starts_with($route->uri(), 'api/tickets'));
 
     $document = app(Generator::class)();

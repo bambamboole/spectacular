@@ -7,7 +7,6 @@ use Bambamboole\Spectacular\Attributes\StateEndpoint;
 use Bambamboole\Spectacular\ModelStates\ModelStateTransitions;
 use Bambamboole\Spectacular\ModelStates\StateTransition;
 use Bambamboole\Spectacular\OpenApi\LaravelData\DataSchemaFactory;
-use Bambamboole\Spectacular\Support\ClassDiscoverer;
 use Dedoc\Scramble\Contracts\DocumentTransformer;
 use Dedoc\Scramble\OpenApiContext;
 use Dedoc\Scramble\Support\Generator\Components;
@@ -23,8 +22,11 @@ use Dedoc\Scramble\Support\Generator\Types\ObjectType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\Generator\TypeTransformer;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Routing\Route;
+use Illuminate\Routing\Router;
 use LogicException;
 use ReflectionClass;
+use ReflectionNamedType;
 use RuntimeException;
 use Spatie\LaravelData\Data;
 use Spatie\ModelStates\State;
@@ -32,61 +34,112 @@ use Spatie\ModelStates\State;
 /**
  * Fans a templated state transition route out into one documented operation
  * per reachable target state, each carrying the exact request body its
- * transition expects. Endpoints are declared with the StateEndpoint attribute
- * on a base state class, discovered from the configured scan paths. Runs as a
- * document transformer because it must clone the finished generic operation
- * (security, shared error responses, rate-limit headers, path parameters, and
- * the resource response are already attached) — operation transformers can
- * only mutate the single operation Scramble builds per route.
+ * transition expects. Endpoints are derived from the routes themselves: a
+ * route with a `{state}` parameter whose action binds a model casting a field
+ * to a StateEndpoint-annotated state class. Runs as a document transformer
+ * because it must clone the finished generic operation (security, shared
+ * error responses, rate-limit headers, path parameters, and the resource
+ * response are already attached) — operation transformers can only mutate the
+ * single operation Scramble builds per route.
  */
 final readonly class StateTransitionOperations implements DocumentTransformer
 {
     public function __construct(
         private TypeTransformer $typeTransformer,
-        private ClassDiscoverer $classes,
+        private Router $router,
     ) {}
 
     public function handle(OpenApi $document, OpenApiContext $context): void
     {
-        foreach ($this->stateEndpoints() as [$stateClass, $endpoint]) {
-            $this->expand($document, $stateClass, $endpoint);
+        foreach ($this->router->getRoutes()->getRoutes() as $route) {
+            $endpoint = $this->stateEndpointFor($route);
+
+            if ($endpoint === null) {
+                continue;
+            }
+
+            [$stateClass, $attribute] = $endpoint;
+            $this->expand($document, $context, $route, $stateClass, $attribute);
         }
     }
 
     /**
-     * @return list<array{class-string<State<Model>>, StateEndpoint}>
+     * @return array{class-string<State<Model>>, StateEndpoint}|null
      */
-    private function stateEndpoints(): array
+    private function stateEndpointFor(Route $route): ?array
     {
-        /** @var list<string> $scanPaths */
-        $scanPaths = config('spectacular.openapi.state_transitions.scan_paths', []);
-        $endpoints = [];
+        if (! str_contains($route->uri(), '{state}')) {
+            return null;
+        }
 
-        foreach ($this->classes->classesIn($scanPaths) as $class) {
-            $attributes = new ReflectionClass($class)->getAttributes(StateEndpoint::class);
+        $modelClass = $this->boundModelClass($route);
 
-            if ($attributes === []) {
+        if ($modelClass === null) {
+            return null;
+        }
+
+        $annotated = [];
+
+        foreach ((new $modelClass)->getCasts() as $cast) {
+            if (! is_string($cast) || ! is_subclass_of($cast, State::class)) {
                 continue;
             }
 
-            if (! is_subclass_of($class, State::class)) {
-                throw new LogicException("[{$class}] carries the StateEndpoint attribute but is not a model state class.");
-            }
+            $attributes = new ReflectionClass($cast)->getAttributes(StateEndpoint::class);
 
-            $endpoints[] = [$class, $attributes[0]->newInstance()];
+            if ($attributes !== []) {
+                $annotated[$cast] = $attributes[0]->newInstance();
+            }
         }
 
-        return $endpoints;
+        if ($annotated === []) {
+            return null;
+        }
+
+        if (count($annotated) > 1) {
+            throw new LogicException("Route [{$route->uri()}] binds [{$modelClass}], which casts several StateEndpoint-annotated state classes.");
+        }
+
+        /** @var class-string<State<Model>> $stateClass */
+        $stateClass = array_key_first($annotated);
+
+        return [$stateClass, $annotated[$stateClass]];
+    }
+
+    /**
+     * @return class-string<Model>|null
+     */
+    private function boundModelClass(Route $route): ?string
+    {
+        foreach ($route->signatureParameters(['subClass' => Model::class]) as $parameter) {
+            $type = $parameter->getType();
+
+            if ($type instanceof ReflectionNamedType && ! $type->isBuiltin()) {
+                /** @var class-string<Model> */
+                return $type->getName();
+            }
+        }
+
+        return null;
     }
 
     /**
      * @param  class-string<State<Model>>  $stateClass
      */
-    private function expand(OpenApi $document, string $stateClass, StateEndpoint $endpoint): void
+    private function expand(OpenApi $document, OpenApiContext $context, Route $route, string $stateClass, StateEndpoint $endpoint): void
     {
-        $label = $endpoint->label ?? self::labelFor($stateClass);
-        [$index, $generic] = $this->findTemplatedOperation($document, $endpoint->path, $endpoint->method);
+        $template = $context->config->apiPath()->stripPrefix($route->uri());
+        $method = strtolower($route->methods()[0]);
+        $found = $this->findTemplatedOperation($document, $template, $method);
 
+        // The route may be excluded from this document by the Scramble
+        // routes filter; there is nothing to fan out then.
+        if ($found === null) {
+            return;
+        }
+
+        [$index, $generic] = $found;
+        $label = $endpoint->label ?? self::labelFor($stateClass);
         $transitions = ModelStateTransitions::forStateClass($stateClass);
         $conflict = $this->conflictResponse($document->components, $label, $transitions);
         $bodyFactory = new DataSchemaFactory($this->typeTransformer);
@@ -100,7 +153,7 @@ final readonly class StateTransitionOperations implements DocumentTransformer
             }
 
             $operation = clone $generic;
-            $operation->setPath(str_replace('{state}', $target, $endpoint->path));
+            $operation->setPath(str_replace('{state}', $target, $template));
             $operation->setOperationId("{$generic->operationId}-to.{$target}");
             $operation->summary("Transition {$label} to {$target}");
             $operation->description($this->describe($label, $target, $sources));
@@ -133,9 +186,9 @@ final readonly class StateTransitionOperations implements DocumentTransformer
     }
 
     /**
-     * @return array{int, Operation}
+     * @return array{int, Operation}|null
      */
-    private function findTemplatedOperation(OpenApi $document, string $template, string $method): array
+    private function findTemplatedOperation(OpenApi $document, string $template, string $method): ?array
     {
         foreach ($document->paths as $index => $path) {
             if ($path->path !== $template) {
@@ -147,7 +200,7 @@ final readonly class StateTransitionOperations implements DocumentTransformer
             return [$index, $operation];
         }
 
-        throw new RuntimeException("State transition route [{$template}] is not part of the generated document.");
+        return null;
     }
 
     /**
