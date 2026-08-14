@@ -66,6 +66,14 @@ it('rejects an invalid body against the transition data class', function (): voi
         ->assertJsonValidationErrors(['reason']);
 });
 
+it('rejects payload keys the transition data class does not declare', function (): void {
+    $ticket = Ticket::create();
+
+    $this->patchJson("api/tickets/{$ticket->id}/transition-to/resolved", ['reason' => 'Restarted', 'typo' => 'x'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['typo']);
+});
+
 it('rejects a body on a transition that accepts none', function (): void {
     $ticket = Ticket::create();
     $ticket->status->transitionTo(Resolved::class, ResolveTicketData::from(['reason' => 'setup']));
@@ -85,6 +93,6 @@ final class TicketTransitionsController
 {
     public function __invoke(Ticket $ticket, string $state, Request $request): Model
     {
-        return new TransitionModelState()->handle($ticket, 'status', $state, $request);
+        return new TransitionModelState()->handle($ticket, 'status', $state, $request->json()->all());
     }
 }
