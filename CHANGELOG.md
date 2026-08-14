@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.0](https://github.com/bambamboole/spectacular/compare/0.17.0...0.18.0) (2026-08-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **model-states:** take the transition payload as a plain array ([#54](https://github.com/bambamboole/spectacular/issues/54))
+
+### Features
+
+* **model-states:** take the transition payload as a plain array ([#54](https://github.com/bambamboole/spectacular/issues/54)) ([a8096ce](https://github.com/bambamboole/spectacular/commit/a8096ceabd83008cd2e01ea865b6dfc5f41a6e1f))
+
 ## [0.17.0](https://github.com/bambamboole/spectacular/compare/0.16.0...0.17.0) (2026-08-14)
 
 
