@@ -305,11 +305,12 @@ final class MarkAsCancelled extends Transition
 }
 ```
 
-The runtime side ships too: `TransitionModelState` resolves the target state from its morph name, validates the body
-against the transition's data class when one exists (and rejects bodies on transitions that take none), executes the
-transition inside a database transaction, and throws `StateTransitionDenied` — self-rendering as the documented `409`
-with `current_state`, `requested_state`, and `allowed_states` — when the current state does not allow the move. A
-controller needs one line:
+The runtime side ships too: `TransitionModelState` takes the payload as a plain array — no HTTP coupling, so jobs and
+actions can drive transitions the same way. It resolves the target state from its morph name, validates the payload
+against the transition's data class when one exists (rejecting undeclared keys, and any payload on transitions that
+take none), executes the transition inside a database transaction, and throws `StateTransitionDenied` — self-rendering
+as the documented `409` with `current_state`, `requested_state`, and `allowed_states` — when the current state does not
+allow the move. A controller needs one line:
 
 ```php
 Route::patch('orders/{order}/transition-to/{state}', OrderTransitionsController::class);
@@ -318,7 +319,7 @@ final class OrderTransitionsController
 {
     public function __invoke(Order $order, string $state, Request $request, TransitionModelState $transition): OrderResource
     {
-        return new OrderResource($transition->handle($order, 'status', $state, $request));
+        return new OrderResource($transition->handle($order, 'status', $state, $request->json()->all()));
     }
 }
 ```
