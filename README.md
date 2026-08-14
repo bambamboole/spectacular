@@ -268,13 +268,13 @@ A `Data` class declaring its own `rules()` method is left to Scramble, which rea
 ### State transition endpoints
 
 When `spatie/laravel-model-states` is installed, a templated transition route such as
-`PATCH /api/orders/{order}/transition-to/{state}` can be fanned out into one documented operation per reachable target
+`PATCH /api/orders/{order}/transition-to/{state}` is fanned out into one documented operation per reachable target
 state — `…/transition-to/paid`, `…/transition-to/cancelled` — each with a distinct summary, the source states that
 allow it, a shared `409 Conflict` response, and exactly the request body its transition expects. The base state class
-declares its own endpoint:
+opts in with a marker attribute; there is nothing to configure:
 
 ```php
-#[StateEndpoint(path: 'orders/{order}/transition-to/{state}')]
+#[StateEndpoint]
 abstract class OrderState extends State
 {
     public static function config(): StateConfig
@@ -286,15 +286,9 @@ abstract class OrderState extends State
 }
 ```
 
-`path` is the route as it appears in the generated document (the configured API prefix stripped, no leading slash) with
-`{state}` as the target-state placeholder. `label` defaults to the state class basename without its `State` suffix,
-`method` to `patch`. Annotated classes are discovered from the configured scan paths:
-
-```php
-'state_transitions' => [
-    'scan_paths' => [app_path('States')],
-],
-```
+A documented route qualifies when its URI carries a `{state}` parameter and its action binds a model that casts a field
+to the annotated state class — path and HTTP method come from the route itself. The attribute's optional `label` (the
+noun used in summaries and descriptions) defaults to the state class basename without its `State` suffix, lowercased.
 
 A transition takes a request body by declaring a `laravel-data` object in its custom transition constructor after the
 model; the documented operation then requires exactly that body, described like any other data payload. Transitions

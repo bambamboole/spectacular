@@ -10,7 +10,7 @@ use Spatie\ModelStates\StateConfig;
 /**
  * @extends State<Ticket>
  */
-#[StateEndpoint(path: 'tickets/{ticket}/transition-to/{state}')]
+#[StateEndpoint]
 abstract class TicketState extends State
 {
     #[\Override]
