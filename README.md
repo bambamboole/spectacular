@@ -265,6 +265,60 @@ tree-shaped payload from recursing forever.
 
 A `Data` class declaring its own `rules()` method is left to Scramble, which reads that method directly.
 
+### State transition endpoints
+
+When `spatie/laravel-model-states` is installed, a templated transition route such as
+`PATCH /api/orders/{order}/transition-to/{state}` can be fanned out into one documented operation per reachable target
+state — `…/transition-to/paid`, `…/transition-to/cancelled` — each with a distinct summary, the source states that
+allow it, a shared `409 Conflict` response, and exactly the request body its transition expects. Declare the routes in
+the config:
+
+```php
+'state_transitions' => [
+    ['model' => App\Models\Order::class, 'path' => 'orders/{order}/transition-to/{state}'],
+],
+```
+
+`path` is the route as it appears in the generated document (the configured API prefix stripped, no leading slash) with
+`{state}` as the target-state placeholder. `field` defaults to `status`, `label` to the lowercased model basename, and
+`method` to `patch`.
+
+A transition takes a request body by declaring a `laravel-data` object in its custom transition constructor after the
+model; the documented operation then requires exactly that body, described like any other data payload. Transitions
+without a data class document without a request body. All source states of one target must agree on the payload, since
+a single operation cannot carry a different body per current state.
+
+```php
+final class MarkAsCancelled extends Transition
+{
+    public function __construct(
+        private readonly Order $order,
+        private readonly CancelOrderData $data,
+    ) {}
+}
+```
+
+The runtime side ships too: `TransitionModelState` resolves the target state from its morph name, validates the body
+against the transition's data class when one exists (and rejects bodies on transitions that take none), executes the
+transition inside a database transaction, and throws `StateTransitionDenied` — self-rendering as the documented `409`
+with `current_state`, `requested_state`, and `allowed_states` — when the current state does not allow the move. A
+controller needs one line:
+
+```php
+Route::patch('orders/{order}/transition-to/{state}', OrderTransitionsController::class);
+
+final class OrderTransitionsController
+{
+    public function __invoke(Order $order, string $state, Request $request, TransitionModelState $transition): OrderResource
+    {
+        return new OrderResource($transition->handle($order, 'status', $state, $request));
+    }
+}
+```
+
+Both messages the runtime produces are translatable under the `spectacular::states` namespace
+(`php artisan vendor:publish --tag=spectacular-lang`).
+
 ### Documentation attributes
 
 Three attributes document a payload field, a parameter and an endpoint. Each takes a `tooltip`: a short piece of HTML,
