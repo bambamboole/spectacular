@@ -91,6 +91,13 @@ it('documents a shared 409 response referencing the state enum', function (): vo
         ->and($document['components']['schemas']['TicketState']['enum'])->toBe(['closed', 'open', 'resolved']);
 });
 
+it('rejects the attribute on a class that is not a model state', function (): void {
+    config()->set('spectacular.openapi.state_transitions.scan_paths', [__DIR__.'/../Fixtures/InvalidStateEndpoint']);
+    Scramble::configure()->withDocumentTransformers(StateTransitionOperations::class);
+
+    app(Generator::class)();
+})->throws(LogicException::class, 'is not a model state class');
+
 /**
  * @return array<string, mixed>
  */
@@ -98,9 +105,7 @@ function generatedTicketTransitionsDocument(): array
 {
     RouteFacade::patch('api/tickets/{ticket}/transition-to/{state}', TicketTransitionDocsController::class);
 
-    config()->set('spectacular.openapi.state_transitions', [
-        ['model' => Ticket::class, 'path' => 'tickets/{ticket}/transition-to/{state}'],
-    ]);
+    config()->set('spectacular.openapi.state_transitions.scan_paths', [__DIR__.'/../Fixtures/StateTransitions']);
 
     Scramble::configure()->withDocumentTransformers(StateTransitionOperations::class);
     Scramble::routes(fn (Route $route): bool => str_starts_with($route->uri(), 'api/tickets'));

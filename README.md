@@ -270,18 +270,31 @@ A `Data` class declaring its own `rules()` method is left to Scramble, which rea
 When `spatie/laravel-model-states` is installed, a templated transition route such as
 `PATCH /api/orders/{order}/transition-to/{state}` can be fanned out into one documented operation per reachable target
 state — `…/transition-to/paid`, `…/transition-to/cancelled` — each with a distinct summary, the source states that
-allow it, a shared `409 Conflict` response, and exactly the request body its transition expects. Declare the routes in
-the config:
+allow it, a shared `409 Conflict` response, and exactly the request body its transition expects. The base state class
+declares its own endpoint:
 
 ```php
-'state_transitions' => [
-    ['model' => App\Models\Order::class, 'path' => 'orders/{order}/transition-to/{state}'],
-],
+#[StateEndpoint(path: 'orders/{order}/transition-to/{state}')]
+abstract class OrderState extends State
+{
+    public static function config(): StateConfig
+    {
+        return parent::config()
+            ->allowTransition(Pending::class, Paid::class)
+            ->allowTransition(Pending::class, Cancelled::class, MarkAsCancelled::class);
+    }
+}
 ```
 
 `path` is the route as it appears in the generated document (the configured API prefix stripped, no leading slash) with
-`{state}` as the target-state placeholder. `field` defaults to `status`, `label` to the lowercased model basename, and
-`method` to `patch`.
+`{state}` as the target-state placeholder. `label` defaults to the state class basename without its `State` suffix,
+`method` to `patch`. Annotated classes are discovered from the configured scan paths:
+
+```php
+'state_transitions' => [
+    'scan_paths' => [app_path('States')],
+],
+```
 
 A transition takes a request body by declaring a `laravel-data` object in its custom transition constructor after the
 model; the documented operation then requires exactly that body, described like any other data payload. Transitions

@@ -3,12 +3,14 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\Tests\Fixtures\StateTransitions;
 
+use Bambamboole\Spectacular\Attributes\StateEndpoint;
 use Spatie\ModelStates\State;
 use Spatie\ModelStates\StateConfig;
 
 /**
  * @extends State<Ticket>
  */
+#[StateEndpoint(path: 'tickets/{ticket}/transition-to/{state}')]
 abstract class TicketState extends State
 {
     #[\Override]
