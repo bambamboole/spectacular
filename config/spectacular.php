@@ -86,6 +86,26 @@ return [
             'middleware' => ['auth', 'auth:*'],
             'schemes' => [],
         ],
+
+        /*
+         * Templated spatie/laravel-model-states transition routes to fan out
+         * into one documented operation per reachable target state. Each
+         * entry names the state-holding `model` and the route `path` as it
+         * appears in the generated document (the configured API prefix
+         * stripped, no leading slash) with `{state}` as the target-state
+         * placeholder. `field` defaults to `status`, `label` (used in
+         * summaries and descriptions) to the lowercased model basename, and
+         * `method` to `patch`.
+         *
+         * A transition declares its request body by taking a laravel-data
+         * object in its custom Transition constructor after the model; the
+         * documented operation then requires exactly that body.
+         *
+         *  'state_transitions' => [
+         *      ['model' => App\Models\Order::class, 'path' => 'v1/orders/{order}/actions/transition-to/{state}'],
+         *  ],
+         */
+        'state_transitions' => [],
     ],
     'asyncapi' => [
         'version' => '3.0.0',

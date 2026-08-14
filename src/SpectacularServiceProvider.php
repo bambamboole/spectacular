@@ -17,6 +17,7 @@ use Bambamboole\Spectacular\OpenApi\Extensions\SpecParameterExtension;
 use Bambamboole\Spectacular\OpenApi\Info\DocumentsConfiguredInfo;
 use Bambamboole\Spectacular\OpenApi\LaravelData\DataParametersExtractor;
 use Bambamboole\Spectacular\OpenApi\LaravelData\DataRequiredFieldsTransformer;
+use Bambamboole\Spectacular\OpenApi\ModelStates\StateTransitionOperations;
 use Bambamboole\Spectacular\OpenApi\RateLimiting\RateLimitResponses;
 use Bambamboole\Spectacular\OpenApi\Security\DocumentsConfiguredSecurity;
 use Bambamboole\Spectacular\OpenApi\Security\MarksUnauthenticatedRoutesPublic;
@@ -65,9 +66,15 @@ final class SpectacularServiceProvider extends ServiceProvider
     {
         $this->configureScramble();
 
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'spectacular');
+
         $this->publishes([
             __DIR__.'/../config/spectacular.php' => config_path('spectacular.php'),
         ], 'spectacular-config');
+
+        $this->publishes([
+            __DIR__.'/../lang' => $this->app->langPath('vendor/spectacular'),
+        ], 'spectacular-lang');
 
         $this->commands([
             GenerateAsyncApiCommand::class,
@@ -100,6 +107,10 @@ final class SpectacularServiceProvider extends ServiceProvider
             Scramble::configure()
                 ->withParametersExtractors(fn (ParametersExtractors $extractors): ParametersExtractors => $extractors->prepend(DataParametersExtractor::class))
                 ->withOperationTransformers(DataRequiredFieldsTransformer::class);
+        }
+
+        if (class_exists(State::class) && config('spectacular.openapi.state_transitions', []) !== []) {
+            Scramble::configure()->withDocumentTransformers(StateTransitionOperations::class);
         }
     }
 
