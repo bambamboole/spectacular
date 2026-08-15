@@ -101,6 +101,7 @@ final readonly class DataSchemaFactory
 
                 if ($property->type->kind->isDataCollectable() && $node instanceof ArrayType) {
                     $node->items = $oneOf;
+                    $this->dropDottedRuleProperties($type, $name);
 
                     continue;
                 }
