@@ -22,6 +22,7 @@ final class Invoice extends Model
             'is_draft' => 'boolean',
             'reminders' => 'integer',
             'total' => 'decimal:2',
+            'net_total' => AsMoney::class,
             'paid_at' => 'datetime',
         ];
     }

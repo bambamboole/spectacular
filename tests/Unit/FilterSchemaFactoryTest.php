@@ -16,6 +16,7 @@ it('types an exact filter from the column it filters', function (string $name, a
     'boolean cast' => ['is_draft', ['type' => 'boolean']],
     'integer cast' => ['reminders', ['type' => 'integer']],
     'decimal cast' => ['total', ['type' => 'number']],
+    'big decimal class cast' => ['net_total', ['type' => 'number']],
     'datetime cast' => ['paid_at', ['type' => 'string', 'format' => 'date-time']],
     'belongs to an integer keyed model' => ['customer_id', ['type' => 'integer']],
     'belongs to a uuid keyed model' => ['parent_id', ['type' => 'string', 'format' => 'uuid']],
