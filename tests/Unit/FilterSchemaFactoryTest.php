@@ -5,6 +5,7 @@ use Bambamboole\Spectacular\OpenApi\Filters\FilterKind;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterSchemaFactory;
 use Bambamboole\Spectacular\Tests\Fixtures\Filters\Invoice;
 use Bambamboole\Spectacular\Tests\Fixtures\ModelStates\Order;
+use Spatie\QueryBuilder\Enums\FilterOperator;
 
 it('types an exact filter from the column it filters', function (string $name, array $schema): void {
     $type = new FilterSchemaFactory()->make(Invoice::class, $name, FilterKind::Exact);
@@ -23,6 +24,18 @@ it('types an exact filter from the column it filters', function (string $name, a
     'column the model says nothing about' => ['reference', ['type' => 'string']],
     'relation that is not a belongs to' => ['lines_id', ['type' => 'string']],
 ]);
+
+it('leaves a dynamic operator filter a plain string on a typed column', function (): void {
+    $type = new FilterSchemaFactory()->make(Invoice::class, 'paid_at', FilterKind::Operator, FilterOperator::DYNAMIC);
+
+    expect($type->toArray())->toBe(['type' => 'string']);
+});
+
+it('types a fixed operator filter from the column it compares', function (): void {
+    $type = new FilterSchemaFactory()->make(Invoice::class, 'paid_at', FilterKind::Operator, FilterOperator::GREATER_THAN_OR_EQUAL);
+
+    expect($type->toArray())->toBe(['type' => 'string', 'format' => 'date-time']);
+});
 
 it('offers the state names of a model state cast', function (): void {
     $type = new FilterSchemaFactory()->make(Order::class, 'status', FilterKind::Exact);

@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\AllowedSort;
+use Spatie\QueryBuilder\Enums\FilterOperator;
 
 /**
  * @property-read Collection<int, Role> $roles
@@ -29,6 +30,7 @@ class User extends Model implements HasApiFilters, HasApiIncludes, HasApiSorts
         return [
             AllowedFilter::scope('created_after'),
             AllowedFilter::scope('created_before'),
+            AllowedFilter::operator('created_at', FilterOperator::DYNAMIC),
             AllowedFilter::exact('email'),
         ];
     }

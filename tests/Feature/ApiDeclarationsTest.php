@@ -80,6 +80,18 @@ it('allows api filters on a forwarded query execution', function (): void {
         ->assertJsonPath('0.name', 'User 1');
 });
 
+it('compares with the operator prefixed to a dynamic operator filter value', function (string $value, array $names): void {
+    $response = $this->getJson('/api/public-users?filter[created_at]='.urlencode($value))->assertSuccessful();
+
+    expect($response->collect('data')->pluck('name')->all())->toBe($names);
+})->with([
+    'greater than' => ['>2026-02-01 00:00:00', ['User 3']],
+    'greater than or equal' => ['>=2026-02-01 00:00:00', ['User 2', 'User 3']],
+    'less than' => ['<2026-02-01 00:00:00', ['User 1']],
+    'less than or equal' => ['<=2026-02-01 00:00:00', ['User 1', 'User 2']],
+    'no prefix matches exactly' => ['2026-02-01 00:00:00', ['User 2']],
+]);
+
 it('allows a non-scope api filter', function (): void {
     $this->getJson('/api/public-users?filter[email]=user2@example.com')
         ->assertSuccessful()

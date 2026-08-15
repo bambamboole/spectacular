@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use ReflectionMethod;
 use ReflectionNamedType;
 use Spatie\ModelStates\State;
+use Spatie\QueryBuilder\Enums\FilterOperator;
 use Throwable;
 
 /**
@@ -28,13 +29,20 @@ final class FilterSchemaFactory
     /** @var array<string, Model|null> */
     private array $models = [];
 
-    public function make(?string $modelClass, string $name, FilterKind $kind): Type
+    public function make(?string $modelClass, string $name, FilterKind $kind, ?FilterOperator $operator = null): Type
     {
         if ($kind === FilterKind::Trashed) {
             return new StringType()->enum(['with', 'only', '']);
         }
 
         if (! $kind->comparesTypedValues()) {
+            return new StringType;
+        }
+
+        // A dynamic operator filter embeds the comparison in the value
+        // (`filter[created_at]=>=2026-01-01`), so a typed column schema
+        // (number, date-time format) would reject every prefixed value.
+        if ($operator === FilterOperator::DYNAMIC) {
             return new StringType;
         }
 
