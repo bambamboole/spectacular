@@ -4,22 +4,30 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Extensions;
 
+use Bambamboole\Spectacular\Contracts\HasPublicFilters;
+use Bambamboole\Spectacular\Contracts\HasPublicSorts;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterKind;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterSchemaFactory;
+use Bambamboole\Spectacular\QueryBuilder as SpectacularQueryBuilder;
 use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\RouteInfo;
+use Illuminate\Support\Str;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\FunctionLike;
+use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
+use PhpParser\NodeFinder;
+use ReflectionMethod;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\Includes\IncludedRelationship;
+use Throwable;
 
 final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 {
@@ -40,18 +48,30 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             return;
         }
 
+        $publicModels = $this->publicDeclarationModelClasses($actionNode);
+        $publicSortNames = $this->publicSortNames($publicModels);
         $parameters = [];
+        $sortsDeclared = false;
+
+        foreach ($publicModels as $model) {
+            $parameters = [...$parameters, ...$this->publicFilterParameters($model)];
+        }
 
         foreach ($this->queryBuilderCalls($actionNode, self::QUERY_BUILDER_METHODS) as $call) {
+            $sortsDeclared = $sortsDeclared || $this->methodName($call->name) === 'allowedSorts';
             $parameters = [
                 ...$parameters,
                 ...match ($this->methodName($call->name)) {
                     'allowedFilters' => $this->filterParameters($call),
                     'allowedIncludes' => $this->includeParameters($call),
-                    'allowedSorts' => $this->sortParameters($call),
+                    'allowedSorts' => $this->sortParameters($call, $publicSortNames),
                     default => [],
                 },
             ];
+        }
+
+        if (! $sortsDeclared && ($sortParameter = $this->sortParameter($publicSortNames)) !== null) {
+            $parameters[] = $sortParameter;
         }
 
         $this->applyParameters($operation, $parameters);
@@ -67,19 +87,175 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         return array_map(
             function (array $declaration) use ($model): Parameter {
                 ['name' => $name, 'factory' => $factory] = $declaration;
-                $kind = FilterKind::tryFromFactory($factory);
 
-                return Parameter::make($this->nestedParameterName('filter', $name), 'query')
-                    ->description($this->filterDescription($name, $kind))
-                    ->setSchema(Schema::fromType($this->filterSchemas()->make($model, $name, $kind)));
+                return $this->filterParameter($model, $name, FilterKind::tryFromFactory($factory));
             },
             $this->argumentDeclarations($call->args, AllowedFilter::class, 'trashed'),
         );
     }
 
-    private function filterDescription(string $name, FilterKind $kind): string
+    private function filterParameter(?string $model, string $name, FilterKind $kind): Parameter
     {
+        return Parameter::make($this->nestedParameterName('filter', $name), 'query')
+            ->description($this->filterDescription($model, $name, $kind))
+            ->setSchema(Schema::fromType($this->filterSchemas()->make($model, $name, $kind)));
+    }
+
+    /**
+     * The models whose public declarations are in effect at runtime: only a chain
+     * opened with the spectacular query builder auto-allows them, so a plain
+     * spatie chain must not document filters its endpoint would reject.
+     *
+     * @return list<class-string>
+     */
+    private function publicDeclarationModelClasses(FunctionLike $actionNode): array
+    {
+        $models = [];
+
+        foreach ((new NodeFinder)->findInstanceOf($actionNode, Expr\StaticCall::class) as $call) {
+            if (! $call->class instanceof Name || $this->methodName($call->name) !== 'for') {
+                continue;
+            }
+
+            $builder = $this->resolvedClassName($call->class);
+
+            if (! class_exists($builder) || ! is_a($builder, SpectacularQueryBuilder::class, true)) {
+                continue;
+            }
+
+            $model = $this->subjectModelClass($call);
+
+            if ($model !== null && ! in_array($model, $models, true)) {
+                $models[] = $model;
+            }
+        }
+
+        return $models;
+    }
+
+    /**
+     * @param  class-string  $model
+     * @return list<Parameter>
+     */
+    private function publicFilterParameters(string $model): array
+    {
+        if (! is_a($model, HasPublicFilters::class, true)) {
+            return [];
+        }
+
+        try {
+            $filters = $model::getFilters();
+        } catch (Throwable) {
+            return [];
+        }
+
+        return array_map(
+            fn (AllowedFilter $filter): Parameter => $this->filterParameter(
+                $model,
+                $filter->getName(),
+                FilterKind::fromAllowedFilter($filter),
+            ),
+            $filters,
+        );
+    }
+
+    /**
+     * @param  list<class-string>  $models
+     * @return list<string>
+     */
+    private function publicSortNames(array $models): array
+    {
+        $names = [];
+
+        foreach ($models as $model) {
+            if (! is_a($model, HasPublicSorts::class, true)) {
+                continue;
+            }
+
+            try {
+                $sorts = $model::getSorts();
+            } catch (Throwable) {
+                continue;
+            }
+
+            foreach ($sorts as $sort) {
+                if ($sort instanceof AllowedSort) {
+                    $names[] = $sort->getName();
+                } elseif (is_string($sort)) {
+                    $names[] = ltrim($sort, '-');
+                }
+            }
+        }
+
+        return $this->uniqueStrings($names);
+    }
+
+    private function filterDescription(?string $model, string $name, FilterKind $kind): string
+    {
+        if ($kind === FilterKind::Scope && $model !== null && ($summary = $this->scopeSummary($model, $name)) !== null) {
+            return $summary;
+        }
+
         return implode(' ', array_filter(["Filter by `{$name}`.", $kind->matching()]));
+    }
+
+    /**
+     * A scope filter points at a method the developer already documented, so its
+     * docblock summary beats the generic template.
+     *
+     * @param  class-string  $model
+     */
+    private function scopeSummary(string $model, string $name): ?string
+    {
+        $method = $this->scopeMethod($model, $name);
+        $docComment = $method?->getDocComment();
+
+        if ($docComment === null || $docComment === false) {
+            return null;
+        }
+
+        $body = preg_replace(['#^\s*/\*\*+#', '#\*+/\s*$#'], '', $docComment) ?? '';
+        $lines = [];
+
+        foreach (preg_split('/\R/', $body) ?: [] as $line) {
+            $line = trim(preg_replace('#^\s*\*+#', '', $line) ?? '');
+
+            if ($line === '' || str_starts_with($line, '@')) {
+                if ($lines !== []) {
+                    break;
+                }
+
+                if (str_starts_with($line, '@')) {
+                    return null;
+                }
+
+                continue;
+            }
+
+            $lines[] = $line;
+        }
+
+        return $lines === [] ? null : implode(' ', $lines);
+    }
+
+    /**
+     * Laravel resolves both a #[Scope]-attributed method named after the filter
+     * and the legacy scope-prefixed naming; method_exists sees protected, trait,
+     * and inherited methods alike.
+     *
+     * @param  class-string  $model
+     */
+    private function scopeMethod(string $model, string $name): ?ReflectionMethod
+    {
+        $scope = Str::camel($name);
+
+        foreach ([$scope, 'scope'.ucfirst($scope)] as $candidate) {
+            if (method_exists($model, $candidate)) {
+                return new ReflectionMethod($model, $candidate);
+            }
+        }
+
+        return null;
     }
 
     private function filterSchemas(): FilterSchemaFactory
@@ -88,18 +264,29 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     }
 
     /**
+     * @param  list<string>  $publicSortNames
      * @return list<Parameter>
      */
-    private function sortParameters(Expr\MethodCall $call): array
+    private function sortParameters(Expr\MethodCall $call, array $publicSortNames): array
     {
         $sorts = array_map(
             fn (string $sort): string => ltrim($sort, '-'),
             $this->argumentNames($call->args, AllowedSort::class),
         );
+        $parameter = $this->sortParameter([...$sorts, ...$publicSortNames]);
+
+        return $parameter === null ? [] : [$parameter];
+    }
+
+    /**
+     * @param  list<string>  $sorts
+     */
+    private function sortParameter(array $sorts): ?Parameter
+    {
         $sorts = $this->uniqueStrings($sorts);
 
         if ($sorts === []) {
-            return [];
+            return null;
         }
 
         $values = [];
@@ -109,7 +296,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             $values[] = "-{$sort}";
         }
 
-        return [$this->arrayParameter(
+        return $this->arrayParameter(
             $this->parameterName('sort'),
             $values,
             sprintf(
@@ -117,7 +304,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
                 $this->markdownValueList($sorts),
                 $sorts[0],
             ),
-        )];
+        );
     }
 
     /**

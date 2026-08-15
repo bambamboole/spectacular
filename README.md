@@ -91,6 +91,45 @@ it. `exact`, `belongsTo` and `operator` compare a whole column value, so the sch
 value. A filter whose semantics Spectacular cannot know (`callback`, `custom`) and a chain opened with something other
 than a model class stay untyped.
 
+A `scope` filter points at a method the developer already documented: when the scope method — `#[Scope]`-attributed or
+legacy `scope`-prefixed, own, inherited, or from a trait — carries a docblock summary, that summary becomes the
+parameter description instead of the generic template.
+
+### Public filters and sorts
+
+Filters shared across every endpoint of a model — timestamp scopes are the typical case — do not have to be re-declared
+in every controller. A model implementing `HasPublicFilters` and/or `HasPublicSorts` declares them once:
+
+```php
+use Bambamboole\Spectacular\Contracts\HasPublicFilters;
+use Bambamboole\Spectacular\Contracts\HasPublicSorts;
+use Spatie\QueryBuilder\AllowedFilter;
+
+class User extends Model implements HasPublicFilters, HasPublicSorts
+{
+    public static function getFilters(): array
+    {
+        return [
+            AllowedFilter::scope('created_after'),
+            AllowedFilter::scope('created_before'),
+        ];
+    }
+
+    public static function getSorts(): array
+    {
+        return ['created_at', 'updated_at'];
+    }
+}
+```
+
+Every chain opened with the Spectacular `QueryBuilder` on that model then allows and documents these declarations
+automatically: with no `allowedFilters()`/`allowedSorts()` call at all, merged into an explicit call (the explicit
+declaration wins over a public one of the same name), and on relation subjects such as
+`QueryBuilder::for($tenant->members())`. Scope filters are the intended use, but any `AllowedFilter` works. Unknown
+filters and sorts are rejected as usual; `apiPaginate()` enforces that even without an explicit
+`allowedFilters()`/`allowedSorts()` call. Chains opened with the plain spatie `QueryBuilder` are not affected — they
+neither allow nor document public declarations.
+
 ### Pagination parameters
 
 `paginate()`, `simplePaginate()` and `cursorPaginate()` on a query-builder chain are documented automatically:
