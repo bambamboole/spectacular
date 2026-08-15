@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.3](https://github.com/bambamboole/spectacular/compare/0.25.2...0.25.3) (2026-08-15)
+
+
+### Bug Fixes
+
+* **openapi:** drop the dotted rule leftovers of a plain nested collection ([#83](https://github.com/bambamboole/spectacular/issues/83)) ([4cf7bdc](https://github.com/bambamboole/spectacular/commit/4cf7bdce55e3c6cb67c9821552240b8516134a43))
+
 ## [0.25.2](https://github.com/bambamboole/spectacular/compare/0.25.1...0.25.2) (2026-08-15)
 
 
