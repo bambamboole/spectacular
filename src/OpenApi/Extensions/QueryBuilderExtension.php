@@ -24,9 +24,12 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\NodeFinder;
 use ReflectionMethod;
+use ReflectionProperty;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\AllowedSort;
+use Spatie\QueryBuilder\Enums\FilterOperator;
+use Spatie\QueryBuilder\Filters\FiltersOperator;
 use Spatie\QueryBuilder\Includes\IncludedRelationship;
 use Throwable;
 
@@ -107,11 +110,11 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         );
     }
 
-    private function filterParameter(?string $model, string $name, FilterKind $kind): Parameter
+    private function filterParameter(?string $model, string $name, FilterKind $kind, ?FilterOperator $operator = null): Parameter
     {
         return Parameter::make($this->nestedParameterName('filter', $name), 'query')
-            ->description($this->filterDescription($model, $name, $kind))
-            ->setSchema(Schema::fromType($this->filterSchemas()->make($model, $name, $kind)));
+            ->description($this->filterDescription($model, $name, $kind, $operator))
+            ->setSchema(Schema::fromType($this->filterSchemas()->make($model, $name, $kind, $operator)));
     }
 
     /**
@@ -215,6 +218,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
                 $model,
                 $filter->getName(),
                 FilterKind::fromAllowedFilter($filter),
+                $this->filterOperator($filter),
             ),
             $filters,
         );
@@ -282,13 +286,34 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         return $this->uniqueStrings($names);
     }
 
-    private function filterDescription(?string $model, string $name, FilterKind $kind): string
+    private function filterDescription(?string $model, string $name, FilterKind $kind, ?FilterOperator $operator = null): string
     {
         if ($kind === FilterKind::Scope && $model !== null && ($summary = $this->scopeSummary($model, $name)) !== null) {
             return $summary;
         }
 
+        if ($operator === FilterOperator::DYNAMIC) {
+            return "Filter by `{$name}`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly. Combine comparisons with a comma to express a range, for example `>=2026-01-01,<2026-02-01`.";
+        }
+
         return implode(' ', array_filter(["Filter by `{$name}`.", $kind->matching()]));
+    }
+
+    /**
+     * The operator an operator filter compares with only lives in a protected
+     * property of its runtime filter instance.
+     */
+    private function filterOperator(AllowedFilter $filter): ?FilterOperator
+    {
+        $filterClass = $filter->getFilterClass();
+
+        if (! $filterClass instanceof FiltersOperator) {
+            return null;
+        }
+
+        $operator = new ReflectionProperty(FiltersOperator::class, 'filterOperator')->getValue($filterClass);
+
+        return $operator instanceof FilterOperator ? $operator : null;
     }
 
     /**

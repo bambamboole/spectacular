@@ -721,6 +721,15 @@
                         }
                     },
                     {
+                        "name": "filter[created_at]",
+                        "in": "query",
+                        "description": "Filter by `created_at`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly. Combine comparisons with a comma to express a range, for example `>=2026-01-01,<2026-02-01`.",
+                        "schema": {
+                            "type": "string",
+                            "x-value-format": "date-time"
+                        }
+                    },
+                    {
                         "name": "filter[email]",
                         "in": "query",
                         "description": "Filter by `email`. Matches the exact value.",

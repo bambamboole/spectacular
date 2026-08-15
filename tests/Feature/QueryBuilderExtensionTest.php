@@ -133,11 +133,15 @@ it('documents model api declarations without inline declarations', function (): 
     $parameters = generatedOperationParametersForUri('api/public-declaration-users');
 
     expect($parameters)
-        ->toHaveKeys(['filter[created_after]', 'filter[created_before]', 'filter[email]', 'sort', 'include'])
+        ->toHaveKeys(['filter[created_after]', 'filter[created_before]', 'filter[created_at]', 'filter[email]', 'sort', 'include'])
         ->and($parameters['filter[created_after]']['description'])
         ->toBe('Only users created at or after the given date.')
         ->and($parameters['filter[created_after]']['schema'])
         ->toBe(['type' => 'string'])
+        ->and($parameters['filter[created_at]']['description'])
+        ->toBe('Filter by `created_at`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly. Combine comparisons with a comma to express a range, for example `>=2026-01-01,<2026-02-01`.')
+        ->and($parameters['filter[created_at]']['schema'])
+        ->toBe(['type' => 'string', 'x-value-format' => 'date-time'])
         ->and($parameters['filter[email]']['description'])
         ->toBe('Filter by `email`. Matches the exact value.')
         ->and($parameters['sort']['schema']['items']['enum'])

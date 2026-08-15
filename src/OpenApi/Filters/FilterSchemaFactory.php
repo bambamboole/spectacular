@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use ReflectionMethod;
 use ReflectionNamedType;
 use Spatie\ModelStates\State;
+use Spatie\QueryBuilder\Enums\FilterOperator;
 use Throwable;
 
 /**
@@ -28,7 +29,7 @@ final class FilterSchemaFactory
     /** @var array<string, Model|null> */
     private array $models = [];
 
-    public function make(?string $modelClass, string $name, FilterKind $kind): Type
+    public function make(?string $modelClass, string $name, FilterKind $kind, ?FilterOperator $operator = null): Type
     {
         if ($kind === FilterKind::Trashed) {
             return new StringType()->enum(['with', 'only', '']);
@@ -39,8 +40,36 @@ final class FilterSchemaFactory
         }
 
         $model = $this->model($modelClass);
+        $columnType = $model === null ? new StringType : $this->columnType($model, $name);
 
-        return $model === null ? new StringType : $this->columnType($model, $name);
+        if ($operator === FilterOperator::DYNAMIC) {
+            return $this->dynamicOperatorType($columnType);
+        }
+
+        return $columnType;
+    }
+
+    /**
+     * A dynamic operator filter embeds the comparison in the value
+     * (`filter[created_at]=>=2026-01-01`), so the typed column schema
+     * (number, date-time format) would reject every prefixed value. The
+     * column's value type survives as `x-value-format` for tooling.
+     */
+    private function dynamicOperatorType(Type $columnType): Type
+    {
+        $type = new StringType;
+
+        $format = match (true) {
+            $columnType->format !== '' => $columnType->format,
+            $columnType->type !== 'string' => $columnType->type,
+            default => null,
+        };
+
+        if ($format !== null) {
+            $type->setExtensionProperty('value-format', $format);
+        }
+
+        return $type;
     }
 
     private function columnType(Model $model, string $name): Type
@@ -49,6 +78,11 @@ final class FilterSchemaFactory
 
         if (is_string($cast) && ($type = $this->castType($cast)) !== null) {
             return $type;
+        }
+
+        // The timestamp columns are dates without appearing in the casts.
+        if (in_array($name, $model->getDates(), true)) {
+            return new StringType()->format('date-time');
         }
 
         if ($name === $model->getKeyName()) {
