@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.24.0](https://github.com/bambamboole/spectacular/compare/0.23.0...0.24.0) (2026-08-15)
+
+
+### Features
+
+* **openapi:** document dynamic operator filters honestly ([#73](https://github.com/bambamboole/spectacular/issues/73)) ([675785d](https://github.com/bambamboole/spectacular/commit/675785df263171922a0d74cf7d9c9e52e2246080))
+* **openapi:** honest filter lists, between filters, and self-documenting custom filters ([#75](https://github.com/bambamboole/spectacular/issues/75)) ([b5a945c](https://github.com/bambamboole/spectacular/commit/b5a945c11ac74e13b9ea6a100b8f5a0197456cff))
+
 ## [0.23.0](https://github.com/bambamboole/spectacular/compare/0.22.0...0.23.0) (2026-08-15)
 
 
