@@ -446,12 +446,16 @@
                     {
                         "name": "include",
                         "in": "query",
+                        "description": "Available includes are `roles`, `rolesCount`, `rolesExists`. You can include multiple options by separating them with a comma.",
+                        "style": "form",
                         "schema": {
                             "type": "array",
                             "items": {
                                 "type": "string",
                                 "enum": [
-                                    "roles"
+                                    "roles",
+                                    "rolesCount",
+                                    "rolesExists"
                                 ]
                             }
                         },

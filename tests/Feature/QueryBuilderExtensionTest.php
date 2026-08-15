@@ -171,6 +171,18 @@ it('merges model api declarations with inline ones', function (): void {
         ->toBe(['roleTotal', 'roles', 'rolesCount', 'rolesExists']);
 });
 
+it('documents only includes for a single-result api lookup', function (): void {
+    RouteFacade::get('api/single-result-users/{id}', SingleResultUserController::class)
+        ->name('api.single-result-users.show');
+
+    $parameters = generatedOperationParametersForUri('api/single-result-users/{id}');
+
+    expect($parameters)->toHaveKey('include')
+        ->and($parameters)->not->toHaveKeys(['filter[created_after]', 'filter[created_before]', 'filter[email]', 'sort'])
+        ->and($parameters['include']['schema']['items']['enum'])
+        ->toBe(['roles', 'rolesCount', 'rolesExists']);
+});
+
 it('describes a scope filter from the scope method docblock summary', function (): void {
     RouteFacade::get('api/inline-scope-users', InlineScopeUsersController::class)
         ->name('api.inline-scope-users.index');
@@ -743,6 +755,14 @@ final class DefaultApiPaginatedUsersController
     public function __invoke(): AnonymousResourceCollection
     {
         return UserResource::collection(SpectacularQueryBuilder::for(User::class)->apiPaginate());
+    }
+}
+
+final class SingleResultUserController
+{
+    public function __invoke(int $id): UserResource
+    {
+        return new UserResource(SpectacularQueryBuilder::for(User::class)->apiFindOrFail($id));
     }
 }
 

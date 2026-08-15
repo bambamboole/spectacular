@@ -39,6 +39,8 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         'allowedSorts',
     ];
 
+    private const SINGLE_RESULT_METHOD = 'apiFindOrFail';
+
     private ?FilterSchemaFactory $filterSchemas = null;
 
     public function handle(Operation $operation, RouteInfo $routeInfo): void
@@ -49,8 +51,10 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             return;
         }
 
-        $apiModels = $this->apiDeclarationModelClasses($actionNode);
-        $apiIncludeNames = $this->apiIncludeNames($apiModels);
+        $singleResultSubjects = $this->singleResultSubjectCalls($actionNode);
+        $apiModels = $this->apiDeclarationModelClasses($actionNode, $singleResultSubjects);
+        $singleResultModels = $this->subjectModelClasses($singleResultSubjects);
+        $apiIncludeNames = $this->apiIncludeNames($this->uniqueStrings([...$apiModels, ...$singleResultModels]));
         $apiSortNames = $this->apiSortNames($apiModels);
         $parameters = [];
         $includesDeclared = false;
@@ -113,16 +117,23 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     /**
      * The models whose API declarations are in effect at runtime: only a chain
      * opened with the spectacular query builder auto-allows them, so a plain
-     * spatie chain must not document filters its endpoint would reject.
+     * spatie chain must not document filters its endpoint would reject. A
+     * chain completed with apiFindOrFail() only accepts includes, so its
+     * subject must not document filters and sorts the endpoint would reject.
      *
+     * @param  list<Expr\StaticCall>  $singleResultSubjects
      * @return list<class-string>
      */
-    private function apiDeclarationModelClasses(FunctionLike $actionNode): array
+    private function apiDeclarationModelClasses(FunctionLike $actionNode, array $singleResultSubjects): array
     {
         $models = [];
 
         foreach ((new NodeFinder)->findInstanceOf($actionNode, Expr\StaticCall::class) as $call) {
             if (! $call->class instanceof Name || $this->methodName($call->name) !== 'for') {
+                continue;
+            }
+
+            if (in_array($call, $singleResultSubjects, true)) {
                 continue;
             }
 
@@ -133,6 +144,47 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             }
 
             $model = $this->subjectModelClass($call);
+
+            if ($model !== null && ! in_array($model, $models, true)) {
+                $models[] = $model;
+            }
+        }
+
+        return $models;
+    }
+
+    /**
+     * @return list<Expr\StaticCall>
+     */
+    private function singleResultSubjectCalls(FunctionLike $actionNode): array
+    {
+        $subjects = [];
+
+        foreach ((new NodeFinder)->findInstanceOf($actionNode, Expr\MethodCall::class) as $call) {
+            if ($this->methodName($call->name) !== self::SINGLE_RESULT_METHOD) {
+                continue;
+            }
+
+            $subject = $this->subjectCall($call->var);
+
+            if ($subject !== null && ! in_array($subject, $subjects, true)) {
+                $subjects[] = $subject;
+            }
+        }
+
+        return $subjects;
+    }
+
+    /**
+     * @param  list<Expr\StaticCall>  $subjects
+     * @return list<class-string>
+     */
+    private function subjectModelClasses(array $subjects): array
+    {
+        $models = [];
+
+        foreach ($subjects as $subject) {
+            $model = $this->subjectModelClass($subject);
 
             if ($model !== null && ! in_array($model, $models, true)) {
                 $models[] = $model;

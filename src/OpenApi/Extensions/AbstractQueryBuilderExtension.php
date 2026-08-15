@@ -77,7 +77,7 @@ abstract class AbstractQueryBuilderExtension extends OperationExtension
         return $argument instanceof String_ && class_exists($argument->value) ? $argument->value : null;
     }
 
-    private function subjectCall(Expr $expression): ?Expr\StaticCall
+    protected function subjectCall(Expr $expression): ?Expr\StaticCall
     {
         if ($expression instanceof Expr\MethodCall) {
             return $this->subjectCall($expression->var);
