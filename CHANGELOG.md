@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.2](https://github.com/bambamboole/spectacular/compare/0.21.1...0.21.2) (2026-08-15)
+
+
+### Bug Fixes
+
+* **openapi:** resolve the subject model from a builder with a static base ([#67](https://github.com/bambamboole/spectacular/issues/67)) ([071e09c](https://github.com/bambamboole/spectacular/commit/071e09c50bf00297290deefd77feda4b0fcd6c1b))
+
 ## [0.21.1](https://github.com/bambamboole/spectacular/compare/0.21.0...0.21.1) (2026-08-15)
 
 
