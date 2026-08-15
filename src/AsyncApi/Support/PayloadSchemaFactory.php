@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Bambamboole\Spectacular\AsyncApi\Support;
 
 use BackedEnum;
+use Brick\Math\BigDecimal;
 use DateTimeInterface;
 use Dedoc\Scramble\Infer\Services\FileNameResolver;
 use Dedoc\Scramble\OpenApiContext;
@@ -317,6 +318,16 @@ final class PayloadSchemaFactory
             return [
                 'type' => 'string',
                 'format' => 'date-time',
+                'x-php-type' => $type->name,
+            ];
+        }
+
+        if (is_a($type->name, BigDecimal::class, true)) {
+            return [
+                'anyOf' => [
+                    ['type' => 'number'],
+                    ['type' => 'string', 'pattern' => '^-?\\d+(\\.\\d+)?$'],
+                ],
                 'x-php-type' => $type->name,
             ];
         }

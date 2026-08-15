@@ -29,6 +29,7 @@
     "require-dev": {
         "bambamboole/extended-testbench": "^0.6",
         "bambamboole/laravel-webhooks": ">=0.3 <1.0.0",
+        "brick/math": "^0.18",
         "larastan/larastan": "^3.10",
         "laravel/pint": "^1.29",
         "pestphp/pest": "^5.0",
@@ -42,7 +43,8 @@
         "bambamboole/laravel-webhooks": "Document webhook events alongside broadcasts in the generated AsyncAPI (>=0.3).",
         "spatie/laravel-model-states": "Document model state properties as string enum schemas in the generated OpenAPI (^2.0).",
         "lattice-php/api-reference": "Render the generated OpenAPI documents as a browsable API reference (Lattice component, ^0.42).",
-        "spatie/laravel-data": "Document the request body of actions taking a Data object, descriptions included (^4.23)."
+        "spatie/laravel-data": "Document the request body of actions taking a Data object, descriptions included (^4.23).",
+        "brick/math": "Type BigDecimal directly on Data properties: auto-registered cast/transformer plus an OpenAPI schema accepting number and decimal string."
     },
     "autoload": {
         "psr-4": {

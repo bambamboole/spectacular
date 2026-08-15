@@ -8,6 +8,9 @@ use Bambamboole\Spectacular\AsyncApi\AsyncApiGenerator;
 use Bambamboole\Spectacular\AsyncApi\Console\GenerateAsyncApiCommand;
 use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
+use Bambamboole\Spectacular\LaravelData\BigDecimalCast;
+use Bambamboole\Spectacular\LaravelData\BigDecimalRuleInferrer;
+use Bambamboole\Spectacular\LaravelData\BigDecimalTransformer;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
 use Bambamboole\Spectacular\OpenApi\Extensions\ModelStateToSchemaExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
@@ -24,6 +27,7 @@ use Bambamboole\Spectacular\OpenApi\Security\MarksUnauthenticatedRoutesPublic;
 use Bambamboole\Spectacular\OpenApi\Security\SecurityConfig;
 use Bambamboole\Spectacular\OpenApi\Transformers\ValidationErrorResponses;
 use Bambamboole\Spectacular\Support\ClassDiscoverer;
+use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Configuration\ParametersExtractors;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Contracts\Foundation\Application;
@@ -65,6 +69,7 @@ final class SpectacularServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureScramble();
+        $this->registerBigDecimalDataSupport();
 
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'spectacular');
 
@@ -111,6 +116,28 @@ final class SpectacularServiceProvider extends ServiceProvider
 
         if (class_exists(State::class)) {
             Scramble::configure()->withDocumentTransformers(StateTransitionOperations::class);
+        }
+    }
+
+    /**
+     * Runs in boot() so laravel-data has already merged its config defaults —
+     * setting the keys during register() would race provider order and could
+     * shadow the default DateTimeInterface entries. An application entry for
+     * BigDecimal always wins over the package one.
+     */
+    private function registerBigDecimalDataSupport(): void
+    {
+        if (! class_exists(Data::class) || ! class_exists(BigDecimal::class)) {
+            return;
+        }
+
+        config()->set('data.casts', config('data.casts', []) + [BigDecimal::class => BigDecimalCast::class]);
+        config()->set('data.transformers', config('data.transformers', []) + [BigDecimal::class => BigDecimalTransformer::class]);
+
+        $inferrers = config('data.rule_inferrers', []);
+
+        if (! in_array(BigDecimalRuleInferrer::class, $inferrers, true)) {
+            config()->set('data.rule_inferrers', [...$inferrers, BigDecimalRuleInferrer::class]);
         }
     }
 
