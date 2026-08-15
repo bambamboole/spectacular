@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.1](https://github.com/bambamboole/spectacular/compare/0.21.0...0.21.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* **query-builder:** validate model API declarations on every chain-completing call ([#65](https://github.com/bambamboole/spectacular/issues/65)) ([2728b45](https://github.com/bambamboole/spectacular/commit/2728b45d2038da3c0a7cafa923660eb3df2d1711))
+
 ## [0.21.0](https://github.com/bambamboole/spectacular/compare/0.20.0...0.21.0) (2026-08-15)
 
 
