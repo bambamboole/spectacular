@@ -3,6 +3,17 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Filters;
 
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\Filters\FiltersBeginsWith;
+use Spatie\QueryBuilder\Filters\FiltersBelongsTo;
+use Spatie\QueryBuilder\Filters\FiltersCallback;
+use Spatie\QueryBuilder\Filters\FiltersEndsWith;
+use Spatie\QueryBuilder\Filters\FiltersExact;
+use Spatie\QueryBuilder\Filters\FiltersOperator;
+use Spatie\QueryBuilder\Filters\FiltersPartial;
+use Spatie\QueryBuilder\Filters\FiltersScope;
+use Spatie\QueryBuilder\Filters\FiltersTrashed;
+
 /**
  * The `AllowedFilter` factory a filter was declared with. It carries the matching
  * semantics a client needs and decides whether the filter compares against a typed
@@ -26,6 +37,27 @@ enum FilterKind: string
     public static function tryFromFactory(?string $factory): self
     {
         return $factory === null ? self::Partial : (self::tryFrom($factory) ?? self::Partial);
+    }
+
+    /**
+     * A filter only known as a runtime instance reveals its factory through the
+     * internal filter class it was constructed with. Begins/ends-with extend the
+     * partial filter, so the subclasses have to match first.
+     */
+    public static function fromAllowedFilter(AllowedFilter $filter): self
+    {
+        return match (true) {
+            $filter->getFilterClass() instanceof FiltersBeginsWith => self::BeginsWith,
+            $filter->getFilterClass() instanceof FiltersEndsWith => self::EndsWith,
+            $filter->getFilterClass() instanceof FiltersPartial => self::Partial,
+            $filter->getFilterClass() instanceof FiltersOperator => self::Operator,
+            $filter->getFilterClass() instanceof FiltersExact => self::Exact,
+            $filter->getFilterClass() instanceof FiltersScope => self::Scope,
+            $filter->getFilterClass() instanceof FiltersTrashed => self::Trashed,
+            $filter->getFilterClass() instanceof FiltersBelongsTo => self::BelongsTo,
+            $filter->getFilterClass() instanceof FiltersCallback => self::Callback,
+            default => self::Custom,
+        };
     }
 
     /**

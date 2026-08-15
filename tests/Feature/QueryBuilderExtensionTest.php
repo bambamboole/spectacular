@@ -125,6 +125,68 @@ it('documents an example for the required user path parameter', function (): voi
     expect($parameters['user']['example'])->toBe(1);
 });
 
+it('documents public model filters and sorts without inline declarations', function (): void {
+    RouteFacade::get('api/public-declaration-users', DefaultApiPaginatedUsersController::class)
+        ->name('api.public-declaration-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/public-declaration-users');
+
+    expect($parameters)
+        ->toHaveKeys(['filter[created_after]', 'filter[created_before]', 'filter[email]', 'sort'])
+        ->and($parameters['filter[created_after]']['description'])
+        ->toBe('Only users created at or after the given date.')
+        ->and($parameters['filter[created_after]']['schema'])
+        ->toBe(['type' => 'string'])
+        ->and($parameters['filter[email]']['description'])
+        ->toBe('Filter by `email`. Matches the exact value.')
+        ->and($parameters['sort']['schema']['items']['enum'])
+        ->toBe(['created_at', '-created_at', 'updated_at', '-updated_at']);
+});
+
+it('merges public model declarations with inline ones', function (): void {
+    RouteFacade::get('api/mixed-declaration-users', MixedDeclarationsUsersController::class)
+        ->name('api.mixed-declaration-users.index');
+
+    $operation = generatedOperationForUri('api/mixed-declaration-users');
+    $parameters = generatedOperationParametersForUri('api/mixed-declaration-users');
+
+    $createdAfterParameters = array_filter(
+        $operation['parameters'] ?? [],
+        fn (array $parameter): bool => $parameter['name'] === 'filter[created_after]',
+    );
+
+    expect($createdAfterParameters)->toHaveCount(1)
+        ->and($parameters['filter[created_after]']['description'])
+        ->toBe('Filter by `created_after`. Matches the exact value.')
+        ->and($parameters['filter[name]']['description'])
+        ->toBe('Filter by `name`. Matches values containing the given text, case-insensitively.')
+        ->and($parameters['filter[created_before]']['description'])
+        ->toBe('Filter by `created_before`. Applies the query scope of the same name.')
+        ->and($parameters['sort']['schema']['items']['enum'])
+        ->toBe(['name', '-name', 'created_at', '-created_at', 'updated_at', '-updated_at']);
+});
+
+it('describes a scope filter from the scope method docblock summary', function (): void {
+    RouteFacade::get('api/inline-scope-users', InlineScopeUsersController::class)
+        ->name('api.inline-scope-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/inline-scope-users');
+
+    expect($parameters['filter[created_after]']['description'])
+        ->toBe('Only users created at or after the given date.')
+        ->and($parameters['filter[created_before]']['description'])
+        ->toBe('Filter by `created_before`. Applies the query scope of the same name.');
+});
+
+it('leaves public model declarations off plain spatie query builder chains', function (): void {
+    RouteFacade::get('api/spatie-declaration-users', StandardUsersController::class)
+        ->name('api.spatie-declaration-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/spatie-declaration-users');
+
+    expect($parameters)->not->toHaveKeys(['filter[created_after]', 'filter[created_before]']);
+});
+
 it('matches the workbench OpenAPI fixture', function (): void {
     app()->register(WorkbenchServiceProvider::class);
     Scramble::configure()->useConfig(config('scramble'));
@@ -684,6 +746,30 @@ final class DefaultApiPaginatedUsersWithMaxController
     public function __invoke(): AnonymousResourceCollection
     {
         return UserResource::collection(SpectacularQueryBuilder::for(User::class)->apiPaginate(max: 50));
+    }
+}
+
+final class InlineScopeUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(QueryBuilder::for(User::class)
+            ->allowedFilters(
+                AllowedFilter::scope('created_after'),
+                AllowedFilter::scope('created_before'),
+            )
+            ->get());
+    }
+}
+
+final class MixedDeclarationsUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(SpectacularQueryBuilder::for(User::class)
+            ->allowedFilters(AllowedFilter::partial('name'), AllowedFilter::exact('created_after'))
+            ->allowedSorts('name', 'created_at')
+            ->apiPaginate());
     }
 }
 

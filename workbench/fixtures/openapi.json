@@ -701,9 +701,33 @@
                         "explode": false
                     },
                     {
+                        "name": "filter[created_after]",
+                        "in": "query",
+                        "description": "Only users created at or after the given date.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[created_before]",
+                        "in": "query",
+                        "description": "Filter by `created_before`. Applies the query scope of the same name.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[email]",
+                        "in": "query",
+                        "description": "Filter by `email`. Matches the exact value.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "sort",
                         "in": "query",
-                        "description": "Available sorts are `name`, `created_at`. You can sort by multiple options by separating them with a comma. To sort in descending order, use `-` sign in front of the sort, for example: `-name`.",
+                        "description": "Available sorts are `name`, `created_at`, `updated_at`. You can sort by multiple options by separating them with a comma. To sort in descending order, use `-` sign in front of the sort, for example: `-name`.",
                         "style": "form",
                         "schema": {
                             "type": "array",
@@ -713,7 +737,9 @@
                                     "name",
                                     "-name",
                                     "created_at",
-                                    "-created_at"
+                                    "-created_at",
+                                    "updated_at",
+                                    "-updated_at"
                                 ]
                             }
                         },
@@ -723,14 +749,6 @@
                         "name": "filter[name]",
                         "in": "query",
                         "description": "Filter by `name`. Matches values containing the given text, case-insensitively.",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "filter[email]",
-                        "in": "query",
-                        "description": "Filter by `email`. Matches the exact value.",
                         "schema": {
                             "type": "string"
                         }
