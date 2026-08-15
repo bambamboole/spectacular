@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Filters;
 
+use Bambamboole\Spectacular\QueryBuilder\Filters\FiltersBetween;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\Filters\FiltersBeginsWith;
 use Spatie\QueryBuilder\Filters\FiltersBelongsTo;
@@ -30,6 +31,7 @@ enum FilterKind: string
     case Callback = 'callback';
     case Custom = 'custom';
     case Operator = 'operator';
+    case Between = 'between';
     case Trashed = 'trashed';
     case GroupOr = 'groupOr';
     case GroupAnd = 'groupAnd';
@@ -56,6 +58,7 @@ enum FilterKind: string
             $filter->getFilterClass() instanceof FiltersTrashed => self::Trashed,
             $filter->getFilterClass() instanceof FiltersBelongsTo => self::BelongsTo,
             $filter->getFilterClass() instanceof FiltersCallback => self::Callback,
+            $filter->getFilterClass() instanceof FiltersBetween => self::Between,
             default => self::Custom,
         };
     }
@@ -67,7 +70,20 @@ enum FilterKind: string
     public function comparesTypedValues(): bool
     {
         return match ($this) {
-            self::Exact, self::BelongsTo, self::Operator => true,
+            self::Exact, self::BelongsTo, self::Operator, self::Between => true,
+            default => false,
+        };
+    }
+
+    /**
+     * laravel-query-builder splits every filter value on the delimiter, so these
+     * kinds accept a comma-separated list at runtime (whereIn or an OR group) —
+     * their parameter is honestly an array serialized as `form`/`explode: false`.
+     */
+    public function acceptsMultipleValues(): bool
+    {
+        return match ($this) {
+            self::Exact, self::BelongsTo, self::Partial, self::BeginsWith, self::EndsWith => true,
             default => false,
         };
     }

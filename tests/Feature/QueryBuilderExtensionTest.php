@@ -36,13 +36,13 @@ it('documents supported spatie query builder parameters from the route action', 
             'include',
         ])
         ->and($parameters['filter[name]']['schema'])
-        ->toBe(['type' => 'string'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string']])
         ->and($parameters['filter[name]']['description'])
-        ->toBe('Filter by `name`. Matches values containing the given text, case-insensitively.')
+        ->toBe('Filter by `name`. Matches values containing the given text, case-insensitively. Separate multiple values with a comma; records matching any value qualify.')
         ->and($parameters['filter[email]']['schema'])
-        ->toBe(['type' => 'string'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string']])
         ->and($parameters['filter[email]']['description'])
-        ->toBe('Filter by `email`. Matches the exact value.')
+        ->toBe('Filter by `email`. Matches the exact value. Separate multiple values with a comma; records matching any value qualify.')
         ->and($parameters['sort'])
         ->toMatchArray([
             'in' => 'query',
@@ -77,13 +77,17 @@ it('types an exact filter from the model it filters', function (): void {
     $parameters = generatedOperationParametersForUri('api/categories');
 
     expect($parameters['filter[status]']['schema'])
-        ->toBe(['type' => 'string', 'enum' => ['draft', 'published', 'archived']])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['draft', 'published', 'archived']]])
+        ->and($parameters['filter[status]']['style'])
+        ->toBe('form')
+        ->and($parameters['filter[status]']['explode'])
+        ->toBe(false)
         ->and($parameters['filter[is_visible]']['schema'])
-        ->toBe(['type' => 'boolean'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'boolean']])
         ->and($parameters['filter[parent_id]']['schema'])
-        ->toBe(['type' => 'integer'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'integer']])
         ->and($parameters['filter[name]']['schema'])
-        ->toBe(['type' => 'string']);
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string']]);
 });
 
 it('describes how each filter kind matches', function (): void {
@@ -92,11 +96,11 @@ it('describes how each filter kind matches', function (): void {
     $parameters = generatedOperationParametersForUri('api/filter-kinds-users');
 
     expect($parameters['filter[name]']['description'])
-        ->toBe('Filter by `name`. Matches values starting with the given text, case-insensitively.')
+        ->toBe('Filter by `name`. Matches values starting with the given text, case-insensitively. Separate multiple values with a comma; records matching any value qualify.')
         ->and($parameters['filter[email]']['description'])
-        ->toBe('Filter by `email`. Matches values ending with the given text, case-insensitively.')
+        ->toBe('Filter by `email`. Matches values ending with the given text, case-insensitively. Separate multiple values with a comma; records matching any value qualify.')
         ->and($parameters['filter[id]']['description'])
-        ->toBe('Filter by `id`. Matches the exact value.')
+        ->toBe('Filter by `id`. Matches the exact value. Separate multiple values with a comma; records matching any value qualify.')
         ->and($parameters['filter[trashed]'])
         ->toMatchArray([
             'description' => 'Filter by `trashed`. Includes soft deleted records with `with`, returns only them with `only`.',
@@ -109,7 +113,7 @@ it('leaves a text matching filter a string even on a typed column', function ():
 
     $parameters = generatedOperationParametersForUri('api/partial-key-users');
 
-    expect($parameters['filter[id]']['schema'])->toBe(['type' => 'string']);
+    expect($parameters['filter[id]']['schema'])->toBe(['type' => 'array', 'items' => ['type' => 'string']]);
 });
 
 it('leaves a filter untyped when the query builder subject is dynamic', function (): void {
@@ -117,7 +121,7 @@ it('leaves a filter untyped when the query builder subject is dynamic', function
 
     $parameters = generatedOperationParametersForUri('api/dynamic-subject-users');
 
-    expect($parameters['filter[id]']['schema'])->toBe(['type' => 'string']);
+    expect($parameters['filter[id]']['schema'])->toBe(['type' => 'array', 'items' => ['type' => 'string']]);
 });
 
 it('documents an example for the required user path parameter', function (): void {
@@ -133,7 +137,7 @@ it('documents model api declarations without inline declarations', function (): 
     $parameters = generatedOperationParametersForUri('api/public-declaration-users');
 
     expect($parameters)
-        ->toHaveKeys(['filter[created_after]', 'filter[created_before]', 'filter[created_at]', 'filter[email]', 'sort', 'include'])
+        ->toHaveKeys(['filter[created_after]', 'filter[created_before]', 'filter[created_at]', 'filter[created_at.between]', 'filter[email]', 'filter[roles]', 'sort', 'include'])
         ->and($parameters['filter[created_after]']['description'])
         ->toBe('Only users created at or after the given date.')
         ->and($parameters['filter[created_after]']['schema'])
@@ -142,12 +146,55 @@ it('documents model api declarations without inline declarations', function (): 
         ->toBe('Filter by `created_at`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly. Combine comparisons with a comma to express a range, for example `>=2026-01-01,<2026-02-01`.')
         ->and($parameters['filter[created_at]']['schema'])
         ->toBe(['type' => 'string', 'x-value-format' => 'date-time'])
-        ->and($parameters['filter[email]']['description'])
-        ->toBe('Filter by `email`. Matches the exact value.')
+        ->and($parameters['filter[created_at]']['x-filter-type'])
+        ->toBe('operator')
         ->and($parameters['sort']['schema']['items']['enum'])
         ->toBe(['created_at', '-created_at', 'updated_at', '-updated_at'])
         ->and($parameters['include']['schema']['items']['enum'])
         ->toBe(['roles', 'rolesCount', 'rolesExists']);
+});
+
+it('documents a between filter as a two-value range for its column', function (): void {
+    RouteFacade::get('api/public-declaration-users', DefaultApiPaginatedUsersController::class)
+        ->name('api.public-declaration-users.index');
+
+    $between = generatedOperationParametersForUri('api/public-declaration-users')['filter[created_at.between]'];
+
+    expect($between['description'])
+        ->toBe('Only records where `created_at` lies between the two comma-separated values, inclusive.')
+        ->and($between['schema'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string', 'format' => 'date-time'], 'minItems' => 2, 'maxItems' => 2])
+        ->and($between['x-filter-type'])->toBe('between')
+        ->and($between['style'])->toBe('form')
+        ->and($between['explode'])->toBe(false);
+});
+
+it('documents a comma-separated list for filters accepting multiple values', function (): void {
+    RouteFacade::get('api/public-declaration-users', DefaultApiPaginatedUsersController::class)
+        ->name('api.public-declaration-users.index');
+
+    $email = generatedOperationParametersForUri('api/public-declaration-users')['filter[email]'];
+
+    expect($email['description'])
+        ->toBe('Filter by `email`. Matches the exact value. Separate multiple values with a comma; records matching any value qualify.')
+        ->and($email['schema'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string']])
+        ->and($email['style'])->toBe('form')
+        ->and($email['explode'])->toBe(false);
+});
+
+it('documents a custom filter from its own schema contract', function (): void {
+    RouteFacade::get('api/public-declaration-users', DefaultApiPaginatedUsersController::class)
+        ->name('api.public-declaration-users.index');
+
+    $roles = generatedOperationParametersForUri('api/public-declaration-users')['filter[roles]'];
+
+    expect($roles['description'])
+        ->toBe('Only users holding any of the given role names.')
+        ->and($roles['schema'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string']])
+        ->and($roles['style'])->toBe('form')
+        ->and($roles['explode'])->toBe(false);
 });
 
 it('merges model api declarations with inline ones', function (): void {
@@ -164,9 +211,9 @@ it('merges model api declarations with inline ones', function (): void {
 
     expect($createdAfterParameters)->toHaveCount(1)
         ->and($parameters['filter[created_after]']['description'])
-        ->toBe('Filter by `created_after`. Matches the exact value.')
+        ->toBe('Filter by `created_after`. Matches the exact value. Separate multiple values with a comma; records matching any value qualify.')
         ->and($parameters['filter[name]']['description'])
-        ->toBe('Filter by `name`. Matches values containing the given text, case-insensitively.')
+        ->toBe('Filter by `name`. Matches values containing the given text, case-insensitively. Separate multiple values with a comma; records matching any value qualify.')
         ->and($parameters['filter[created_before]']['description'])
         ->toBe('Filter by `created_before`. Applies the query scope of the same name.')
         ->and($parameters['sort']['schema']['items']['enum'])

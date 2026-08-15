@@ -46,7 +46,7 @@ it('documents a query parameter the query builder extension generated', function
 
     expect($filter['description'])->toBe('Exact email address to look for.')
         ->and($filter['x-tooltip'])->toBe('<a href="https://example.com/docs/filters">Filtering guide</a>')
-        ->and($filter['schema'])->toBe(['type' => 'string']);
+        ->and($filter['schema'])->toBe(['type' => 'array', 'items' => ['type' => 'string']]);
 });
 
 it('documents a query parameter the pagination extension generated', function (): void {

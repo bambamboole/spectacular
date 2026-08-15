@@ -6,6 +6,7 @@ namespace Workbench\App\Models;
 use Bambamboole\Spectacular\Contracts\HasApiFilters;
 use Bambamboole\Spectacular\Contracts\HasApiIncludes;
 use Bambamboole\Spectacular\Contracts\HasApiSorts;
+use Bambamboole\Spectacular\QueryBuilder\Filters\FiltersBetween;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,7 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\Enums\FilterOperator;
+use Workbench\App\Filters\RoleNameFilter;
 
 /**
  * @property-read Collection<int, Role> $roles
@@ -31,7 +33,9 @@ class User extends Model implements HasApiFilters, HasApiIncludes, HasApiSorts
             AllowedFilter::scope('created_after'),
             AllowedFilter::scope('created_before'),
             AllowedFilter::operator('created_at', FilterOperator::DYNAMIC),
+            FiltersBetween::allowed('created_at'),
             AllowedFilter::exact('email'),
+            AllowedFilter::custom('roles', new RoleNameFilter),
         ];
     }
 
