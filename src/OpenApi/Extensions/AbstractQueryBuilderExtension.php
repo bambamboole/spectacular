@@ -8,6 +8,7 @@ use Bambamboole\Spectacular\QueryBuilder as SpectacularQueryBuilder;
 use Dedoc\Scramble\Extensions\OperationExtension;
 use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Parameter;
+use Illuminate\Database\Eloquent\Model;
 use PhpParser\Node\Expr;
 use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
@@ -57,7 +58,9 @@ abstract class AbstractQueryBuilderExtension extends OperationExtension
 
     /**
      * The class the chain was opened with, when `for()` names one statically —
-     * `QueryBuilder::for(User::class)` filters users.
+     * `QueryBuilder::for(User::class)` filters users, and a builder subject
+     * like `QueryBuilder::for(User::query()->whereHas(...))` still names its
+     * model at the base of the method chain.
      *
      * @return class-string|null
      */
@@ -74,7 +77,29 @@ abstract class AbstractQueryBuilderExtension extends OperationExtension
             return class_exists($class) ? $class : null;
         }
 
-        return $argument instanceof String_ && class_exists($argument->value) ? $argument->value : null;
+        if ($argument instanceof String_ && class_exists($argument->value)) {
+            return $argument->value;
+        }
+
+        return $this->builderSubjectModelClass($argument);
+    }
+
+    /**
+     * @return class-string|null
+     */
+    private function builderSubjectModelClass(?Expr $argument): ?string
+    {
+        while ($argument instanceof Expr\MethodCall) {
+            $argument = $argument->var;
+        }
+
+        if (! $argument instanceof Expr\StaticCall || ! $argument->class instanceof Name) {
+            return null;
+        }
+
+        $class = $this->resolvedClassName($argument->class);
+
+        return class_exists($class) && is_a($class, Model::class, true) ? $class : null;
     }
 
     protected function subjectCall(Expr $expression): ?Expr\StaticCall
