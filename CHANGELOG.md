@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.0](https://github.com/bambamboole/spectacular/compare/0.22.0...0.23.0) (2026-08-15)
+
+
+### Features
+
+* **openapi:** type filters on BigDecimal-cast columns as number ([#71](https://github.com/bambamboole/spectacular/issues/71)) ([55b44d9](https://github.com/bambamboole/spectacular/commit/55b44d9662ab325a9802c69ced68876a08c8acae))
+
 ## [0.22.0](https://github.com/bambamboole/spectacular/compare/0.21.2...0.22.0) (2026-08-15)
 
 
