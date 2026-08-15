@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.2](https://github.com/bambamboole/spectacular/compare/0.25.1...0.25.2) (2026-08-15)
+
+
+### Bug Fixes
+
+* **openapi:** drop the dotted rule leftovers of a morphable collection ([#81](https://github.com/bambamboole/spectacular/issues/81)) ([8f5e1e0](https://github.com/bambamboole/spectacular/commit/8f5e1e08eb43634357699b7d59d045bf57f99210))
+
 ## [0.25.1](https://github.com/bambamboole/spectacular/compare/0.25.0...0.25.1) (2026-08-15)
 
 
