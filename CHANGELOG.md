@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.1](https://github.com/bambamboole/spectacular/compare/0.18.0...0.18.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* **openapi:** nested laravel-data schemas and model-state filter typing ([#56](https://github.com/bambamboole/spectacular/issues/56)) ([e7bdbd6](https://github.com/bambamboole/spectacular/commit/e7bdbd698f9b1a8f17fc29e6c8c8820d6540a5ba))
+
 ## [0.18.0](https://github.com/bambamboole/spectacular/compare/0.17.0...0.18.0) (2026-08-14)
 
 
