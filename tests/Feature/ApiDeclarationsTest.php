@@ -35,6 +35,10 @@ beforeEach(function (): void {
         QueryBuilder::for(User::class)->findOrFail($id),
     ));
 
+    Route::get('api/public-user-lookup/{id}', fn (string $id) => response()->json(
+        QueryBuilder::for(User::class)->apiFindOrFail($id),
+    ));
+
     Route::get('api/declared-public-users', fn () => response()->json(
         QueryBuilder::for(User::class)
             ->allowedFilters('name')
@@ -144,6 +148,27 @@ it('rejects an unknown api include on a forwarded single-model lookup', function
 
     $this->getJson("/api/public-users/{$id}?include=unknown")->assertBadRequest();
 });
+
+it('allows api includes on a single-result lookup', function (): void {
+    $id = User::query()->where('name', 'User 1')->value('id');
+
+    $this->getJson("/api/public-user-lookup/{$id}?include=roles,rolesCount")
+        ->assertSuccessful()
+        ->assertJsonPath('roles', [])
+        ->assertJsonPath('roles_count', 0);
+});
+
+it('rejects collection parameters on a single-result lookup', function (string $query): void {
+    $id = User::query()->where('name', 'User 1')->value('id');
+
+    $this->getJson("/api/public-user-lookup/{$id}?{$query}")->assertBadRequest();
+})->with([
+    'unknown include' => 'include=unknown',
+    'declared filter' => 'filter[created_after]=2026-01-01',
+    'unknown filter' => 'filter[unknown]=x',
+    'declared sort' => 'sort=created_at',
+    'unknown sort' => 'sort=unknown',
+]);
 
 it('allows api filters on a relation subject', function (): void {
     $this->getJson('/api/role-users?filter[created_after]=2026-02-01')

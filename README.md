@@ -138,6 +138,21 @@ Unknown filters, sorts, and includes are rejected as usual: any call that comple
 calls. Chains opened with the plain Spatie `QueryBuilder` are not affected: they neither allow nor document model API
 declarations.
 
+### Single-result endpoints
+
+A show endpoint returns one record: there is nothing to filter or sort, but includes still make sense. Complete the
+chain with `apiFindOrFail()` instead of `findOrFail()`:
+
+```php
+return new UserResource(
+    QueryBuilder::for(User::class)->apiFindOrFail($id),
+);
+```
+
+`apiFindOrFail()` allows and validates the model's API includes, rejects any `filter` or `sort` request parameter with
+a 400 before the lookup runs, and documents only the `include` parameter on the endpoint — the model's API filters and
+sorts stay off single-result operations.
+
 ### Pagination parameters
 
 `paginate()`, `simplePaginate()` and `cursorPaginate()` on a query-builder chain are documented automatically:

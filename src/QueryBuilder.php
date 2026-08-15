@@ -16,6 +16,8 @@ use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\AllowedSort;
+use Spatie\QueryBuilder\Exceptions\InvalidFilterQuery;
+use Spatie\QueryBuilder\Exceptions\InvalidSortQuery;
 use Spatie\QueryBuilder\QueryBuilder as SpatieQueryBuilder;
 
 /**
@@ -144,6 +146,37 @@ class QueryBuilder extends SpatieQueryBuilder
             PaginationMode::Simple => $this->getEloquentBuilder()->simplePaginate($perPage),
             PaginationMode::Cursor => $this->getEloquentBuilder()->cursorPaginate($perPage),
         })->withQueryString();
+    }
+
+    /**
+     * Terminal for single-result endpoints: one record accepts includes but
+     * has nothing to filter or sort, so those request parameters are rejected
+     * outright — before the lookup, so a bad request beats a missing record.
+     *
+     * @return TModel
+     */
+    public function apiFindOrFail(int|string $key): Model
+    {
+        $requestedFilters = $this->request->filters()->keys();
+
+        if ($requestedFilters->isNotEmpty()) {
+            throw InvalidFilterQuery::filtersNotAllowed($requestedFilters, collect());
+        }
+
+        $requestedSorts = $this->request->sorts()
+            ->map(fn (string $sort): string => ltrim($sort, '-'));
+
+        if ($requestedSorts->isNotEmpty()) {
+            throw InvalidSortQuery::sortsNotAllowed($requestedSorts, collect());
+        }
+
+        $this->applyUndeclaredApiIncludes();
+
+        if (! $this->apiIncludesMerged && $this->apiIncludes() !== []) {
+            $this->ensureAllIncludesExist();
+        }
+
+        return $this->getEloquentBuilder()->findOrFail($key);
     }
 
     /**

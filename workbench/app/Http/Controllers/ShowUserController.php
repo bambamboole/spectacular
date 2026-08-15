@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Workbench\App\Http\Controllers;
 
 use Bambamboole\Spectacular\Attributes\SpecParameter;
+use Bambamboole\Spectacular\QueryBuilder;
 use Dedoc\Scramble\Attributes\PathParameter;
 use Workbench\App\Http\Resources\UserResource;
 use Workbench\App\Models\User;
@@ -18,6 +19,6 @@ final class ShowUserController
     )]
     public function __invoke(User $user): UserResource
     {
-        return new UserResource($user);
+        return new UserResource(QueryBuilder::for(User::class)->apiFindOrFail($user->getKey()));
     }
 }
