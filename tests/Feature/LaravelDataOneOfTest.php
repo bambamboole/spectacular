@@ -25,7 +25,8 @@ it('documents a property-morphable collection as a discriminated oneOf', functio
 it('documents each variant with its discriminator pinned to the selecting value', function (): void {
     $schemas = generatedPageSchemas();
 
-    expect($schemas['TextBlockData']['properties']['type']['enum'] ?? null)->toBe(['text'])
+    expect($schemas['TextBlockData']['properties']['type'])->toBe(['type' => 'string', 'enum' => ['text']])
+        ->and($schemas['TextBlockData']['properties']['type']['enum'] ?? null)->toBe(['text'])
         ->and($schemas['TextBlockData']['required'] ?? null)->toBe(['text', 'type'])
         ->and($schemas['TextBlockData']['properties']['text']['description'] ?? null)->toBe('Rich text of the block.')
         ->and($schemas['ImageBlockData']['properties']['type']['enum'] ?? null)->toBe(['image'])

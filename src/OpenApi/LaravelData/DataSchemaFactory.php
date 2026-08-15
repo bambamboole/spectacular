@@ -252,9 +252,19 @@ final readonly class DataSchemaFactory
 
         $schema = $components->getSchema(class_basename($variantClass))->type;
 
-        if ($schema instanceof ObjectType && isset($schema->properties[$discriminator])) {
-            $schema->properties[$discriminator]->enum([$value]);
+        if (! $schema instanceof ObjectType || ! isset($schema->properties[$discriminator])) {
+            return;
         }
+
+        // The node must be replaced, not annotated: an enum-typed discriminator
+        // documents as a $ref to the enum component, and a $ref overrides its
+        // sibling keywords — the pinned enum would be ignored and every variant
+        // would match every payload.
+        $node = $schema->properties[$discriminator];
+        $pinned = new StringType()->enum([$value]);
+        $pinned->description = $node->description;
+
+        $schema->properties[$discriminator] = $pinned;
     }
 
     /**
