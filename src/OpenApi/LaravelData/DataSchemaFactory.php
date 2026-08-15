@@ -82,12 +82,29 @@ final readonly class DataSchemaFactory
             }
 
             if ($property->type->kind->isDataObject()) {
+                $name = $property->inputMappedName ?? $property->name;
                 $reference = $this->reference($nestedDataClass, $components);
                 $reference->setDescription($node->description);
                 $reference->nullable($property->type->isNullable);
                 $reference->mergeExtensionProperties($node->extensionProperties());
 
-                $type->properties[$property->inputMappedName ?? $property->name] = $reference;
+                $type->properties[$name] = $reference;
+                $this->dropDottedRuleProperties($type, $name);
+            }
+        }
+    }
+
+    /**
+     * The rules of a nested data object also arrive as dot-notated keys
+     * (`address.street`), which end up as flat sibling properties next to the
+     * property they belong to. The referenced component schema documents those
+     * fields, so the leftovers only duplicate it.
+     */
+    private function dropDottedRuleProperties(ObjectType $type, string $name): void
+    {
+        foreach (array_keys($type->properties) as $key) {
+            if (str_starts_with((string) $key, "{$name}.")) {
+                unset($type->properties[$key]);
             }
         }
     }

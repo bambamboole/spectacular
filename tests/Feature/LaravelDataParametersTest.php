@@ -50,6 +50,19 @@ it('does not require defaulted properties of a nested data collection item', fun
         ->and($schemas['ArticleSectionData']['required'] ?? [])->toBe(['heading']);
 });
 
+it('drops the dotted rule properties of a nested data object promoted to a reference', function (): void {
+    $schemas = generatedArticleSchemas();
+
+    expect(array_keys($schemas['ArticleSectionData']['properties'] ?? []))
+        ->toBe(['heading', 'is_collapsed', 'venue', 'children'])
+        ->and($schemas['ArticleSectionData']['properties']['venue']['anyOf'][0]['$ref'] ?? null)
+        ->toBe('#/components/schemas/ArticleVenueData')
+        ->and($schemas['ArticleVenueData']['required'] ?? [])
+        ->toBe(['street', 'country_code'])
+        ->and($schemas['ArticleVenueData']['properties']['street']['description'] ?? null)
+        ->toBe('Street and house number.');
+});
+
 it('keeps the null of a nullable nested data object', function (): void {
     $author = generatedArticleSchemas()['StoreArticleData']['properties']['author'];
 
