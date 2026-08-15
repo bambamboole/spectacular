@@ -139,7 +139,7 @@ it('documents model api declarations without inline declarations', function (): 
         ->and($parameters['filter[created_after]']['schema'])
         ->toBe(['type' => 'string'])
         ->and($parameters['filter[created_at]']['description'])
-        ->toBe('Filter by `created_at`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly.')
+        ->toBe('Filter by `created_at`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly. Combine comparisons with a comma to express a range, for example `>=2026-01-01,<2026-02-01`.')
         ->and($parameters['filter[created_at]']['schema'])
         ->toBe(['type' => 'string', 'x-value-format' => 'date-time'])
         ->and($parameters['filter[email]']['description'])

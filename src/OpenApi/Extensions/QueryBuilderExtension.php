@@ -293,7 +293,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         }
 
         if ($operator === FilterOperator::DYNAMIC) {
-            return "Filter by `{$name}`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly.";
+            return "Filter by `{$name}`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly. Combine comparisons with a comma to express a range, for example `>=2026-01-01,<2026-02-01`.";
         }
 
         return implode(' ', array_filter(["Filter by `{$name}`.", $kind->matching()]));

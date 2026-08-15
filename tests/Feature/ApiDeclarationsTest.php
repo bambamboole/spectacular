@@ -90,6 +90,7 @@ it('compares with the operator prefixed to a dynamic operator filter value', fun
     'less than' => ['<2026-02-01 00:00:00', ['User 1']],
     'less than or equal' => ['<=2026-02-01 00:00:00', ['User 1', 'User 2']],
     'no prefix matches exactly' => ['2026-02-01 00:00:00', ['User 2']],
+    'comma combines comparisons into a range' => ['>=2026-01-15 00:00:00,<2026-03-01 00:00:00', ['User 2']],
 ]);
 
 it('allows a non-scope api filter', function (): void {
