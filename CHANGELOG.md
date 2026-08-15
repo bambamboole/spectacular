@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.4](https://github.com/bambamboole/spectacular/compare/0.25.3...0.25.4) (2026-08-15)
+
+
+### Bug Fixes
+
+* **openapi:** drop the class-name description of a data response ([#85](https://github.com/bambamboole/spectacular/issues/85)) ([7eb52ed](https://github.com/bambamboole/spectacular/commit/7eb52ed3255882f00a777bce7f05452a41e6c4f6))
+
 ## [0.25.3](https://github.com/bambamboole/spectacular/compare/0.25.2...0.25.3) (2026-08-15)
 
 
