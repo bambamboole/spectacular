@@ -7,8 +7,10 @@ use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\CustomBroadcastWithNotificat
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\ExternalPayload;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidBroadcastNotification;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
+use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\PaymentSettledWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\PublicPropertiesBroadcast;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
+use Brick\Math\BigDecimal;
 use Carbon\CarbonImmutable;
 
 it('infers scalar and array-shape payload entries from broadcastWith PHPDoc', function (): void {
@@ -117,6 +119,18 @@ it('keeps untyped public property schemas unconstrained', function (): void {
 
     expect($schema['properties']['payload'])->toBe([])
         ->and($schema['required'] ?? null)->toBeNull();
+});
+
+it('documents a BigDecimal payload entry as number or decimal string', function (): void {
+    $schema = app(PayloadSchemaFactory::class)->forMethod(PaymentSettledWebhook::class, 'webhookPayload');
+
+    expect($schema['properties']['amount'])->toBe([
+        'anyOf' => [
+            ['type' => 'number'],
+            ['type' => 'string', 'pattern' => '^-?\\d+(\\.\\d+)?$'],
+        ],
+        'x-php-type' => BigDecimal::class,
+    ]);
 });
 
 final class MalformedArrayShapePayload

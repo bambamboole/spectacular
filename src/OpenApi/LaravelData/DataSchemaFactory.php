@@ -4,13 +4,19 @@ declare(strict_types=1);
 namespace Bambamboole\Spectacular\OpenApi\LaravelData;
 
 use Bambamboole\Spectacular\Attributes\SpecProperty;
+use Brick\Math\BigDecimal;
+use Dedoc\Scramble\Support\Generator\Combined\AnyOf;
 use Dedoc\Scramble\Support\Generator\Components;
 use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\Reference;
 use Dedoc\Scramble\Support\Generator\RequestBodyObject;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType;
+use Dedoc\Scramble\Support\Generator\Types\NullType;
+use Dedoc\Scramble\Support\Generator\Types\NumberType;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
+use Dedoc\Scramble\Support\Generator\Types\StringType;
+use Dedoc\Scramble\Support\Generator\Types\Type;
 use Dedoc\Scramble\Support\Generator\TypeTransformer;
 use Dedoc\Scramble\Support\OperationExtensions\RulesExtractor\RulesToParameters;
 use ReflectionProperty;
@@ -68,10 +74,22 @@ final readonly class DataSchemaFactory
         )));
 
         foreach (app(DataConfig::class)->getDataClass($dataClass)->properties as $property) {
-            $node = $type->properties[$property->inputMappedName ?? $property->name] ?? null;
+            $name = $property->inputMappedName ?? $property->name;
+            $node = $type->properties[$name] ?? null;
+
+            if ($node === null) {
+                continue;
+            }
+
+            if (! $node instanceof AnyOf && $this->acceptsBigDecimal($property)) {
+                $type->properties[$name] = $this->bigDecimalSchema($property, $node);
+
+                continue;
+            }
+
             $nestedDataClass = $property->type->dataClass;
 
-            if ($node === null || $nestedDataClass === null || ! is_a($nestedDataClass, Data::class, true)) {
+            if ($nestedDataClass === null || ! is_a($nestedDataClass, Data::class, true)) {
                 continue;
             }
 
@@ -82,7 +100,6 @@ final readonly class DataSchemaFactory
             }
 
             if ($property->type->kind->isDataObject()) {
-                $name = $property->inputMappedName ?? $property->name;
                 $reference = $this->reference($nestedDataClass, $components);
                 $reference->setDescription($node->description);
                 $reference->nullable($property->type->isNullable);
@@ -92,6 +109,40 @@ final readonly class DataSchemaFactory
                 $this->dropDottedRuleProperties($type, $name);
             }
         }
+    }
+
+    private function acceptsBigDecimal(DataProperty $property): bool
+    {
+        return class_exists(BigDecimal::class) && $property->type->acceptsType(BigDecimal::class);
+    }
+
+    /**
+     * BigDecimalCast hydrates a BigDecimal property from an int, float, or
+     * numeric-string payload value, and the `numeric` rule this property carries
+     * would otherwise document `type: number` — rejecting the decimal strings
+     * the API itself serializes. The anyOf states both accepted wire shapes.
+     */
+    private function bigDecimalSchema(DataProperty $property, Type $node): AnyOf
+    {
+        $number = new NumberType;
+        $string = new StringType;
+        $string->pattern = '^-?\d+(\.\d+)?$';
+
+        if ($node instanceof NumberType) {
+            $number->setMin($node->min)->setMax($node->max);
+        }
+
+        $items = [$number, $string];
+
+        if ($property->type->isNullable) {
+            $items[] = new NullType;
+        }
+
+        $schema = new AnyOf()->setItems($items);
+        $schema->description = $node->description;
+        $schema->mergeExtensionProperties($node->extensionProperties());
+
+        return $schema;
     }
 
     /**
