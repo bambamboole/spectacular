@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/bambamboole/spectacular/compare/0.20.0...0.21.0) (2026-08-15)
+
+
+### Features
+
+* add model API query declarations ([#63](https://github.com/bambamboole/spectacular/issues/63)) ([d4848bb](https://github.com/bambamboole/spectacular/commit/d4848bbc38abe345c3e846209fbaaaf1fa55559a))
+
 ## [0.20.0](https://github.com/bambamboole/spectacular/compare/0.19.0...0.20.0) (2026-08-15)
 
 
