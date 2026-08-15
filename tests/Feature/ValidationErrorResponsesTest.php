@@ -1,9 +1,11 @@
 <?php
 declare(strict_types=1);
 
+use Bambamboole\Spectacular\QueryBuilder as SpectacularQueryBuilder;
 use Dedoc\Scramble\Generator;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Workbench\App\Http\Resources\UserResource;
@@ -39,6 +41,18 @@ it('describes the validation error body once for the whole document', function (
         ->and($response['content']['application/json']['schema']['required'])->toBe(['message', 'errors']);
 });
 
+it('documents a validation error on reading endpoints that api-paginate', function (): void {
+    RouteFacade::get('api/paginated-widgets', PaginatedWidgetsController::class);
+
+    Scramble::routes(fn (Route $route): bool => $route->uri() === 'api/paginated-widgets');
+    $document = app(Generator::class)();
+
+    expect(data_get($document, 'paths./paginated-widgets.get.responses.422.$ref'))
+        ->toBe('#/components/responses/ValidationException')
+        ->and(data_get($document, 'components.responses.ValidationException.description'))
+        ->toBe('Validation error');
+});
+
 it('does not add a second validation error to an endpoint that already documents one', function (): void {
     Scramble::routes(fn (Route $route): bool => $route->uri() === 'api/users' && $route->methods()[0] === 'POST');
     $document = app(Generator::class)();
@@ -66,5 +80,13 @@ final class WidgetsController
     public function __invoke(Request $request): UserResource
     {
         return new UserResource(User::firstOrNew(['name' => 'widget']));
+    }
+}
+
+final class PaginatedWidgetsController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(SpectacularQueryBuilder::for(User::class)->apiPaginate());
     }
 }

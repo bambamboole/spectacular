@@ -122,7 +122,8 @@ that header as a select and includes it in generated and live requests. OpenAPI 
 for each declared mode.
 
 `per_page` defaults to the model's page size. Supplied integers are clamped between `1` and `max`, which defaults to
-`100`.
+`100`. A non-integer `per_page` or an unavailable `x-pagination` mode fails validation, so operations using
+`apiPaginate()` document a `422` response even on reading endpoints.
 
 ### Authentication modes
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Bambamboole\Spectacular\OpenApi\Extensions;
 
 use Bambamboole\Spectacular\OpenApi\PaginationResponseType;
+use Bambamboole\Spectacular\OpenApi\Transformers\ValidationErrorResponses;
 use Bambamboole\Spectacular\PaginationMode;
 use Dedoc\Scramble\Support\Generator\Combined\AnyOf;
 use Dedoc\Scramble\Support\Generator\Operation;
@@ -52,6 +53,7 @@ final class PaginationExtension extends AbstractQueryBuilderExtension
                 if ($pagination = $this->apiPagination($call)) {
                     array_push($parameters, ...$this->apiPaginationParameters(...$pagination));
                     $this->applyApiPaginationResponse($operation, $pagination['modes']);
+                    ValidationErrorResponses::document($operation, $this->openApiTransformer->context->openApi->components);
                 }
 
                 continue;

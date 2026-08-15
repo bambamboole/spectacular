@@ -5,6 +5,7 @@ namespace Bambamboole\Spectacular\OpenApi\Transformers;
 
 use Dedoc\Scramble\Contracts\OperationTransformer;
 use Dedoc\Scramble\OpenApiContext;
+use Dedoc\Scramble\Support\Generator\Components;
 use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Reference;
 use Dedoc\Scramble\Support\Generator\Response;
@@ -35,11 +36,19 @@ final readonly class ValidationErrorResponses implements OperationTransformer
             return;
         }
 
-        $components = $this->context->openApi->components;
+        self::document($operation, $this->context->openApi->components);
+    }
+
+    /**
+     * Also used by PaginationExtension: an `apiPaginate()` call validates the
+     * pagination input, so even a reading endpoint can fail validation.
+     */
+    public static function document(Operation $operation, Components $components): void
+    {
         $reference = new Reference('responses', '\\'.ValidationException::class, $components);
 
         if (! $components->has($reference)) {
-            $components->add($reference, $this->response());
+            $components->add($reference, self::response());
         }
 
         foreach ($operation->responses ?? [] as $response) {
@@ -55,7 +64,7 @@ final readonly class ValidationErrorResponses implements OperationTransformer
         $operation->addResponse($reference);
     }
 
-    private function response(): Response
+    private static function response(): Response
     {
         $body = new ObjectType()
             ->addProperty('message', new StringType()->setDescription('Errors overview.'))
