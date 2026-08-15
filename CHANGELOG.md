@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.0](https://github.com/bambamboole/spectacular/compare/0.21.2...0.22.0) (2026-08-15)
+
+
+### Features
+
+* **laravel-data:** first-class BigDecimal properties ([#69](https://github.com/bambamboole/spectacular/issues/69)) ([f181d0d](https://github.com/bambamboole/spectacular/commit/f181d0de4d0fc7ae647d9e40401c65d87c5d510d))
+
 ## [0.21.2](https://github.com/bambamboole/spectacular/compare/0.21.1...0.21.2) (2026-08-15)
 
 
