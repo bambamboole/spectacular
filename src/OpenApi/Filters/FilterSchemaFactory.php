@@ -13,6 +13,7 @@ use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Str;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -29,7 +30,7 @@ final class FilterSchemaFactory
     /** @var array<string, Model|null> */
     private array $models = [];
 
-    public function make(?string $modelClass, string $name, FilterKind $kind, ?FilterOperator $operator = null): Type
+    public function make(?string $modelClass, string $name, FilterKind $kind, ?FilterOperator $operator = null, ?string $internalName = null): Type
     {
         if ($kind === FilterKind::Trashed) {
             return new StringType()->enum(['with', 'only', '']);
@@ -40,13 +41,51 @@ final class FilterSchemaFactory
         }
 
         $model = $this->model($modelClass);
-        $columnType = $model === null ? new StringType : $this->columnType($model, $name);
+
+        if ($model === null) {
+            return new StringType;
+        }
+
+        if ($kind === FilterKind::BelongsTo && ($related = $this->relatedModelFromRelationPath($model, $internalName ?? $name)) !== null) {
+            return $this->keyType($related);
+        }
+
+        $columnType = $this->columnType($model, $kind === FilterKind::Between ? ($internalName ?? $name) : $name);
 
         if ($operator === FilterOperator::DYNAMIC) {
             return $this->dynamicOperatorType($columnType);
         }
 
         return $columnType;
+    }
+
+    /**
+     * A belongsTo filter names its relation in the internal name — dot-nested
+     * for a relation reached through others, exactly how FiltersBelongsTo
+     * resolves it at runtime. The name-based heuristic in relatedModel() stays
+     * the fallback for filters that follow the `{relation}_id` convention.
+     */
+    private function relatedModelFromRelationPath(Model $model, string $path): ?Model
+    {
+        foreach (explode('.', $path) as $segment) {
+            if ($segment === '' || ! method_exists($model, $segment)) {
+                return null;
+            }
+
+            try {
+                $relation = $model->{$segment}();
+            } catch (Throwable) {
+                return null;
+            }
+
+            if (! $relation instanceof Relation) {
+                return null;
+            }
+
+            $model = $relation->getRelated();
+        }
+
+        return $model;
     }
 
     /**

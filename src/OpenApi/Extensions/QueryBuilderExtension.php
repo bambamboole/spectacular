@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Extensions;
 
+use Bambamboole\Spectacular\Contracts\DocumentsFilterSchema;
 use Bambamboole\Spectacular\Contracts\HasApiFilters;
 use Bambamboole\Spectacular\Contracts\HasApiIncludes;
 use Bambamboole\Spectacular\Contracts\HasApiSorts;
@@ -29,6 +30,7 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\Enums\FilterOperator;
+use Spatie\QueryBuilder\Filters\Filter;
 use Spatie\QueryBuilder\Filters\FiltersOperator;
 use Spatie\QueryBuilder\Includes\IncludedRelationship;
 use Throwable;
@@ -102,19 +104,49 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 
         return array_map(
             function (array $declaration) use ($model): Parameter {
-                ['name' => $name, 'factory' => $factory] = $declaration;
+                ['name' => $name, 'factory' => $factory, 'internal' => $internal] = $declaration;
 
-                return $this->filterParameter($model, $name, FilterKind::tryFromFactory($factory));
+                return $this->filterParameter($model, $name, FilterKind::tryFromFactory($factory), internalName: $internal);
             },
             $this->argumentDeclarations($call->args, AllowedFilter::class, 'trashed'),
         );
     }
 
-    private function filterParameter(?string $model, string $name, FilterKind $kind, ?FilterOperator $operator = null): Parameter
+    /**
+     * @param  Filter<*>|null  $filterInstance
+     */
+    private function filterParameter(?string $model, string $name, FilterKind $kind, ?FilterOperator $operator = null, ?string $internalName = null, ?Filter $filterInstance = null): Parameter
     {
-        return Parameter::make($this->nestedParameterName('filter', $name), 'query')
-            ->description($this->filterDescription($model, $name, $kind, $operator))
-            ->setSchema(Schema::fromType($this->filterSchemas()->make($model, $name, $kind, $operator)));
+        $parameter = Parameter::make($this->nestedParameterName('filter', $name), 'query');
+
+        if ($filterInstance instanceof DocumentsFilterSchema) {
+            $type = $filterInstance->filterSchema();
+
+            if ($type instanceof ArrayType) {
+                $parameter->setStyle('form')->setExplode(false);
+            }
+
+            return $parameter
+                ->description($filterInstance->filterDescription($name) ?? "Filter by `{$name}`.")
+                ->setSchema(Schema::fromType($type));
+        }
+
+        $type = $this->filterSchemas()->make($model, $name, $kind, $operator, $internalName);
+
+        if ($kind === FilterKind::Between) {
+            $type = (new ArrayType)->setItems($type)->setMin(2)->setMax(2);
+            $parameter->setStyle('form')->setExplode(false);
+            $parameter->setExtensionProperty('filter-type', 'between');
+        } elseif ($kind->acceptsMultipleValues()) {
+            $type = (new ArrayType)->setItems($type);
+            $parameter->setStyle('form')->setExplode(false);
+        } elseif ($operator === FilterOperator::DYNAMIC) {
+            $parameter->setExtensionProperty('filter-type', 'operator');
+        }
+
+        return $parameter
+            ->description($this->filterDescription($model, $name, $kind, $operator, $internalName))
+            ->setSchema(Schema::fromType($type));
     }
 
     /**
@@ -219,6 +251,8 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
                 $filter->getName(),
                 FilterKind::fromAllowedFilter($filter),
                 $this->filterOperator($filter),
+                $filter->getInternalName(),
+                $filter->getFilterClass(),
             ),
             $filters,
         );
@@ -286,7 +320,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         return $this->uniqueStrings($names);
     }
 
-    private function filterDescription(?string $model, string $name, FilterKind $kind, ?FilterOperator $operator = null): string
+    private function filterDescription(?string $model, string $name, FilterKind $kind, ?FilterOperator $operator = null, ?string $internalName = null): string
     {
         if ($kind === FilterKind::Scope && $model !== null && ($summary = $this->scopeSummary($model, $name)) !== null) {
             return $summary;
@@ -296,7 +330,19 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             return "Filter by `{$name}`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly. Combine comparisons with a comma to express a range, for example `>=2026-01-01,<2026-02-01`.";
         }
 
-        return implode(' ', array_filter(["Filter by `{$name}`.", $kind->matching()]));
+        if ($kind === FilterKind::Between) {
+            $column = $internalName ?? $name;
+
+            return "Only records where `{$column}` lies between the two comma-separated values, inclusive.";
+        }
+
+        $description = implode(' ', array_filter(["Filter by `{$name}`.", $kind->matching()]));
+
+        if ($kind->acceptsMultipleValues()) {
+            $description .= ' Separate multiple values with a comma; records matching any value qualify.';
+        }
+
+        return $description;
     }
 
     /**
@@ -492,7 +538,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     /**
      * @param  list<Arg>  $arguments
      * @param  class-string  $allowedClass
-     * @return list<array{name: string, factory: string|null}>
+     * @return list<array{name: string, factory: string|null, internal: string|null}>
      */
     private function argumentDeclarations(array $arguments, string $allowedClass, ?string $defaultFactoryName = null): array
     {
@@ -510,12 +556,12 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 
     /**
      * @param  class-string  $allowedClass
-     * @return list<array{name: string, factory: string|null}>
+     * @return list<array{name: string, factory: string|null, internal: string|null}>
      */
     private function argumentExpressionDeclarations(Expr $expression, string $allowedClass, ?string $defaultFactoryName = null): array
     {
         if ($expression instanceof String_) {
-            return [['name' => $expression->value, 'factory' => null]];
+            return [['name' => $expression->value, 'factory' => null, 'internal' => null]];
         }
 
         if ($expression instanceof Expr\Array_) {
@@ -591,7 +637,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 
     /**
      * @param  class-string  $allowedClass
-     * @return array{name: string, factory: string|null}|null
+     * @return array{name: string, factory: string|null, internal: string|null}|null
      */
     private function factoryDeclaration(Expr $expression, string $allowedClass, ?string $defaultFactoryName = null): ?array
     {
@@ -604,29 +650,36 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         }
 
         $factory = $this->methodName($expression->name);
-        $name = $this->firstStringArgument($expression->args);
+        $strings = $this->stringArguments($expression->args);
+        $name = $strings[0] ?? null;
 
         if ($name !== null) {
-            return ['name' => $name, 'factory' => $factory];
+            return ['name' => $name, 'factory' => $factory, 'internal' => $strings[1] ?? null];
         }
 
         return $factory === $defaultFactoryName && $factory !== null
-            ? ['name' => $factory, 'factory' => $factory]
+            ? ['name' => $factory, 'factory' => $factory, 'internal' => null]
             : null;
     }
 
     /**
      * @param  list<Arg>  $arguments
      */
-    private function firstStringArgument(array $arguments): ?string
+    /**
+     * @param  list<Arg>  $arguments
+     * @return list<string>
+     */
+    private function stringArguments(array $arguments): array
     {
+        $strings = [];
+
         foreach ($arguments as $argument) {
             if ($argument->value instanceof String_) {
-                return $argument->value->value;
+                $strings[] = $argument->value->value;
             }
         }
 
-        return null;
+        return $strings;
     }
 
     private function parameterName(string $type): string
@@ -649,8 +702,8 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     }
 
     /**
-     * @param  list<array{name: string, factory: string|null}>  $declarations
-     * @return list<array{name: string, factory: string|null}>
+     * @param  list<array{name: string, factory: string|null, internal: string|null}>  $declarations
+     * @return list<array{name: string, factory: string|null, internal: string|null}>
      */
     private function uniqueDeclarations(array $declarations): array
     {

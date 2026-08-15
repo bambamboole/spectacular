@@ -42,6 +42,18 @@ it('types a fixed operator filter from the column it compares', function (): voi
     expect($type->toArray())->toBe(['type' => 'string', 'format' => 'date-time']);
 });
 
+it('resolves a belongs to filter through its internal relation name', function (): void {
+    $type = new FilterSchemaFactory()->make(Invoice::class, 'billed_customer_id', FilterKind::BelongsTo, null, 'customer');
+
+    expect($type->toArray())->toBe(['type' => 'integer']);
+});
+
+it('types the between filter items from the column of its internal name', function (): void {
+    $type = new FilterSchemaFactory()->make(Invoice::class, 'paid_at.between', FilterKind::Between, null, 'paid_at');
+
+    expect($type->toArray())->toBe(['type' => 'string', 'format' => 'date-time']);
+});
+
 it('offers the state names of a model state cast', function (): void {
     $type = new FilterSchemaFactory()->make(Order::class, 'status', FilterKind::Exact);
 

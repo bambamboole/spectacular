@@ -37,40 +37,60 @@
                     {
                         "name": "filter[name]",
                         "in": "query",
-                        "description": "Filter by `name`. Matches values containing the given text, case-insensitively.",
+                        "description": "Filter by `name`. Matches values containing the given text, case-insensitively. Separate multiple values with a comma; records matching any value qualify.",
+                        "style": "form",
                         "schema": {
-                            "type": "string"
-                        }
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "explode": false
                     },
                     {
                         "name": "filter[status]",
                         "in": "query",
                         "description": "Filter by publication state.",
+                        "style": "form",
                         "schema": {
-                            "type": "string",
-                            "enum": [
-                                "draft",
-                                "published",
-                                "archived"
-                            ]
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "draft",
+                                    "published",
+                                    "archived"
+                                ]
+                            }
                         },
+                        "explode": false,
                         "x-tooltip": "One of <code>draft</code>, <code>published</code> or <code>archived</code>."
                     },
                     {
                         "name": "filter[is_visible]",
                         "in": "query",
-                        "description": "Filter by `is_visible`. Matches the exact value.",
+                        "description": "Filter by `is_visible`. Matches the exact value. Separate multiple values with a comma; records matching any value qualify.",
+                        "style": "form",
                         "schema": {
-                            "type": "boolean"
-                        }
+                            "type": "array",
+                            "items": {
+                                "type": "boolean"
+                            }
+                        },
+                        "explode": false
                     },
                     {
                         "name": "filter[parent_id]",
                         "in": "query",
-                        "description": "Filter by `parent_id`. Matches the exact value.",
+                        "description": "Filter by `parent_id`. Matches the exact value. Separate multiple values with a comma; records matching any value qualify.",
+                        "style": "form",
                         "schema": {
-                            "type": "integer"
-                        }
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        },
+                        "explode": false
                     },
                     {
                         "name": "page",
@@ -727,15 +747,51 @@
                         "schema": {
                             "type": "string",
                             "x-value-format": "date-time"
-                        }
+                        },
+                        "x-filter-type": "operator"
+                    },
+                    {
+                        "name": "filter[created_at.between]",
+                        "in": "query",
+                        "description": "Only records where `created_at` lies between the two comma-separated values, inclusive.",
+                        "style": "form",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "minItems": 2,
+                            "maxItems": 2
+                        },
+                        "explode": false,
+                        "x-filter-type": "between"
                     },
                     {
                         "name": "filter[email]",
                         "in": "query",
-                        "description": "Filter by `email`. Matches the exact value.",
+                        "description": "Filter by `email`. Matches the exact value. Separate multiple values with a comma; records matching any value qualify.",
+                        "style": "form",
                         "schema": {
-                            "type": "string"
-                        }
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "explode": false
+                    },
+                    {
+                        "name": "filter[roles]",
+                        "in": "query",
+                        "description": "Only users holding any of the given role names.",
+                        "style": "form",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "explode": false
                     },
                     {
                         "name": "sort",
@@ -761,10 +817,15 @@
                     {
                         "name": "filter[name]",
                         "in": "query",
-                        "description": "Filter by `name`. Matches values containing the given text, case-insensitively.",
+                        "description": "Filter by `name`. Matches values containing the given text, case-insensitively. Separate multiple values with a comma; records matching any value qualify.",
+                        "style": "form",
                         "schema": {
-                            "type": "string"
-                        }
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "explode": false
                     },
                     {
                         "name": "page",

@@ -93,6 +93,37 @@ it('compares with the operator prefixed to a dynamic operator filter value', fun
     'comma combines comparisons into a range' => ['>=2026-01-15 00:00:00,<2026-03-01 00:00:00', ['User 2']],
 ]);
 
+it('selects the inclusive range of a between filter', function (string $value, array $names): void {
+    $response = $this->getJson('/api/public-users?filter[created_at.between]='.urlencode($value))->assertSuccessful();
+
+    expect($response->collect('data')->pluck('name')->all())->toBe($names);
+})->with([
+    'inside the range' => ['2026-01-01 00:00:00,2026-02-15 00:00:00', ['User 1', 'User 2']],
+    'bounds are inclusive' => ['2026-02-01 00:00:00,2026-03-01 00:00:00', ['User 2', 'User 3']],
+]);
+
+it('rejects a between filter without exactly two values', function (string $value): void {
+    $this->getJson('/api/public-users?filter[created_at.between]='.urlencode($value))->assertBadRequest();
+})->with([
+    'one value' => '2026-01-01 00:00:00',
+    'three values' => '2026-01-01,2026-02-01,2026-03-01',
+]);
+
+it('matches any value of a comma-separated exact filter list', function (): void {
+    $response = $this->getJson('/api/public-users?filter[email]=user1@example.com,user3@example.com')->assertSuccessful();
+
+    expect($response->collect('data')->pluck('name')->all())->toBe(['User 1', 'User 3']);
+});
+
+it('applies a self-documenting custom filter', function (): void {
+    $role = Role::query()->create(['name' => 'admin']);
+    $role->users()->attach(User::query()->where('name', 'User 2')->value('id'));
+
+    $response = $this->getJson('/api/public-users?filter[roles]=admin,editor')->assertSuccessful();
+
+    expect($response->collect('data')->pluck('name')->all())->toBe(['User 2']);
+});
+
 it('allows a non-scope api filter', function (): void {
     $this->getJson('/api/public-users?filter[email]=user2@example.com')
         ->assertSuccessful()
