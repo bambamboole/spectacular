@@ -14,7 +14,7 @@ it('documents the request body of an action taking a data object', function (): 
     $schema = generatedArticleRequestSchema();
 
     expect(array_keys($schema['properties'] ?? []))
-        ->toBe(['title', 'author', 'summary', 'is_published', 'translations']);
+        ->toBe(['title', 'author', 'summary', 'is_published', 'translations', 'sections']);
 });
 
 it('describes payload properties from their promoted property docblocks', function (): void {
@@ -30,16 +30,32 @@ it('requires only the fields a client has to send', function (): void {
 });
 
 it('keeps a mandatory field inside an optional object from making that object mandatory', function (): void {
-    $author = generatedArticleRequestSchema()['properties']['author'];
-    $object = $author['anyOf'][0] ?? $author;
-
-    expect($object['required'] ?? [])->toBe(['name']);
+    expect(generatedArticleSchemas()['ArticleAuthorData']['required'] ?? [])->toBe(['name']);
 });
 
-it('stops expanding a data object that nests itself', function (): void {
-    $translations = generatedArticleRequestSchema()['properties']['translations'];
+it('references a data object nesting itself instead of degrading to strings', function (): void {
+    $schemas = generatedArticleSchemas();
 
-    expect($translations['type'])->toBe('array');
+    expect($schemas['StoreArticleData']['properties']['translations']['items'] ?? null)
+        ->toBe(['$ref' => '#/components/schemas/StoreArticleData'])
+        ->and($schemas['ArticleSectionData']['properties']['children']['items'] ?? null)
+        ->toBe(['$ref' => '#/components/schemas/ArticleSectionData']);
+});
+
+it('does not require defaulted properties of a nested data collection item', function (): void {
+    $schemas = generatedArticleSchemas();
+
+    expect($schemas['StoreArticleData']['properties']['sections']['items'] ?? null)
+        ->toBe(['$ref' => '#/components/schemas/ArticleSectionData'])
+        ->and($schemas['ArticleSectionData']['required'] ?? [])->toBe(['heading']);
+});
+
+it('keeps the null of a nullable nested data object', function (): void {
+    $author = generatedArticleSchemas()['StoreArticleData']['properties']['author'];
+
+    expect($author['anyOf'] ?? null)->not->toBeNull()
+        ->and($author['anyOf'][0]['$ref'] ?? null)->toBe('#/components/schemas/ArticleAuthorData')
+        ->and($author['anyOf'][1]['type'] ?? null)->toBe('null');
 });
 
 it('leaves actions without a data object to scramble', function (): void {
@@ -57,14 +73,22 @@ it('leaves actions without a data object to scramble', function (): void {
  */
 function generatedArticleRequestSchema(): array
 {
+    return generatedArticleSchemas()['StoreArticleData'] ?? [];
+}
+
+/**
+ * @return array<string, array<string, mixed>>
+ */
+function generatedArticleSchemas(): array
+{
     RouteFacade::post('api/articles', StoreArticleController::class);
 
     Scramble::routes(fn (Route $route): bool => $route->uri() === 'api/articles');
     $document = app(Generator::class)();
 
-    $schema = data_get($document, 'components.schemas.StoreArticleData');
+    $schemas = data_get($document, 'components.schemas');
 
-    return is_array($schema) ? $schema : [];
+    return is_array($schemas) ? $schemas : [];
 }
 
 final class StoreArticleController

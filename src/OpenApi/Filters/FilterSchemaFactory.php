@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 use ReflectionMethod;
 use ReflectionNamedType;
+use Spatie\ModelStates\State;
 use Throwable;
 
 /**
@@ -61,6 +62,10 @@ final class FilterSchemaFactory
     {
         if (enum_exists($cast)) {
             return $this->enumType($cast);
+        }
+
+        if (class_exists(State::class) && is_a($cast, State::class, true)) {
+            return new StringType()->enum($cast::getStateMapping()->keys()->all());
         }
 
         return match (Str::before($cast, ':')) {

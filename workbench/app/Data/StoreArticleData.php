@@ -10,6 +10,7 @@ final class StoreArticleData extends Data
 {
     /**
      * @param  list<StoreArticleData>  $translations
+     * @param  list<ArticleSectionData>  $sections
      */
     public function __construct(
         /** Headline of the article. */
@@ -23,5 +24,7 @@ final class StoreArticleData extends Data
         public bool $isPublished = false,
         /** Translations of this article, nesting the same shape. */
         public array $translations = [],
+        /** Sections structuring the article body. */
+        public array $sections = [],
     ) {}
 }

@@ -9,6 +9,7 @@ use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\Reference;
 use Dedoc\Scramble\Support\Generator\RequestBodyObject;
 use Dedoc\Scramble\Support\Generator\Schema;
+use Dedoc\Scramble\Support\Generator\Types\ArrayType;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
 use Dedoc\Scramble\Support\Generator\TypeTransformer;
 use Dedoc\Scramble\Support\OperationExtensions\RulesExtractor\RulesToParameters;
@@ -45,24 +46,73 @@ final readonly class DataSchemaFactory
      */
     public function requestBody(string $dataClass, Components $components): RequestBodyObject
     {
+        return RequestBodyObject::make()
+            ->setContent('application/json', $this->reference($dataClass, $components))
+            ->required(true);
+    }
+
+    /**
+     * Restates which properties are mandatory and turns every nested data class
+     * into its own referenced component schema. The rules-derived inline shape
+     * cannot get either right: a property with a default or a nullable type is
+     * optional even though its rules say `required` when present, and a data
+     * class nesting itself has no finite inline expansion.
+     *
+     * @param  class-string<Data>  $dataClass
+     */
+    public function refineSchema(ObjectType $type, string $dataClass, Components $components): void
+    {
+        $type->setRequired(array_values(array_intersect(
+            DataObjects::requiredInputNames($dataClass),
+            array_keys($type->properties),
+        )));
+
+        foreach (app(DataConfig::class)->getDataClass($dataClass)->properties as $property) {
+            $node = $type->properties[$property->inputMappedName ?? $property->name] ?? null;
+            $nestedDataClass = $property->type->dataClass;
+
+            if ($node === null || $nestedDataClass === null || ! is_a($nestedDataClass, Data::class, true)) {
+                continue;
+            }
+
+            if ($property->type->kind->isDataCollectable() && $node instanceof ArrayType) {
+                $node->items = $this->reference($nestedDataClass, $components);
+
+                continue;
+            }
+
+            if ($property->type->kind->isDataObject()) {
+                $reference = $this->reference($nestedDataClass, $components);
+                $reference->setDescription($node->description);
+                $reference->nullable($property->type->isNullable);
+                $reference->mergeExtensionProperties($node->extensionProperties());
+
+                $type->properties[$property->inputMappedName ?? $property->name] = $reference;
+            }
+        }
+    }
+
+    /**
+     * The schema is registered before it is refined, so a data class reachable
+     * from itself resolves to the reference already being built instead of
+     * recursing forever.
+     *
+     * @param  class-string<Data>  $dataClass
+     */
+    private function reference(string $dataClass, Components $components): Reference
+    {
         $schemaName = class_basename($dataClass);
 
         if (! $components->hasSchema($schemaName)) {
             $schema = Schema::createFromParameters($this->bodyParameters($dataClass));
+            $components->addSchema($schemaName, $schema);
 
             if ($schema->type instanceof ObjectType) {
-                $schema->type->setRequired(array_values(array_intersect(
-                    DataObjects::requiredInputNames($dataClass),
-                    array_keys($schema->type->properties),
-                )));
+                $this->refineSchema($schema->type, $dataClass, $components);
             }
-
-            $components->addSchema($schemaName, $schema);
         }
 
-        return RequestBodyObject::make()
-            ->setContent('application/json', new Reference('schemas', $schemaName, $components))
-            ->required(true);
+        return new Reference('schemas', $schemaName, $components);
     }
 
     /**
