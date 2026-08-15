@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.0](https://github.com/bambamboole/spectacular/compare/0.18.1...0.19.0) (2026-08-15)
+
+
+### Features
+
+* **openapi:** document a 422 on endpoints paginating with apiPaginate ([#59](https://github.com/bambamboole/spectacular/issues/59)) ([ec0078f](https://github.com/bambamboole/spectacular/commit/ec0078f99625c1330107b68ab25b27e88f207f91))
+
+
+### Bug Fixes
+
+* **openapi:** drop dotted rule properties once a nested data object is referenced ([#58](https://github.com/bambamboole/spectacular/issues/58)) ([b1eec5a](https://github.com/bambamboole/spectacular/commit/b1eec5a5fabcdad1016b2a0e583628d1ec48723c))
+
 ## [0.18.1](https://github.com/bambamboole/spectacular/compare/0.18.0...0.18.1) (2026-08-15)
 
 
