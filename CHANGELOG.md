@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/bambamboole/spectacular/compare/0.24.0...0.25.0) (2026-08-15)
+
+
+### Features
+
+* **openapi:** document property-morphable data as a discriminated oneOf ([#77](https://github.com/bambamboole/spectacular/issues/77)) ([a5660d2](https://github.com/bambamboole/spectacular/commit/a5660d2f6faade54a0ff42600105e652ec737a6b))
+
 ## [0.24.0](https://github.com/bambamboole/spectacular/compare/0.23.0...0.24.0) (2026-08-15)
 
 
