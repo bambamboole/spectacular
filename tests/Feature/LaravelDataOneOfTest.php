@@ -43,7 +43,9 @@ it('documents a data response with the request side component schema', function 
     $document = app(Generator::class)();
 
     expect(data_get($document, 'paths./pages.post.responses.200.content.application/json.schema.$ref'))
-        ->toBe('#/components/schemas/StorePageData');
+        ->toBe('#/components/schemas/StorePageData')
+        ->and(data_get($document, 'paths./pages.post.responses.200.description', ''))
+        ->toBe('');
 });
 
 it('hydrates each payload item into the variant its discriminator selects', function (): void {
