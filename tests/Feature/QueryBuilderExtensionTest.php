@@ -171,6 +171,18 @@ it('merges model api declarations with inline ones', function (): void {
         ->toBe(['roleTotal', 'roles', 'rolesCount', 'rolesExists']);
 });
 
+it('documents model api declarations for a builder subject with a static base', function (): void {
+    RouteFacade::get('api/builder-subject-users', BuilderSubjectUsersController::class)
+        ->name('api.builder-subject-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/builder-subject-users');
+
+    expect($parameters)
+        ->toHaveKeys(['filter[created_after]', 'filter[created_before]', 'filter[email]', 'sort', 'include'])
+        ->and($parameters['include']['schema']['items']['enum'])
+        ->toBe(['roles', 'rolesCount', 'rolesExists']);
+});
+
 it('documents only includes for a single-result api lookup', function (): void {
     RouteFacade::get('api/single-result-users/{id}', SingleResultUserController::class)
         ->name('api.single-result-users.show');
@@ -763,6 +775,16 @@ final class SingleResultUserController
     public function __invoke(int $id): UserResource
     {
         return new UserResource(SpectacularQueryBuilder::for(User::class)->apiFindOrFail($id));
+    }
+}
+
+final class BuilderSubjectUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(
+            SpectacularQueryBuilder::for(User::query()->whereNotNull('email'))->apiPaginate(),
+        );
     }
 }
 
