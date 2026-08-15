@@ -3,11 +3,13 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Filters;
 
+use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Support\Generator\Types\BooleanType;
 use Dedoc\Scramble\Support\Generator\Types\IntegerType;
 use Dedoc\Scramble\Support\Generator\Types\NumberType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\Generator\Types\Type;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -68,6 +70,10 @@ final class FilterSchemaFactory
             return new StringType()->enum($cast::getStateMapping()->keys()->all());
         }
 
+        if ($this->hydratesBigDecimal($cast)) {
+            return new NumberType;
+        }
+
         return match (Str::before($cast, ':')) {
             'bool', 'boolean' => new BooleanType,
             'int', 'integer' => new IntegerType,
@@ -76,6 +82,23 @@ final class FilterSchemaFactory
             'datetime', 'immutable_date', 'immutable_datetime', 'timestamp' => new StringType()->format('date-time'),
             default => null,
         };
+    }
+
+    /**
+     * A custom cast class whose get() hydrates a BigDecimal marks a decimal
+     * column the model gives no scalar cast for.
+     */
+    private function hydratesBigDecimal(string $cast): bool
+    {
+        $class = Str::before($cast, ':');
+
+        if (! class_exists(BigDecimal::class) || ! is_a($class, CastsAttributes::class, true)) {
+            return false;
+        }
+
+        $returnType = new ReflectionMethod($class, 'get')->getReturnType();
+
+        return $returnType instanceof ReflectionNamedType && is_a($returnType->getName(), BigDecimal::class, true);
     }
 
     /**
