@@ -133,9 +133,10 @@ automatically: without matching `allowedFilters()`, `allowedSorts()`, or `allowe
 calls, where the explicit declaration wins over an API declaration with the same name; and on relation subjects such as
 `QueryBuilder::for($tenant->members())`. Scope filters are the typical filter use case, but any `AllowedFilter` works.
 A string include such as `roles` also allows and documents `rolesCount` and `rolesExists`, matching Spatie's behavior.
-Unknown filters, sorts, and includes are rejected as usual; `apiPaginate()` enforces that even without explicit
-declaration calls. Chains opened with the plain Spatie `QueryBuilder` are not affected: they neither allow nor document
-model API declarations.
+Unknown filters, sorts, and includes are rejected as usual: any call that completes the chain — `apiPaginate()`, `get()`,
+`findOrFail()`, or any other query execution — enforces the model API declarations even without explicit declaration
+calls. Chains opened with the plain Spatie `QueryBuilder` are not affected: they neither allow nor document model API
+declarations.
 
 ### Pagination parameters
 

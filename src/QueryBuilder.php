@@ -108,15 +108,22 @@ class QueryBuilder extends SpatieQueryBuilder
 
     /**
      * A forwarded call may execute the query, so pending API declarations are
-     * applied first. Validation has to wait: the forwarded call may as well be a
-     * chain method with explicit declarations still to come, which would wrongly
-     * reject the API parameters that call is about to declare.
+     * applied first. Validation waits until the forwarded call leaves the
+     * chain: a chain method may still be followed by explicit declaration
+     * calls, which would wrongly reject the API parameters they are about to
+     * declare. A result other than the builder means the chain is complete.
      */
     public function __call(string $name, array $arguments): mixed
     {
-        $this->applyApiDeclarations(validate: false);
+        $this->applyApiDeclarations();
 
-        return parent::__call($name, $arguments);
+        $result = parent::__call($name, $arguments);
+
+        if ($result !== $this) {
+            $this->validateApiDeclarations();
+        }
+
+        return $result;
     }
 
     /**
@@ -127,7 +134,8 @@ class QueryBuilder extends SpatieQueryBuilder
         array $modes = [PaginationMode::Default],
         int $max = 100,
     ): Paginator|LengthAwarePaginator|CursorPaginator {
-        $this->applyApiDeclarations(validate: true);
+        $this->applyApiDeclarations();
+        $this->validateApiDeclarations();
         $mode = $this->selectedPaginationMode($modes);
         $perPage = $this->selectedPerPage($max);
 
@@ -155,28 +163,39 @@ class QueryBuilder extends SpatieQueryBuilder
         return $mode;
     }
 
-    /**
-     * apiPaginate() is a terminal call, so it validates the request against the
-     * API declarations; a forwarded call cannot (see __call).
-     */
-    private function applyApiDeclarations(bool $validate): void
+    private function applyApiDeclarations(): void
     {
-        $this->applyUndeclaredApiFilters($validate);
-        $this->applyUndeclaredApiIncludes($validate);
-        $this->applyUndeclaredApiSorts($validate);
+        $this->applyUndeclaredApiFilters();
+        $this->applyUndeclaredApiIncludes();
+        $this->applyUndeclaredApiSorts();
     }
 
-    private function applyUndeclaredApiFilters(bool $validate): void
+    /**
+     * An explicit allowed*() call validates its dimension itself, so only
+     * dimensions that exist purely as model API declarations still need it.
+     */
+    private function validateApiDeclarations(): void
+    {
+        if (! $this->apiFiltersMerged && $this->apiFilters() !== []) {
+            $this->ensureAllFiltersExist();
+        }
+
+        if (! $this->apiIncludesMerged && $this->apiIncludes() !== []) {
+            $this->ensureAllIncludesExist();
+        }
+
+        if (! $this->apiSortsMerged && $this->apiSorts() !== []) {
+            $this->ensureAllSortsExist();
+        }
+    }
+
+    private function applyUndeclaredApiFilters(): void
     {
         if ($this->apiFiltersMerged || ($filters = $this->apiFilters()) === []) {
             return;
         }
 
         $this->allowedFilters = collect($filters);
-
-        if ($validate) {
-            $this->ensureAllFiltersExist();
-        }
 
         if ($this->appliedApiFilterNames === []) {
             $this->addFiltersToQuery();
@@ -187,17 +206,13 @@ class QueryBuilder extends SpatieQueryBuilder
         }
     }
 
-    private function applyUndeclaredApiIncludes(bool $validate): void
+    private function applyUndeclaredApiIncludes(): void
     {
         if ($this->apiIncludesMerged || ($includes = $this->apiIncludes()) === []) {
             return;
         }
 
         $this->allowedIncludes = collect($includes);
-
-        if ($validate) {
-            $this->ensureAllIncludesExist();
-        }
 
         if ($this->appliedApiIncludeNames === []) {
             $requestedIncludes = $this->request->includes()
@@ -208,17 +223,13 @@ class QueryBuilder extends SpatieQueryBuilder
         }
     }
 
-    private function applyUndeclaredApiSorts(bool $validate): void
+    private function applyUndeclaredApiSorts(): void
     {
         if ($this->apiSortsMerged || ($sorts = $this->apiSorts()) === []) {
             return;
         }
 
         $this->allowedSorts = collect($sorts);
-
-        if ($validate) {
-            $this->ensureAllSortsExist();
-        }
 
         if ($this->appliedApiSortNames === []) {
             $this->addRequestedSortsToQuery();
