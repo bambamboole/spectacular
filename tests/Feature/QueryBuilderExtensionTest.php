@@ -141,7 +141,7 @@ it('documents model api declarations without inline declarations', function (): 
         ->and($parameters['filter[created_at]']['description'])
         ->toBe('Filter by `created_at`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly.')
         ->and($parameters['filter[created_at]']['schema'])
-        ->toBe(['type' => 'string'])
+        ->toBe(['type' => 'string', 'x-value-format' => 'date-time'])
         ->and($parameters['filter[email]']['description'])
         ->toBe('Filter by `email`. Matches the exact value.')
         ->and($parameters['sort']['schema']['items']['enum'])

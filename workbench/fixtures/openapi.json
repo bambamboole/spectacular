@@ -725,7 +725,8 @@
                         "in": "query",
                         "description": "Filter by `created_at`. Prefix the value with `>`, `>=`, `<`, `<=`, or `<>` to choose the comparison; without a prefix the value must match exactly.",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "x-value-format": "date-time"
                         }
                     },
                     {

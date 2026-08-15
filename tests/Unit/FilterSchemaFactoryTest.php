@@ -25,11 +25,16 @@ it('types an exact filter from the column it filters', function (string $name, a
     'relation that is not a belongs to' => ['lines_id', ['type' => 'string']],
 ]);
 
-it('leaves a dynamic operator filter a plain string on a typed column', function (): void {
-    $type = new FilterSchemaFactory()->make(Invoice::class, 'paid_at', FilterKind::Operator, FilterOperator::DYNAMIC);
+it('leaves a dynamic operator filter a string but keeps the value format', function (string $name, array $schema): void {
+    $type = new FilterSchemaFactory()->make(Invoice::class, $name, FilterKind::Operator, FilterOperator::DYNAMIC);
 
-    expect($type->toArray())->toBe(['type' => 'string']);
-});
+    expect($type->toArray())->toBe($schema);
+})->with([
+    'datetime column' => ['paid_at', ['type' => 'string', 'x-value-format' => 'date-time']],
+    'decimal column' => ['total', ['type' => 'string', 'x-value-format' => 'number']],
+    'integer column' => ['reminders', ['type' => 'string', 'x-value-format' => 'integer']],
+    'untyped column' => ['reference', ['type' => 'string']],
+]);
 
 it('types a fixed operator filter from the column it compares', function (): void {
     $type = new FilterSchemaFactory()->make(Invoice::class, 'paid_at', FilterKind::Operator, FilterOperator::GREATER_THAN_OR_EQUAL);

@@ -39,16 +39,37 @@ final class FilterSchemaFactory
             return new StringType;
         }
 
-        // A dynamic operator filter embeds the comparison in the value
-        // (`filter[created_at]=>=2026-01-01`), so a typed column schema
-        // (number, date-time format) would reject every prefixed value.
+        $model = $this->model($modelClass);
+        $columnType = $model === null ? new StringType : $this->columnType($model, $name);
+
         if ($operator === FilterOperator::DYNAMIC) {
-            return new StringType;
+            return $this->dynamicOperatorType($columnType);
         }
 
-        $model = $this->model($modelClass);
+        return $columnType;
+    }
 
-        return $model === null ? new StringType : $this->columnType($model, $name);
+    /**
+     * A dynamic operator filter embeds the comparison in the value
+     * (`filter[created_at]=>=2026-01-01`), so the typed column schema
+     * (number, date-time format) would reject every prefixed value. The
+     * column's value type survives as `x-value-format` for tooling.
+     */
+    private function dynamicOperatorType(Type $columnType): Type
+    {
+        $type = new StringType;
+
+        $format = match (true) {
+            $columnType->format !== '' => $columnType->format,
+            $columnType->type !== 'string' => $columnType->type,
+            default => null,
+        };
+
+        if ($format !== null) {
+            $type->setExtensionProperty('value-format', $format);
+        }
+
+        return $type;
     }
 
     private function columnType(Model $model, string $name): Type
@@ -57,6 +78,11 @@ final class FilterSchemaFactory
 
         if (is_string($cast) && ($type = $this->castType($cast)) !== null) {
             return $type;
+        }
+
+        // The timestamp columns are dates without appearing in the casts.
+        if (in_array($name, $model->getDates(), true)) {
+            return new StringType()->format('date-time');
         }
 
         if ($name === $model->getKeyName()) {
