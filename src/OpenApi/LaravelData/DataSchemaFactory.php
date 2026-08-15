@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\LaravelData;
 
+use Bambamboole\Spectacular\Attributes\SpecOneOf;
 use Bambamboole\Spectacular\Attributes\SpecProperty;
+use Bambamboole\Spectacular\OpenApi\Types\OneOf;
 use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Support\Generator\Combined\AnyOf;
 use Dedoc\Scramble\Support\Generator\Components;
@@ -19,6 +21,7 @@ use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\Generator\Types\Type;
 use Dedoc\Scramble\Support\Generator\TypeTransformer;
 use Dedoc\Scramble\Support\OperationExtensions\RulesExtractor\RulesToParameters;
+use ReflectionClass;
 use ReflectionProperty;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Support\DataConfig;
@@ -93,6 +96,25 @@ final readonly class DataSchemaFactory
                 continue;
             }
 
+            if (($mapping = $this->oneOfMapping($nestedDataClass)) !== null) {
+                $oneOf = $this->oneOfSchema($nestedDataClass, $mapping, $components);
+
+                if ($property->type->kind->isDataCollectable() && $node instanceof ArrayType) {
+                    $node->items = $oneOf;
+
+                    continue;
+                }
+
+                if ($property->type->kind->isDataObject()) {
+                    $oneOf->description = $node->description;
+                    $oneOf->mergeExtensionProperties($node->extensionProperties());
+                    $type->properties[$name] = $oneOf;
+                    $this->dropDottedRuleProperties($type, $name);
+
+                    continue;
+                }
+            }
+
             if ($property->type->kind->isDataCollectable() && $node instanceof ArrayType) {
                 $node->items = $this->reference($nestedDataClass, $components);
 
@@ -143,6 +165,96 @@ final readonly class DataSchemaFactory
         $schema->mergeExtensionProperties($node->extensionProperties());
 
         return $schema;
+    }
+
+    /**
+     * The full component schema of a data class, refined and with nested data
+     * registered — the response-side counterpart of requestBody(). An abstract
+     * property-morphable class resolves to the oneOf of its declared variants.
+     *
+     * @param  class-string<Data>  $dataClass
+     */
+    public function schemaType(string $dataClass, Components $components): Type
+    {
+        if (($mapping = $this->oneOfMapping($dataClass)) !== null) {
+            return $this->oneOfSchema($dataClass, $mapping, $components);
+        }
+
+        $schema = Schema::createFromParameters($this->bodyParameters($dataClass));
+
+        if ($schema->type instanceof ObjectType) {
+            $this->refineSchema($schema->type, $dataClass, $components);
+        }
+
+        return $schema->type;
+    }
+
+    /**
+     * @return array<string, class-string<Data>>|null
+     */
+    private function oneOfMapping(string $dataClass): ?array
+    {
+        $attributes = new ReflectionClass($dataClass)->getAttributes(SpecOneOf::class);
+
+        return $attributes === [] ? null : $attributes[0]->newInstance()->mapping;
+    }
+
+    /**
+     * @param  class-string<Data>  $abstractClass
+     * @param  array<string, class-string<Data>>  $mapping
+     */
+    private function oneOfSchema(string $abstractClass, array $mapping, Components $components): OneOf
+    {
+        $discriminator = $this->morphPropertyName($abstractClass);
+        $items = [];
+        $references = [];
+
+        foreach ($mapping as $value => $variantClass) {
+            $items[] = $this->reference($variantClass, $components);
+            $references[(string) $value] = '#/components/schemas/'.class_basename($variantClass);
+            $this->pinDiscriminatorValue($components, $variantClass, $discriminator, (string) $value);
+        }
+
+        $oneOf = new OneOf()->setItems($items);
+
+        if ($discriminator !== null) {
+            $oneOf->setDiscriminator($discriminator, $references);
+        }
+
+        return $oneOf;
+    }
+
+    /**
+     * @param  class-string<Data>  $dataClass
+     */
+    private function morphPropertyName(string $dataClass): ?string
+    {
+        foreach (app(DataConfig::class)->getDataClass($dataClass)->properties as $property) {
+            if ($property->morphable) {
+                return $property->inputMappedName ?? $property->name;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A variant documents its discriminator pinned to the single value that
+     * selects it, while the abstract class keeps the full enum.
+     *
+     * @param  class-string<Data>  $variantClass
+     */
+    private function pinDiscriminatorValue(Components $components, string $variantClass, ?string $discriminator, string $value): void
+    {
+        if ($discriminator === null || ! $components->hasSchema(class_basename($variantClass))) {
+            return;
+        }
+
+        $schema = $components->getSchema(class_basename($variantClass))->type;
+
+        if ($schema instanceof ObjectType && isset($schema->properties[$discriminator])) {
+            $schema->properties[$discriminator]->enum([$value]);
+        }
     }
 
     /**
@@ -305,7 +417,7 @@ final readonly class DataSchemaFactory
             if ($property->type->kind->isDataCollectable() && $nestedDataClass !== null && is_a($nestedDataClass, Data::class, true)) {
                 $payload[$name] = isset($expanding[$nestedDataClass])
                     ? []
-                    : [$this->payload($nestedDataClass, $expanding)];
+                    : [$this->payloadForClass($nestedDataClass, $expanding)];
 
                 continue;
             }
@@ -313,12 +425,40 @@ final readonly class DataSchemaFactory
             if ($property->type->kind->isDataObject() && $nestedDataClass !== null && is_a($nestedDataClass, Data::class, true)) {
                 $payload[$name] = isset($expanding[$nestedDataClass])
                     ? null
-                    : $this->payload($nestedDataClass, $expanding);
+                    : $this->payloadForClass($nestedDataClass, $expanding);
 
                 continue;
             }
 
             $payload[$name] = $property->hasDefaultValue ? $property->defaultValue : null;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * An abstract property-morphable class cannot answer for its own rules —
+     * fabricating its first declared variant, discriminator included, lets
+     * laravel-data resolve the morph and produce a complete rule set.
+     *
+     * @param  class-string<Data>  $dataClass
+     * @param  array<class-string<Data>, true>  $expanding
+     * @return array<string, mixed>
+     */
+    private function payloadForClass(string $dataClass, array $expanding): array
+    {
+        $mapping = $this->oneOfMapping($dataClass);
+
+        if ($mapping === null) {
+            return $this->payload($dataClass, $expanding);
+        }
+
+        $value = array_key_first($mapping);
+        $payload = $this->payload($mapping[$value], $expanding);
+        $discriminator = $this->morphPropertyName($dataClass);
+
+        if ($discriminator !== null) {
+            $payload[$discriminator] = $value;
         }
 
         return $payload;
