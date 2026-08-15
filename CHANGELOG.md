@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1](https://github.com/bambamboole/spectacular/compare/0.25.0...0.25.1) (2026-08-15)
+
+
+### Bug Fixes
+
+* **openapi:** pin a oneOf discriminator by replacing its node ([#79](https://github.com/bambamboole/spectacular/issues/79)) ([7341484](https://github.com/bambamboole/spectacular/commit/734148413b58f3b20f9d2483651b29ba81867849))
+
 ## [0.25.0](https://github.com/bambamboole/spectacular/compare/0.24.0...0.25.0) (2026-08-15)
 
 
