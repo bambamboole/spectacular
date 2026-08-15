@@ -8,7 +8,10 @@ use Illuminate\Support\Facades\Route as RouteFacade;
 use Workbench\App\Data\StorePageData;
 
 it('documents a property-morphable collection as a discriminated oneOf', function (): void {
-    $blocks = generatedPageSchemas()['StorePageData']['properties']['blocks'];
+    $schema = generatedPageSchemas()['StorePageData'];
+    $blocks = $schema['properties']['blocks'];
+
+    expect(array_keys($schema['properties']))->toBe(['title', 'blocks']);
 
     expect($blocks['items']['oneOf'] ?? null)->toBe([
         ['$ref' => '#/components/schemas/TextBlockData'],
