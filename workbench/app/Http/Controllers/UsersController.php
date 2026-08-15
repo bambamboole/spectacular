@@ -20,7 +20,6 @@ class UsersController
                 AllowedFilter::exact('email'),
             )
             ->allowedSorts('name', 'created_at')
-            ->allowedIncludes('roles')
             ->allowedFields('id', 'name', 'email', 'roles.id', 'roles.name')
             ->apiPaginate(modes: [
                 PaginationMode::Default,

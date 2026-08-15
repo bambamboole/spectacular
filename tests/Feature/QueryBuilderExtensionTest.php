@@ -12,6 +12,7 @@ use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\QueryBuilder;
 use Workbench\App\Http\Resources\UserResource;
 use Workbench\App\Models\User;
@@ -125,14 +126,14 @@ it('documents an example for the required user path parameter', function (): voi
     expect($parameters['user']['example'])->toBe(1);
 });
 
-it('documents public model filters and sorts without inline declarations', function (): void {
+it('documents model api declarations without inline declarations', function (): void {
     RouteFacade::get('api/public-declaration-users', DefaultApiPaginatedUsersController::class)
         ->name('api.public-declaration-users.index');
 
     $parameters = generatedOperationParametersForUri('api/public-declaration-users');
 
     expect($parameters)
-        ->toHaveKeys(['filter[created_after]', 'filter[created_before]', 'filter[email]', 'sort'])
+        ->toHaveKeys(['filter[created_after]', 'filter[created_before]', 'filter[email]', 'sort', 'include'])
         ->and($parameters['filter[created_after]']['description'])
         ->toBe('Only users created at or after the given date.')
         ->and($parameters['filter[created_after]']['schema'])
@@ -140,10 +141,12 @@ it('documents public model filters and sorts without inline declarations', funct
         ->and($parameters['filter[email]']['description'])
         ->toBe('Filter by `email`. Matches the exact value.')
         ->and($parameters['sort']['schema']['items']['enum'])
-        ->toBe(['created_at', '-created_at', 'updated_at', '-updated_at']);
+        ->toBe(['created_at', '-created_at', 'updated_at', '-updated_at'])
+        ->and($parameters['include']['schema']['items']['enum'])
+        ->toBe(['roles', 'rolesCount', 'rolesExists']);
 });
 
-it('merges public model declarations with inline ones', function (): void {
+it('merges model api declarations with inline ones', function (): void {
     RouteFacade::get('api/mixed-declaration-users', MixedDeclarationsUsersController::class)
         ->name('api.mixed-declaration-users.index');
 
@@ -163,7 +166,9 @@ it('merges public model declarations with inline ones', function (): void {
         ->and($parameters['filter[created_before]']['description'])
         ->toBe('Filter by `created_before`. Applies the query scope of the same name.')
         ->and($parameters['sort']['schema']['items']['enum'])
-        ->toBe(['name', '-name', 'created_at', '-created_at', 'updated_at', '-updated_at']);
+        ->toBe(['name', '-name', 'created_at', '-created_at', 'updated_at', '-updated_at'])
+        ->and($parameters['include']['schema']['items']['enum'])
+        ->toBe(['roleTotal', 'roles', 'rolesCount', 'rolesExists']);
 });
 
 it('describes a scope filter from the scope method docblock summary', function (): void {
@@ -178,7 +183,7 @@ it('describes a scope filter from the scope method docblock summary', function (
         ->toBe('Filter by `created_before`. Applies the query scope of the same name.');
 });
 
-it('leaves public model declarations off plain spatie query builder chains', function (): void {
+it('leaves model api declarations off plain spatie query builder chains', function (): void {
     RouteFacade::get('api/spatie-declaration-users', StandardUsersController::class)
         ->name('api.spatie-declaration-users.index');
 
@@ -769,6 +774,7 @@ final class MixedDeclarationsUsersController
         return UserResource::collection(SpectacularQueryBuilder::for(User::class)
             ->allowedFilters(AllowedFilter::partial('name'), AllowedFilter::exact('created_after'))
             ->allowedSorts('name', 'created_at')
+            ->allowedIncludes(AllowedInclude::count('roleTotal', 'roles'))
             ->apiPaginate());
     }
 }
