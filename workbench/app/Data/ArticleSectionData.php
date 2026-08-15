@@ -17,6 +17,8 @@ final class ArticleSectionData extends Data
         /** Whether the section starts collapsed. Defaults to false. */
         #[MapInputName('is_collapsed')]
         public bool $isCollapsed = false,
+        /** Venue the section reports from. */
+        public ?ArticleVenueData $venue = null,
         /** Sections nested below this one. */
         public array $children = [],
     ) {}
