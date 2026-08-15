@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/bambamboole/spectacular/compare/0.19.0...0.20.0) (2026-08-15)
+
+
+### Features
+
+* **query-builder:** public model filters and sorts, scope docblock descriptions ([#61](https://github.com/bambamboole/spectacular/issues/61)) ([b74df1f](https://github.com/bambamboole/spectacular/commit/b74df1f8ec03903f6baaacdc2c342ce731edeb61))
+
 ## [0.19.0](https://github.com/bambamboole/spectacular/compare/0.18.1...0.19.0) (2026-08-15)
 
 
