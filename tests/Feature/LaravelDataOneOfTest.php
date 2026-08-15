@@ -5,6 +5,7 @@ use Dedoc\Scramble\Generator;
 use Dedoc\Scramble\Scramble;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
+use Workbench\App\Data\StoreGalleryData;
 use Workbench\App\Data\StorePageData;
 
 it('documents a property-morphable collection as a discriminated oneOf', function (): void {
@@ -68,6 +69,17 @@ it('rejects an unknown discriminator value', function (): void {
     ])->assertUnprocessable();
 });
 
+it('drops the dotted rule leftovers of a plain nested collection', function (): void {
+    RouteFacade::post('api/galleries', StoreGalleryController::class);
+
+    Scramble::routes(fn (Route $route): bool => $route->uri() === 'api/galleries');
+    $document = app(Generator::class)();
+    $schema = data_get($document, 'components.schemas.StoreGalleryData', []);
+
+    expect(array_keys($schema['properties'] ?? []))->toBe(['title', 'images'])
+        ->and($schema['properties']['images']['items'] ?? null)->toBe(['$ref' => '#/components/schemas/ImageBlockData']);
+});
+
 /**
  * @return array<string, array<string, mixed>>
  */
@@ -81,6 +93,14 @@ function generatedPageSchemas(): array
     $schemas = data_get($document, 'components.schemas');
 
     return is_array($schemas) ? $schemas : [];
+}
+
+final class StoreGalleryController
+{
+    public function __invoke(StoreGalleryData $data): StoreGalleryData
+    {
+        return $data;
+    }
 }
 
 final class StorePageController
