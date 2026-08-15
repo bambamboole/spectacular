@@ -3,26 +3,28 @@ declare(strict_types=1);
 
 namespace Workbench\App\Models;
 
-use Bambamboole\Spectacular\Contracts\HasPublicFilters;
-use Bambamboole\Spectacular\Contracts\HasPublicSorts;
+use Bambamboole\Spectacular\Contracts\HasApiFilters;
+use Bambamboole\Spectacular\Contracts\HasApiIncludes;
+use Bambamboole\Spectacular\Contracts\HasApiSorts;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\AllowedSort;
 
 /**
  * @property-read Collection<int, Role> $roles
  */
-class User extends Model implements HasPublicFilters, HasPublicSorts
+class User extends Model implements HasApiFilters, HasApiIncludes, HasApiSorts
 {
     protected $guarded = [];
 
     /**
      * @return list<AllowedFilter>
      */
-    public static function getFilters(): array
+    public static function getApiFilters(): array
     {
         return [
             AllowedFilter::scope('created_after'),
@@ -34,12 +36,20 @@ class User extends Model implements HasPublicFilters, HasPublicSorts
     /**
      * @return list<AllowedSort|string>
      */
-    public static function getSorts(): array
+    public static function getApiSorts(): array
     {
         return [
             AllowedSort::field('created_at'),
             'updated_at',
         ];
+    }
+
+    /**
+     * @return list<AllowedInclude|string>
+     */
+    public static function getApiIncludes(): array
+    {
+        return ['roles'];
     }
 
     /**

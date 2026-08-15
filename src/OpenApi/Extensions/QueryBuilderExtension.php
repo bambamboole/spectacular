@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Extensions;
 
-use Bambamboole\Spectacular\Contracts\HasPublicFilters;
-use Bambamboole\Spectacular\Contracts\HasPublicSorts;
+use Bambamboole\Spectacular\Contracts\HasApiFilters;
+use Bambamboole\Spectacular\Contracts\HasApiIncludes;
+use Bambamboole\Spectacular\Contracts\HasApiSorts;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterKind;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterSchemaFactory;
 use Bambamboole\Spectacular\QueryBuilder as SpectacularQueryBuilder;
@@ -48,29 +49,37 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             return;
         }
 
-        $publicModels = $this->publicDeclarationModelClasses($actionNode);
-        $publicSortNames = $this->publicSortNames($publicModels);
+        $apiModels = $this->apiDeclarationModelClasses($actionNode);
+        $apiIncludeNames = $this->apiIncludeNames($apiModels);
+        $apiSortNames = $this->apiSortNames($apiModels);
         $parameters = [];
+        $includesDeclared = false;
         $sortsDeclared = false;
 
-        foreach ($publicModels as $model) {
-            $parameters = [...$parameters, ...$this->publicFilterParameters($model)];
+        foreach ($apiModels as $model) {
+            $parameters = [...$parameters, ...$this->apiFilterParameters($model)];
         }
 
         foreach ($this->queryBuilderCalls($actionNode, self::QUERY_BUILDER_METHODS) as $call) {
-            $sortsDeclared = $sortsDeclared || $this->methodName($call->name) === 'allowedSorts';
+            $method = $this->methodName($call->name);
+            $includesDeclared = $includesDeclared || $method === 'allowedIncludes';
+            $sortsDeclared = $sortsDeclared || $method === 'allowedSorts';
             $parameters = [
                 ...$parameters,
-                ...match ($this->methodName($call->name)) {
+                ...match ($method) {
                     'allowedFilters' => $this->filterParameters($call),
-                    'allowedIncludes' => $this->includeParameters($call),
-                    'allowedSorts' => $this->sortParameters($call, $publicSortNames),
+                    'allowedIncludes' => $this->includeParameters($call, $apiIncludeNames),
+                    'allowedSorts' => $this->sortParameters($call, $apiSortNames),
                     default => [],
                 },
             ];
         }
 
-        if (! $sortsDeclared && ($sortParameter = $this->sortParameter($publicSortNames)) !== null) {
+        if (! $includesDeclared && ($includeParameter = $this->includeParameter($apiIncludeNames)) !== null) {
+            $parameters[] = $includeParameter;
+        }
+
+        if (! $sortsDeclared && ($sortParameter = $this->sortParameter($apiSortNames)) !== null) {
             $parameters[] = $sortParameter;
         }
 
@@ -102,13 +111,13 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     }
 
     /**
-     * The models whose public declarations are in effect at runtime: only a chain
+     * The models whose API declarations are in effect at runtime: only a chain
      * opened with the spectacular query builder auto-allows them, so a plain
      * spatie chain must not document filters its endpoint would reject.
      *
      * @return list<class-string>
      */
-    private function publicDeclarationModelClasses(FunctionLike $actionNode): array
+    private function apiDeclarationModelClasses(FunctionLike $actionNode): array
     {
         $models = [];
 
@@ -137,14 +146,14 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
      * @param  class-string  $model
      * @return list<Parameter>
      */
-    private function publicFilterParameters(string $model): array
+    private function apiFilterParameters(string $model): array
     {
-        if (! is_a($model, HasPublicFilters::class, true)) {
+        if (! is_a($model, HasApiFilters::class, true)) {
             return [];
         }
 
         try {
-            $filters = $model::getFilters();
+            $filters = $model::getApiFilters();
         } catch (Throwable) {
             return [];
         }
@@ -163,17 +172,48 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
      * @param  list<class-string>  $models
      * @return list<string>
      */
-    private function publicSortNames(array $models): array
+    private function apiIncludeNames(array $models): array
     {
         $names = [];
 
         foreach ($models as $model) {
-            if (! is_a($model, HasPublicSorts::class, true)) {
+            if (! is_a($model, HasApiIncludes::class, true)) {
                 continue;
             }
 
             try {
-                $sorts = $model::getSorts();
+                $includes = $model::getApiIncludes();
+            } catch (Throwable) {
+                continue;
+            }
+
+            foreach ($includes as $include) {
+                if ($include instanceof AllowedInclude) {
+                    $names[] = $include->getName();
+                } elseif (is_string($include)) {
+                    $names = [...$names, ...$this->expandedStringIncludeNames($include)];
+                }
+            }
+        }
+
+        return $this->uniqueStrings($names);
+    }
+
+    /**
+     * @param  list<class-string>  $models
+     * @return list<string>
+     */
+    private function apiSortNames(array $models): array
+    {
+        $names = [];
+
+        foreach ($models as $model) {
+            if (! is_a($model, HasApiSorts::class, true)) {
+                continue;
+            }
+
+            try {
+                $sorts = $model::getApiSorts();
             } catch (Throwable) {
                 continue;
             }
@@ -264,16 +304,16 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     }
 
     /**
-     * @param  list<string>  $publicSortNames
+     * @param  list<string>  $apiSortNames
      * @return list<Parameter>
      */
-    private function sortParameters(Expr\MethodCall $call, array $publicSortNames): array
+    private function sortParameters(Expr\MethodCall $call, array $apiSortNames): array
     {
         $sorts = array_map(
             fn (string $sort): string => ltrim($sort, '-'),
             $this->argumentNames($call->args, AllowedSort::class),
         );
-        $parameter = $this->sortParameter([...$sorts, ...$publicSortNames]);
+        $parameter = $this->sortParameter([...$sorts, ...$apiSortNames]);
 
         return $parameter === null ? [] : [$parameter];
     }
@@ -308,9 +348,10 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     }
 
     /**
+     * @param  list<string>  $apiIncludeNames
      * @return list<Parameter>
      */
-    private function includeParameters(Expr\MethodCall $call): array
+    private function includeParameters(Expr\MethodCall $call, array $apiIncludeNames): array
     {
         $includes = [];
 
@@ -321,17 +362,27 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             ];
         }
 
-        if ($includes === []) {
-            return [];
-        }
+        $parameter = $this->includeParameter([...$includes, ...$apiIncludeNames]);
 
+        return $parameter === null ? [] : [$parameter];
+    }
+
+    /**
+     * @param  list<string>  $includes
+     */
+    private function includeParameter(array $includes): ?Parameter
+    {
         $includes = $this->uniqueStrings($includes);
 
-        return [$this->arrayParameter(
+        if ($includes === []) {
+            return null;
+        }
+
+        return $this->arrayParameter(
             $this->parameterName('include'),
             $includes,
             $this->availableValuesDescription('includes', $includes),
-        )];
+        );
     }
 
     /**

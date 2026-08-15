@@ -6,6 +6,7 @@ use Bambamboole\Spectacular\QueryBuilder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedInclude;
 use Workbench\App\Models\Role;
 use Workbench\App\Models\User;
 
@@ -34,6 +35,7 @@ beforeEach(function (): void {
         QueryBuilder::for(User::class)
             ->allowedFilters('name')
             ->allowedSorts('name')
+            ->allowedIncludes(AllowedInclude::count('roleTotal', 'roles'))
             ->apiPaginate(),
     ));
 
@@ -56,28 +58,28 @@ beforeEach(function (): void {
     ));
 });
 
-it('allows public filters without an allowedFilters call', function (): void {
+it('allows api filters without an allowedFilters call', function (): void {
     $this->getJson('/api/public-users?filter[created_after]=2026-02-01')
         ->assertSuccessful()
         ->assertJsonCount(2, 'data')
         ->assertJsonPath('data.0.name', 'User 2');
 });
 
-it('allows public filters on a forwarded query execution', function (): void {
+it('allows api filters on a forwarded query execution', function (): void {
     $this->getJson('/api/public-users-list?filter[created_before]=2026-01-15')
         ->assertSuccessful()
         ->assertJsonCount(1)
         ->assertJsonPath('0.name', 'User 1');
 });
 
-it('allows a non-scope public filter', function (): void {
+it('allows a non-scope api filter', function (): void {
     $this->getJson('/api/public-users?filter[email]=user2@example.com')
         ->assertSuccessful()
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.name', 'User 2');
 });
 
-it('allows public sorts without an allowedSorts call', function (): void {
+it('allows api sorts without an allowedSorts call', function (): void {
     $this->getJson('/api/public-users?sort=-created_at')
         ->assertSuccessful()
         ->assertJsonPath('data.0.name', 'User 3');
@@ -87,36 +89,47 @@ it('allows public sorts without an allowedSorts call', function (): void {
         ->assertJsonPath('data.0.name', 'User 1');
 });
 
-it('merges public declarations with explicit calls', function (): void {
-    $this->getJson('/api/declared-public-users?filter[name]=User&filter[created_after]=2026-03-01&sort=-created_at')
+it('allows api includes without an allowedIncludes call', function (): void {
+    $this->getJson('/api/public-users-list?include=roles,rolesCount')
         ->assertSuccessful()
-        ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.name', 'User 3');
+        ->assertJsonPath('0.roles', [])
+        ->assertJsonPath('0.roles_count', 0);
 });
 
-it('keeps a re-declared public declaration single', function (): void {
+it('merges api declarations with explicit calls', function (): void {
+    $this->getJson('/api/declared-public-users?filter[name]=User&filter[created_after]=2026-03-01&sort=-created_at&include=roles,roleTotal')
+        ->assertSuccessful()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.name', 'User 3')
+        ->assertJsonPath('data.0.roles', [])
+        ->assertJsonPath('data.0.roles_count', 0);
+});
+
+it('keeps a re-declared api declaration single', function (): void {
     $this->getJson('/api/redeclared-public-users?filter[created_after]=2026-02-01&sort=-created_at')
         ->assertSuccessful()
         ->assertJsonCount(2, 'data')
         ->assertJsonPath('data.0.name', 'User 3');
 });
 
-it('rejects unknown filters and sorts', function (string $uri, string $query): void {
+it('rejects unknown api declarations', function (string $uri, string $query): void {
     $this->getJson("{$uri}?{$query}")->assertBadRequest();
 })->with([
     'undeclared filter' => ['/api/public-users', 'filter[unknown]=x'],
     'undeclared sort' => ['/api/public-users', 'sort=unknown'],
     'declared filter' => ['/api/declared-public-users', 'filter[unknown]=x'],
     'declared sort' => ['/api/declared-public-users', 'sort=unknown'],
+    'undeclared include' => ['/api/public-users', 'include=unknown'],
+    'declared include' => ['/api/declared-public-users', 'include=unknown'],
 ]);
 
-it('allows public filters on a relation subject', function (): void {
+it('allows api filters on a relation subject', function (): void {
     $this->getJson('/api/role-users?filter[created_after]=2026-02-01')
         ->assertSuccessful()
         ->assertJsonCount(2, 'data');
 });
 
-it('leaves models without public declarations untouched', function (): void {
+it('leaves models without api declarations untouched', function (): void {
     $this->getJson('/api/public-roles?filter[name]=x')
         ->assertSuccessful();
 });

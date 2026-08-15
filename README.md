@@ -95,19 +95,20 @@ A `scope` filter points at a method the developer already documented: when the s
 legacy `scope`-prefixed, own, inherited, or from a trait — carries a docblock summary, that summary becomes the
 parameter description instead of the generic template.
 
-### Public filters and sorts
+### API filters, sorts, and includes
 
-Filters shared across every endpoint of a model — timestamp scopes are the typical case — do not have to be re-declared
-in every controller. A model implementing `HasPublicFilters` and/or `HasPublicSorts` declares them once:
+Filters, sorts, and includes shared across every API endpoint of a model do not have to be re-declared in every
+controller. A model implementing one or more of the API contracts declares them once:
 
 ```php
-use Bambamboole\Spectacular\Contracts\HasPublicFilters;
-use Bambamboole\Spectacular\Contracts\HasPublicSorts;
+use Bambamboole\Spectacular\Contracts\HasApiFilters;
+use Bambamboole\Spectacular\Contracts\HasApiIncludes;
+use Bambamboole\Spectacular\Contracts\HasApiSorts;
 use Spatie\QueryBuilder\AllowedFilter;
 
-class User extends Model implements HasPublicFilters, HasPublicSorts
+class User extends Model implements HasApiFilters, HasApiIncludes, HasApiSorts
 {
-    public static function getFilters(): array
+    public static function getApiFilters(): array
     {
         return [
             AllowedFilter::scope('created_after'),
@@ -115,20 +116,26 @@ class User extends Model implements HasPublicFilters, HasPublicSorts
         ];
     }
 
-    public static function getSorts(): array
+    public static function getApiSorts(): array
     {
         return ['created_at', 'updated_at'];
+    }
+
+    public static function getApiIncludes(): array
+    {
+        return ['roles'];
     }
 }
 ```
 
 Every chain opened with the Spectacular `QueryBuilder` on that model then allows and documents these declarations
-automatically: with no `allowedFilters()`/`allowedSorts()` call at all, merged into an explicit call (the explicit
-declaration wins over a public one of the same name), and on relation subjects such as
-`QueryBuilder::for($tenant->members())`. Scope filters are the intended use, but any `AllowedFilter` works. Unknown
-filters and sorts are rejected as usual; `apiPaginate()` enforces that even without an explicit
-`allowedFilters()`/`allowedSorts()` call. Chains opened with the plain spatie `QueryBuilder` are not affected — they
-neither allow nor document public declarations.
+automatically: without matching `allowedFilters()`, `allowedSorts()`, or `allowedIncludes()` calls; merged into explicit
+calls, where the explicit declaration wins over an API declaration with the same name; and on relation subjects such as
+`QueryBuilder::for($tenant->members())`. Scope filters are the typical filter use case, but any `AllowedFilter` works.
+A string include such as `roles` also allows and documents `rolesCount` and `rolesExists`, matching Spatie's behavior.
+Unknown filters, sorts, and includes are rejected as usual; `apiPaginate()` enforces that even without explicit
+declaration calls. Chains opened with the plain Spatie `QueryBuilder` are not affected: they neither allow nor document
+model API declarations.
 
 ### Pagination parameters
 

@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular;
 
-use Bambamboole\Spectacular\Contracts\HasPublicFilters;
-use Bambamboole\Spectacular\Contracts\HasPublicSorts;
+use Bambamboole\Spectacular\Contracts\HasApiFilters;
+use Bambamboole\Spectacular\Contracts\HasApiIncludes;
+use Bambamboole\Spectacular\Contracts\HasApiSorts;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder as SpatieQueryBuilder;
 
@@ -23,29 +26,37 @@ use Spatie\QueryBuilder\QueryBuilder as SpatieQueryBuilder;
 class QueryBuilder extends SpatieQueryBuilder
 {
     /** @var list<AllowedFilter>|null */
-    private ?array $publicFilters = null;
+    private ?array $apiFilters = null;
+
+    /** @var list<AllowedInclude>|null */
+    private ?array $apiIncludes = null;
 
     /** @var list<AllowedSort>|null */
-    private ?array $publicSorts = null;
+    private ?array $apiSorts = null;
 
-    private bool $publicFiltersMerged = false;
+    private bool $apiFiltersMerged = false;
 
-    private bool $publicSortsMerged = false;
+    private bool $apiIncludesMerged = false;
+
+    private bool $apiSortsMerged = false;
 
     /** @var list<string> */
-    private array $appliedPublicFilterNames = [];
+    private array $appliedApiFilterNames = [];
 
     /** @var list<string> */
-    private array $appliedPublicSortNames = [];
+    private array $appliedApiIncludeNames = [];
+
+    /** @var list<string> */
+    private array $appliedApiSortNames = [];
 
     /**
-     * Filters a HasPublicFilters model declares are always allowed: an explicit
-     * call merges them in (its own declaration wins over a public filter of the
+     * Filters a HasApiFilters model declares are always allowed: an explicit
+     * call merges them in (its own declaration wins over an API filter of the
      * same name), so spatie validates and applies everything in one place.
      */
     public function allowedFilters(AllowedFilter|string ...$filters): static
     {
-        $this->publicFiltersMerged = true;
+        $this->apiFiltersMerged = true;
 
         $declared = array_map(
             fn (AllowedFilter|string $filter): AllowedFilter => $filter instanceof AllowedFilter
@@ -55,16 +66,30 @@ class QueryBuilder extends SpatieQueryBuilder
         );
         $declaredNames = array_map(fn (AllowedFilter $filter): string => $filter->getName(), $declared);
         $missing = array_filter(
-            $this->publicFilters(),
+            $this->apiFilters(),
             fn (AllowedFilter $filter): bool => ! in_array($filter->getName(), $declaredNames, true),
         );
 
         return parent::allowedFilters(...$declared, ...$missing);
     }
 
+    public function allowedIncludes(AllowedInclude|string ...$includes): static
+    {
+        $this->apiIncludesMerged = true;
+
+        $declared = $this->normalizeIncludes(array_values($includes));
+        $declaredNames = array_map(fn (AllowedInclude $include): string => $include->getName(), $declared);
+        $missing = array_filter(
+            $this->apiIncludes(),
+            fn (AllowedInclude $include): bool => ! in_array($include->getName(), $declaredNames, true),
+        );
+
+        return parent::allowedIncludes(...$declared, ...$missing);
+    }
+
     public function allowedSorts(AllowedSort|string ...$sorts): static
     {
-        $this->publicSortsMerged = true;
+        $this->apiSortsMerged = true;
 
         $declared = array_map(
             fn (AllowedSort|string $sort): AllowedSort => $sort instanceof AllowedSort
@@ -74,7 +99,7 @@ class QueryBuilder extends SpatieQueryBuilder
         );
         $declaredNames = array_map(fn (AllowedSort $sort): string => $sort->getName(), $declared);
         $missing = array_filter(
-            $this->publicSorts(),
+            $this->apiSorts(),
             fn (AllowedSort $sort): bool => ! in_array($sort->getName(), $declaredNames, true),
         );
 
@@ -82,14 +107,14 @@ class QueryBuilder extends SpatieQueryBuilder
     }
 
     /**
-     * A forwarded call may execute the query, so pending public declarations are
+     * A forwarded call may execute the query, so pending API declarations are
      * applied first. Validation has to wait: the forwarded call may as well be a
-     * chain method with an explicit allowedFilters()/allowedSorts() still to come,
-     * which would wrongly reject the filters that call is about to declare.
+     * chain method with explicit declarations still to come, which would wrongly
+     * reject the API parameters that call is about to declare.
      */
     public function __call(string $name, array $arguments): mixed
     {
-        $this->applyPublicDeclarations(validate: false);
+        $this->applyApiDeclarations(validate: false);
 
         return parent::__call($name, $arguments);
     }
@@ -102,7 +127,7 @@ class QueryBuilder extends SpatieQueryBuilder
         array $modes = [PaginationMode::Default],
         int $max = 100,
     ): Paginator|LengthAwarePaginator|CursorPaginator {
-        $this->applyPublicDeclarations(validate: true);
+        $this->applyApiDeclarations(validate: true);
         $mode = $this->selectedPaginationMode($modes);
         $perPage = $this->selectedPerPage($max);
 
@@ -132,17 +157,18 @@ class QueryBuilder extends SpatieQueryBuilder
 
     /**
      * apiPaginate() is a terminal call, so it validates the request against the
-     * public declarations; a forwarded call cannot (see __call).
+     * API declarations; a forwarded call cannot (see __call).
      */
-    private function applyPublicDeclarations(bool $validate): void
+    private function applyApiDeclarations(bool $validate): void
     {
-        $this->applyUndeclaredPublicFilters($validate);
-        $this->applyUndeclaredPublicSorts($validate);
+        $this->applyUndeclaredApiFilters($validate);
+        $this->applyUndeclaredApiIncludes($validate);
+        $this->applyUndeclaredApiSorts($validate);
     }
 
-    private function applyUndeclaredPublicFilters(bool $validate): void
+    private function applyUndeclaredApiFilters(bool $validate): void
     {
-        if ($this->publicFiltersMerged || ($filters = $this->publicFilters()) === []) {
+        if ($this->apiFiltersMerged || ($filters = $this->apiFilters()) === []) {
             return;
         }
 
@@ -152,18 +178,39 @@ class QueryBuilder extends SpatieQueryBuilder
             $this->ensureAllFiltersExist();
         }
 
-        if ($this->appliedPublicFilterNames === []) {
+        if ($this->appliedApiFilterNames === []) {
             $this->addFiltersToQuery();
-            $this->appliedPublicFilterNames = array_map(
+            $this->appliedApiFilterNames = array_map(
                 fn (AllowedFilter $filter): string => $filter->getName(),
                 $filters,
             );
         }
     }
 
-    private function applyUndeclaredPublicSorts(bool $validate): void
+    private function applyUndeclaredApiIncludes(bool $validate): void
     {
-        if ($this->publicSortsMerged || ($sorts = $this->publicSorts()) === []) {
+        if ($this->apiIncludesMerged || ($includes = $this->apiIncludes()) === []) {
+            return;
+        }
+
+        $this->allowedIncludes = collect($includes);
+
+        if ($validate) {
+            $this->ensureAllIncludesExist();
+        }
+
+        if ($this->appliedApiIncludeNames === []) {
+            $requestedIncludes = $this->request->includes()
+                ->filter(fn (string $include): bool => $this->findInclude($include) !== null);
+
+            $this->addIncludesToQuery($requestedIncludes);
+            $this->appliedApiIncludeNames = $requestedIncludes->values()->all();
+        }
+    }
+
+    private function applyUndeclaredApiSorts(bool $validate): void
+    {
+        if ($this->apiSortsMerged || ($sorts = $this->apiSorts()) === []) {
             return;
         }
 
@@ -173,9 +220,9 @@ class QueryBuilder extends SpatieQueryBuilder
             $this->ensureAllSortsExist();
         }
 
-        if ($this->appliedPublicSortNames === []) {
+        if ($this->appliedApiSortNames === []) {
             $this->addRequestedSortsToQuery();
-            $this->appliedPublicSortNames = array_map(
+            $this->appliedApiSortNames = array_map(
                 fn (AllowedSort $sort): string => $sort->getName(),
                 $sorts,
             );
@@ -183,13 +230,13 @@ class QueryBuilder extends SpatieQueryBuilder
     }
 
     /**
-     * A public filter a forwarded call already applied must not apply again when
+     * An API filter a forwarded call already applied must not apply again when
      * a later explicit allowedFilters() call re-processes the merged set.
      */
     #[\Override]
     protected function addFiltersToQuery(): void
     {
-        if ($this->appliedPublicFilterNames === []) {
+        if ($this->appliedApiFilterNames === []) {
             parent::addFiltersToQuery();
 
             return;
@@ -197,16 +244,35 @@ class QueryBuilder extends SpatieQueryBuilder
 
         $declared = $this->allowedFilters;
         $this->allowedFilters = $declared
-            ->reject(fn (AllowedFilter $filter): bool => in_array($filter->getName(), $this->appliedPublicFilterNames, true))
+            ->reject(fn (AllowedFilter $filter): bool => in_array($filter->getName(), $this->appliedApiFilterNames, true))
             ->values();
         parent::addFiltersToQuery();
         $this->allowedFilters = $declared;
     }
 
+    /**
+     * @param  Collection<array-key, string>  $includes
+     */
+    #[\Override]
+    protected function addIncludesToQuery(Collection $includes): void
+    {
+        if ($this->appliedApiIncludeNames === []) {
+            parent::addIncludesToQuery($includes);
+
+            return;
+        }
+
+        parent::addIncludesToQuery(
+            $includes
+                ->reject(fn (string $include): bool => in_array($include, $this->appliedApiIncludeNames, true))
+                ->values(),
+        );
+    }
+
     #[\Override]
     protected function addRequestedSortsToQuery(): void
     {
-        if ($this->appliedPublicSortNames === []) {
+        if ($this->appliedApiSortNames === []) {
             parent::addRequestedSortsToQuery();
 
             return;
@@ -214,7 +280,7 @@ class QueryBuilder extends SpatieQueryBuilder
 
         $declared = $this->allowedSorts;
         $this->allowedSorts = $declared
-            ->reject(fn (AllowedSort $sort): bool => in_array($sort->getName(), $this->appliedPublicSortNames, true))
+            ->reject(fn (AllowedSort $sort): bool => in_array($sort->getName(), $this->appliedApiSortNames, true))
             ->values();
         parent::addRequestedSortsToQuery();
         $this->allowedSorts = $declared;
@@ -223,42 +289,85 @@ class QueryBuilder extends SpatieQueryBuilder
     /**
      * @return list<AllowedFilter>
      */
-    private function publicFilters(): array
+    private function apiFilters(): array
     {
-        if ($this->publicFilters !== null) {
-            return $this->publicFilters;
+        if ($this->apiFilters !== null) {
+            return $this->apiFilters;
         }
 
         $model = $this->getEloquentBuilder()->getModel();
 
-        if (! $model instanceof HasPublicFilters) {
-            return $this->publicFilters = [];
+        if (! $model instanceof HasApiFilters) {
+            return $this->apiFilters = [];
         }
 
-        return $this->publicFilters = $model::getFilters();
+        return $this->apiFilters = $model::getApiFilters();
+    }
+
+    /**
+     * @return list<AllowedInclude>
+     */
+    private function apiIncludes(): array
+    {
+        if ($this->apiIncludes !== null) {
+            return $this->apiIncludes;
+        }
+
+        $model = $this->getEloquentBuilder()->getModel();
+
+        if (! $model instanceof HasApiIncludes) {
+            return $this->apiIncludes = [];
+        }
+
+        return $this->apiIncludes = $this->normalizeIncludes($model::getApiIncludes());
     }
 
     /**
      * @return list<AllowedSort>
      */
-    private function publicSorts(): array
+    private function apiSorts(): array
     {
-        if ($this->publicSorts !== null) {
-            return $this->publicSorts;
+        if ($this->apiSorts !== null) {
+            return $this->apiSorts;
         }
 
         $model = $this->getEloquentBuilder()->getModel();
 
-        if (! $model instanceof HasPublicSorts) {
-            return $this->publicSorts = [];
+        if (! $model instanceof HasApiSorts) {
+            return $this->apiSorts = [];
         }
 
-        return $this->publicSorts = array_map(
+        return $this->apiSorts = array_map(
             fn (AllowedSort|string $sort): AllowedSort => $sort instanceof AllowedSort
                 ? $sort
                 : AllowedSort::field(ltrim($sort, '-')),
-            $model::getSorts(),
+            $model::getApiSorts(),
         );
+    }
+
+    /**
+     * @param  list<AllowedInclude|string>  $includes
+     * @return list<AllowedInclude>
+     */
+    private function normalizeIncludes(array $includes): array
+    {
+        $normalized = [];
+
+        foreach ($includes as $include) {
+            if ($include === '') {
+                continue;
+            }
+
+            $allowedIncludes = $include instanceof AllowedInclude
+                ? [$include]
+                : $this->generateIncludesFromString($include);
+
+            foreach ($allowedIncludes as $allowedInclude) {
+                $normalized[$allowedInclude->getName()] ??= $allowedInclude;
+            }
+        }
+
+        return array_values($normalized);
     }
 
     private function selectedPerPage(int $max): int
