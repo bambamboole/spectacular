@@ -447,6 +447,13 @@ use Bambamboole\Spectacular\Attributes\SpecEndpoint;
 public function __invoke(StoreCategoryData $data): CategoryResource
 ```
 
+Set `internal: true` to keep an operation in the complete document while excluding it from the public document:
+
+```php
+#[SpecEndpoint(internal: true)]
+public function __invoke(): InternalMetricsResource
+```
+
 Response resources are not covered: a `JsonResource::toArray()` describes its fields through docblocks, and a PHP
 attribute cannot attach to a key of an array literal.
 
@@ -458,7 +465,9 @@ php artisan spectacular:openapi --path=openapi.json
 php artisan spectacular:openapi --pretty=false  # compact JSON
 ```
 
-The command renders the same document Scramble produces, so all of Scramble's own configuration applies.
+The command renders the same document Scramble produces, so all of Scramble's own configuration applies. When a document
+written with `--path` contains an internal operation, the command also writes a `.public.json` sibling without internal
+operations. For example, `--path=openapi.json` writes both `openapi.json` and `openapi.public.json`.
 
 ## AsyncAPI
 
