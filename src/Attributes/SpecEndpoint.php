@@ -6,8 +6,7 @@ namespace Bambamboole\Spectacular\Attributes;
 use Attribute;
 
 /**
- * Adds a tooltip to the endpoint. Its title and description stay with Scramble's
- * own `#[Endpoint]` attribute.
+ * Adds Spectacular-specific documentation to an endpoint.
  */
 #[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION)]
 final readonly class SpecEndpoint
@@ -17,5 +16,6 @@ final readonly class SpecEndpoint
          * HTML rendered next to the endpoint, links included.
          */
         public ?string $tooltip = null,
+        public bool $internal = false,
     ) {}
 }

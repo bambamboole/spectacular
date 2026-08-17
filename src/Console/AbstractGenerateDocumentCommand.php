@@ -17,23 +17,41 @@ abstract class AbstractGenerateDocumentCommand extends Command
      */
     protected function outputDocument(array $document): int
     {
-        $json = json_encode(
-            $document,
-            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | ($this->isPretty() ? JSON_PRETTY_PRINT : 0),
-        ).PHP_EOL;
-
         $path = $this->option('path');
 
         if (is_string($path) && $path !== '') {
-            File::ensureDirectoryExists(dirname($path));
-            File::put($path, $json);
+            $this->writeDocument($document, $path);
 
             return self::SUCCESS;
         }
 
-        $this->line($json);
+        $this->line($this->encodeDocument($document));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>  $document
+     *
+     * @throws JsonException
+     */
+    protected function writeDocument(array $document, string $path): void
+    {
+        File::ensureDirectoryExists(dirname($path));
+        File::put($path, $this->encodeDocument($document));
+    }
+
+    /**
+     * @param  array<string, mixed>  $document
+     *
+     * @throws JsonException
+     */
+    private function encodeDocument(array $document): string
+    {
+        return json_encode(
+            $document,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | ($this->isPretty() ? JSON_PRETTY_PRINT : 0),
+        ).PHP_EOL;
     }
 
     private function isPretty(): bool
