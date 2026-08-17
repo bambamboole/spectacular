@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.0](https://github.com/bambamboole/spectacular/compare/0.25.4...0.26.0) (2026-08-17)
+
+
+### Features
+
+* **asyncapi:** describe payload classes as component schemas ([#88](https://github.com/bambamboole/spectacular/issues/88)) ([0a2710e](https://github.com/bambamboole/spectacular/commit/0a2710e6846c749a0d11c47dd7336d8ca960b871))
+
 ## [0.25.4](https://github.com/bambamboole/spectacular/compare/0.25.3...0.25.4) (2026-08-15)
 
 
