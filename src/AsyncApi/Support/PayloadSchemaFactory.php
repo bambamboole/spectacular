@@ -40,15 +40,32 @@ final class PayloadSchemaFactory
 
     private TypeTransformer $types;
 
+    private OpenApi $document;
+
     public function __construct()
     {
-        $openApi = OpenApi::make('3.1.0')->setInfo(new InfoObject('AsyncAPI payloads'));
+        $this->document = OpenApi::make('3.1.0')->setInfo(new InfoObject('AsyncAPI payloads'));
         $context = new OpenApiContext(
-            $openApi,
+            $this->document,
             Scramble::getGeneratorConfig(Scramble::DEFAULT_API),
         );
 
         $this->types = app()->make(TypeTransformer::class, ['context' => $context]);
+    }
+
+    /**
+     * The schemas the payloads referenced so far, keyed by their component
+     * name. A `$ref` a payload emits only resolves once the document carries
+     * these — the pointer Scramble writes is `#/components/schemas/{name}`,
+     * which addresses the same place in an AsyncAPI document.
+     *
+     * @return array<string, mixed>
+     */
+    public function referencedSchemas(): array
+    {
+        $schemas = $this->document->components->toArray()['schemas'] ?? [];
+
+        return is_array($schemas) ? $schemas : [];
     }
 
     /**
@@ -318,7 +335,6 @@ final class PayloadSchemaFactory
             return [
                 'type' => 'string',
                 'format' => 'date-time',
-                'x-php-type' => $type->name,
             ];
         }
 
@@ -328,7 +344,6 @@ final class PayloadSchemaFactory
                     ['type' => 'number'],
                     ['type' => 'string', 'pattern' => '^-?\\d+(\\.\\d+)?$'],
                 ],
-                'x-php-type' => $type->name,
             ];
         }
 
@@ -341,14 +356,29 @@ final class PayloadSchemaFactory
             return [
                 'type' => is_int($values[0] ?? '') ? 'integer' : 'string',
                 'enum' => $values,
-                'x-php-type' => $type->name,
             ];
         }
 
-        return [
-            'type' => 'object',
-            'x-php-type' => $type->name,
-        ];
+        return $this->transformedSchema($type);
+    }
+
+    /**
+     * Anything Scramble can already describe — a JsonResource, a laravel-data
+     * object — is described rather than flattened to a bare object. The
+     * transformer answers with a `$ref` and files the schema itself, so the
+     * document has to publish referencedSchemas() alongside the messages.
+     *
+     * @return array<string, mixed>
+     */
+    private function transformedSchema(ObjectType $type): array
+    {
+        try {
+            $schema = $this->types->transform($type)->toArray();
+        } catch (Throwable) {
+            return ['type' => 'object'];
+        }
+
+        return $schema === [] ? ['type' => 'object'] : $schema;
     }
 
     /**

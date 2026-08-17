@@ -24,6 +24,14 @@ final readonly class MessageDefinitionFactory
     ) {}
 
     /**
+     * @return array<string, mixed>
+     */
+    public function referencedSchemas(): array
+    {
+        return $this->payloads->referencedSchemas();
+    }
+
+    /**
      * @param  ReflectionClass<object>  $event
      */
     public function fromBroadcastEvent(ReflectionClass $event, Message $attribute, bool $includeLaravelExtensions): ?AsyncMessageDefinition

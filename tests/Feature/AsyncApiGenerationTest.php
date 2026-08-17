@@ -8,12 +8,10 @@ use Bambamboole\Spectacular\AsyncApi\Attributes\Message;
 use Bambamboole\Spectacular\AsyncApi\Messages\MessageDefinitionFactory;
 use Bambamboole\Spectacular\SpectacularServiceProvider;
 use Bambamboole\Spectacular\Support\ClassDiscoverer;
-use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\ImmediateBroadcast;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidBroadcastNotification;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
@@ -325,12 +323,10 @@ it('uses broadcastWith array shapes as the message payload schema', function ():
         ->and($payload['properties']['sentAt'])->toBe([
             'type' => 'string',
             'format' => 'date-time',
-            'x-php-type' => CarbonImmutable::class,
         ])
         ->and($payload['properties']['status'])->toBe([
             'type' => 'string',
             'enum' => ['pending', 'sent'],
-            'x-php-type' => BroadcastStatus::class,
         ]);
 });
 
@@ -362,6 +358,18 @@ it('documents broadcasts without the laravel-webhooks package', function (): voi
     expect($document['components']['messages'])->toHaveKey('Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast')
         ->and($document['components']['messages'])->not->toHaveKey('invoice.paid')
         ->and($document['channels'])->not->toHaveKey('webhooks');
+});
+
+it('resolves a resource named in a payload docblock to a published component schema', function (): void {
+    app()->register(WorkbenchServiceProvider::class);
+
+    $document = app(AsyncApiGenerator::class)->generate();
+    $data = $document['components']['messages']['category.published']['payload']['properties']['data'];
+
+    expect($data['properties']['category'])->toBe(['$ref' => '#/components/schemas/CategoryResource'])
+        ->and($document['components']['schemas']['CategoryResource']['properties']['name'])->toBe(['type' => 'string'])
+        ->and($document['components']['schemas']['CategoryResource']['properties']['status'])->toBe(['$ref' => '#/components/schemas/CategoryStatus'])
+        ->and($document['components']['schemas'])->toHaveKey('CategoryStatus');
 });
 
 it('matches the workbench AsyncAPI fixture', function (): void {

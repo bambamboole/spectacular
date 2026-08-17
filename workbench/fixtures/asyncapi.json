@@ -18,6 +18,9 @@
         "webhooks": {
             "address": "{webhookUrl}",
             "messages": {
+                "category.published": {
+                    "$ref": "#/components/messages/category.published"
+                },
                 "invoice.paid": {
                     "$ref": "#/components/messages/invoice.paid"
                 }
@@ -34,6 +37,17 @@
             "messages": [
                 {
                     "$ref": "#/channels/private-users.{userId}/messages/Workbench.App.Events.UserNotificationReceived"
+                }
+            ]
+        },
+        "category.published.send": {
+            "action": "send",
+            "channel": {
+                "$ref": "#/channels/webhooks"
+            },
+            "messages": [
+                {
+                    "$ref": "#/channels/webhooks/messages/category.published"
                 }
             ]
         },
@@ -81,6 +95,75 @@
                 },
                 "x-laravel-event": "Workbench\\App\\Events\\UserNotificationReceived",
                 "x-laravel-broadcast-now": false
+            },
+            "category.published": {
+                "name": "category.published",
+                "title": "Category Published",
+                "summary": "Sent when a workbench category goes live.",
+                "tags": [
+                    {
+                        "name": "catalog"
+                    }
+                ],
+                "headers": {
+                    "type": "object",
+                    "properties": {
+                        "Content-Type": {
+                            "type": "string",
+                            "enum": [
+                                "application/json"
+                            ]
+                        },
+                        "Signature": {
+                            "type": "string"
+                        },
+                        "Timestamp": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "payload": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "event": {
+                            "type": "string",
+                            "enum": [
+                                "category.published"
+                            ]
+                        },
+                        "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "data": {
+                            "type": "object",
+                            "properties": {
+                                "category": {
+                                    "$ref": "#/components/schemas/CategoryResource"
+                                },
+                                "publishedBy": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "category",
+                                "publishedBy"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "id",
+                        "event",
+                        "createdAt",
+                        "data"
+                    ]
+                },
+                "x-spectacular-webhook-event": "category.published",
+                "x-spectacular-source-class": "Workbench\\App\\Events\\CategoryPublished"
             },
             "invoice.paid": {
                 "name": "invoice.paid",
@@ -150,6 +233,57 @@
                 },
                 "x-spectacular-webhook-event": "invoice.paid",
                 "x-spectacular-source-class": "Workbench\\App\\Events\\InvoicePaid"
+            }
+        },
+        "schemas": {
+            "CategoryResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/CategoryStatus"
+                    },
+                    "is_visible": {
+                        "type": "boolean"
+                    },
+                    "parent": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/CategoryResource"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "children": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CategoryResource"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "status",
+                    "is_visible"
+                ],
+                "title": "CategoryResource"
+            },
+            "CategoryStatus": {
+                "type": "string",
+                "enum": [
+                    "draft",
+                    "published",
+                    "archived"
+                ],
+                "title": "CategoryStatus"
             }
         }
     }
