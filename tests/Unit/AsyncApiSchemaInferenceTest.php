@@ -2,16 +2,12 @@
 declare(strict_types=1);
 
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
-use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\CustomBroadcastWithNotification;
-use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\ExternalPayload;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidBroadcastNotification;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\PaymentSettledWebhook;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\PublicPropertiesBroadcast;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\UserNotificationBroadcast;
-use Brick\Math\BigDecimal;
-use Carbon\CarbonImmutable;
 
 it('infers scalar and array-shape payload entries from broadcastWith PHPDoc', function (): void {
     $schema = app(PayloadSchemaFactory::class)->forEvent(UserNotificationBroadcast::class);
@@ -32,12 +28,10 @@ it('infers webhook payload schemas from configured payload methods', function ()
         ->and($schema['properties']['paidAt'])->toBe([
             'type' => 'string',
             'format' => 'date-time',
-            'x-php-type' => CarbonImmutable::class,
         ])
         ->and($schema['properties']['status'])->toBe([
             'type' => 'string',
             'enum' => ['pending', 'sent'],
-            'x-php-type' => BroadcastStatus::class,
         ]);
 });
 
@@ -51,7 +45,6 @@ it('infers broadcast notification payload schemas from toBroadcast methods', fun
         ->and($schema['properties']['paidAt'])->toBe([
             'type' => 'string',
             'format' => 'date-time',
-            'x-php-type' => CarbonImmutable::class,
         ])
         ->and($schema['properties']['id'])->toBe([
             'type' => 'string',
@@ -97,21 +90,20 @@ it('infers public properties when broadcastWith is absent', function (): void {
         ->and($schema['properties'])->not->toHaveKey('broadcastQueue');
 });
 
-it('maps dates, enums, nullable types, and unknown objects', function (): void {
-    $schema = app(PayloadSchemaFactory::class)->forEvent(PublicPropertiesBroadcast::class);
+it('maps dates, enums, nullable types, and objects', function (): void {
+    $factory = app(PayloadSchemaFactory::class);
+    $schema = $factory->forEvent(PublicPropertiesBroadcast::class);
 
     expect($schema['properties']['status'])->toBe([
         'type' => 'string',
         'enum' => ['pending', 'sent'],
-        'x-php-type' => BroadcastStatus::class,
     ])->and($schema['properties']['createdAt'])->toBe([
         'type' => 'string',
         'format' => 'date-time',
-        'x-php-type' => CarbonImmutable::class,
     ])->and($schema['properties']['payload'])->toBe([
-        'type' => 'object',
-        'x-php-type' => ExternalPayload::class,
-    ]);
+        '$ref' => '#/components/schemas/ExternalPayload',
+    ])->and($factory->referencedSchemas()['ExternalPayload']['properties']['value'] ?? null)
+        ->toBe(['type' => 'string']);
 });
 
 it('keeps untyped public property schemas unconstrained', function (): void {
@@ -129,7 +121,6 @@ it('documents a BigDecimal payload entry as number or decimal string', function 
             ['type' => 'number'],
             ['type' => 'string', 'pattern' => '^-?\\d+(\\.\\d+)?$'],
         ],
-        'x-php-type' => BigDecimal::class,
     ]);
 });
 

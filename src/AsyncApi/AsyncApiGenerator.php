@@ -102,9 +102,10 @@ final readonly class AsyncApiGenerator
             'defaultContentType' => $settings['default_content_type'] ?? 'application/json',
             'channels' => $channels,
             'operations' => $operations,
-            'components' => [
+            'components' => array_filter([
                 'messages' => $messages,
-            ],
+                'schemas' => $this->messages->referencedSchemas(),
+            ], fn (array $section): bool => $section !== []),
         ];
     }
 

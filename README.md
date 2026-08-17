@@ -508,6 +508,27 @@ From an event, Spectacular derives:
   nullable and union types are all understood). When `broadcastWith()` is absent, the event's public properties are
   used, mapping scalars, enums, `DateTimeInterface` and nested objects to JSON Schema.
 
+A class named in a payload — a `JsonResource`, a laravel-data object, a plain object — is described rather than
+flattened to a bare `object`. It becomes a `$ref` into `components/schemas`, and the referenced schemas (including the
+enums and nested resources they pull in) are published in the document alongside the messages:
+
+```php
+/** @return array{category: CategoryResource, publishedBy: string} */
+public function webhookPayload(): array { /* ... */ }
+```
+
+```json
+{
+  "properties": {
+    "category": { "$ref": "#/components/schemas/CategoryResource" },
+    "publishedBy": { "type": "string" }
+  }
+}
+```
+
+That is what lets events sharing an abstract base class document their payload: give the concrete event a
+`webhookPayload()` override whose only job is to carry the narrower `@return` docblock.
+
 ### The `#[Message]` attribute
 
 ```php
