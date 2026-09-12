@@ -1351,20 +1351,23 @@
                                 "type": "object",
                                 "properties": {
                                     "data": {
-                                        "type": "object",
-                                        "properties": {
-                                            "id": {
-                                                "type": "string"
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "type": {
+                                                    "type": "string",
+                                                    "const": "roles"
+                                                }
                                             },
-                                            "type": {
-                                                "type": "string",
-                                                "const": "roles"
-                                            }
-                                        },
-                                        "required": [
-                                            "id",
-                                            "type"
-                                        ]
+                                            "required": [
+                                                "id",
+                                                "type"
+                                            ]
+                                        }
                                     }
                                 },
                                 "required": [

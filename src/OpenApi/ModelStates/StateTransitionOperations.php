@@ -81,7 +81,7 @@ final readonly class StateTransitionOperations implements DocumentTransformer
         $annotated = [];
 
         foreach ((new $modelClass)->getCasts() as $cast) {
-            if (! is_string($cast) || ! is_subclass_of($cast, State::class)) {
+            if (! is_subclass_of($cast, State::class)) {
                 continue;
             }
 
