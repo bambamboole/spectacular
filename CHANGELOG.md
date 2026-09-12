@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.0](https://github.com/bambamboole/spectacular/compare/0.26.0...0.27.0) (2026-09-12)
+
+
+### Features
+
+* **openapi:** document laravel-data responses ([#91](https://github.com/bambamboole/spectacular/issues/91)) ([189e602](https://github.com/bambamboole/spectacular/commit/189e60224128b95360b8f734e8607f365233f3cb))
+* support internal OpenAPI endpoints ([#90](https://github.com/bambamboole/spectacular/issues/90)) ([fe264bf](https://github.com/bambamboole/spectacular/commit/fe264bf5754609a93b2e54e4d3d677fbc04ff220))
+
 ## [0.26.0](https://github.com/bambamboole/spectacular/compare/0.25.4...0.26.0) (2026-08-17)
 
 
