@@ -35,8 +35,8 @@ This writes `config/spectacular.php`.
 
 Spectacular ships Scramble [operation extensions](https://scramble.dedoc.co/usage/extending) for query builder
 parameters, pagination and its own documentation attributes, along with transformers that document validation errors,
-rate limits, laravel-data request bodies and the info object. The service provider registers them for you; add your own
-through Scramble's native `scramble.extensions` config.
+rate limits, laravel-data request bodies and responses, and the info object. The service provider registers them for
+you; add your own through Scramble's native `scramble.extensions` config.
 
 ### Query builder parameters
 
@@ -327,6 +327,35 @@ error. A `Data` class that nests itself is expanded once and then documented as 
 tree-shaped payload from recursing forever.
 
 A `Data` class declaring its own `rules()` method is left to Scramble, which reads that method directly.
+
+### laravel-data responses
+
+An action returning a `Data` object or one of the laravel-data collectables is documented from the same component schema
+the request side derives, so both directions of the wire share one definition.
+
+`config('data.wrap')` decides the top level: with a wrap key configured, a single object and a `DataCollection` are
+documented nested under it; with `wrap` left at `null` they are documented bare. A `PaginatedDataCollection` or
+`CursorPaginatedDataCollection` is always wrapped — laravel-data has nowhere else to put `links` and `meta` — and falls
+back to `data` when no key is configured.
+
+```php
+/** @return PaginatedDataCollection<array-key, ArticleData> */
+public function index(): PaginatedDataCollection
+{
+    return ArticleData::collect(Article::query()->paginate(), PaginatedDataCollection::class);
+}
+```
+
+The collected class comes from the generic the action declares, the way a `JsonResource` collection declares its item
+type; an action that only writes `ArticleData::collect($items, PaginatedDataCollection::class)` is read from the call
+instead, so the docblock is optional. Without either the envelope is still documented, only its items stay untyped.
+
+A paginated data collection is **not** shaped like a paginated `JsonResource` collection. laravel-data hands the
+paginator's own array through, so `links` is the list of page links and the page URLs (`first_page_url`,
+`next_page_url`, …) sit in `meta`; a `JsonResource` collection instead summarises the paginator into
+`links: {first, last, prev, next}` and moves the page links into `meta`. The documented envelope follows laravel-data.
+A `PaginatedDataCollection` built from a simple paginator is documented as the length-aware one, which is the only
+shape a return type can promise — `last_page` and `total` are then documented but absent.
 
 ### State transition endpoints
 

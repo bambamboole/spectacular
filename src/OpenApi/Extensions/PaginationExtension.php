@@ -186,7 +186,8 @@ final class PaginationExtension extends AbstractQueryBuilderExtension
                 if (! $content instanceof Schema
                     || ! $content->type instanceof ObjectType
                     || ! $content->type->hasProperty('data')
-                    || ! $content->type->getProperty('data') instanceof ArrayType) {
+                    || ! $content->type->getProperty('data') instanceof ArrayType
+                    || $this->documentsPaginatorArray($content->type)) {
                     continue;
                 }
 
@@ -207,6 +208,16 @@ final class PaginationExtension extends AbstractQueryBuilderExtension
                     ));
             }
         }
+    }
+
+    /**
+     * A laravel-data collectable documents the paginator's own array, where
+     * `links` is the page-link list. Rewriting that into the JsonResource
+     * envelope would describe a payload laravel-data never emits.
+     */
+    private function documentsPaginatorArray(ObjectType $type): bool
+    {
+        return $type->hasProperty('links') && $type->getProperty('links') instanceof ArrayType;
     }
 
     private function paginationResponse(ObjectType $base, PaginationMode $mode): ObjectType

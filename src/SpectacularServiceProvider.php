@@ -12,6 +12,8 @@ use Bambamboole\Spectacular\LaravelData\BigDecimalCast;
 use Bambamboole\Spectacular\LaravelData\BigDecimalRuleInferrer;
 use Bambamboole\Spectacular\LaravelData\BigDecimalTransformer;
 use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
+use Bambamboole\Spectacular\OpenApi\Extensions\DataCollectableToSchemaExtension;
+use Bambamboole\Spectacular\OpenApi\Extensions\DataCollectReturnTypeExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\DataToSchemaExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\ModelStateToSchemaExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
@@ -59,7 +61,11 @@ final class SpectacularServiceProvider extends ServiceProvider
         }
 
         if (class_exists(Data::class)) {
-            Scramble::registerExtension(DataToSchemaExtension::class);
+            Scramble::registerExtensions([
+                DataCollectReturnTypeExtension::class,
+                DataToSchemaExtension::class,
+                DataCollectableToSchemaExtension::class,
+            ]);
         }
 
         Scramble::registerExtension(SpecEndpointExtension::class);

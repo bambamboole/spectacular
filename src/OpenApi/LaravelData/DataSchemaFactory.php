@@ -5,6 +5,7 @@ namespace Bambamboole\Spectacular\OpenApi\LaravelData;
 
 use Bambamboole\Spectacular\Attributes\SpecOneOf;
 use Bambamboole\Spectacular\Attributes\SpecProperty;
+use Bambamboole\Spectacular\OpenApi\PaginationEnvelope;
 use Bambamboole\Spectacular\OpenApi\Types\OneOf;
 use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Support\Generator\Combined\AnyOf;
@@ -14,6 +15,7 @@ use Dedoc\Scramble\Support\Generator\Reference;
 use Dedoc\Scramble\Support\Generator\RequestBodyObject;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType;
+use Dedoc\Scramble\Support\Generator\Types\MixedType;
 use Dedoc\Scramble\Support\Generator\Types\NullType;
 use Dedoc\Scramble\Support\Generator\Types\NumberType;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
@@ -189,6 +191,52 @@ final readonly class DataSchemaFactory
         }
 
         return $schema->type;
+    }
+
+    /**
+     * The schema of a laravel-data collectable: the collected items, and for a
+     * paginated one the paginator's own links and meta beside them — a cursor
+     * paginator's `links` is always the empty array. The optional wrap of a plain
+     * collection belongs to the response, so it is applied there; a paginated
+     * collectable is wrapped wherever it appears. An unknown item class still
+     * documents the envelope.
+     *
+     * @param  class-string<Data>|null  $dataClass
+     */
+    public function collectableType(DataCollectable $collectable, ?string $dataClass, Components $components): Type
+    {
+        $items = (new ArrayType)->setItems(
+            $dataClass === null ? new MixedType : $this->itemsType($dataClass, $components),
+        );
+
+        if (! $collectable->isAlwaysWrapped()) {
+            return $items;
+        }
+
+        $envelope = DataWrap::wrap($items, DataWrap::key() ?? 'data');
+
+        return match ($collectable) {
+            DataCollectable::CursorPaginated => $envelope
+                ->addProperty('links', (new ArrayType)->setItems(new MixedType))
+                ->addProperty('meta', PaginationEnvelope::cursorPaginatorMeta())
+                ->addRequired(['links', 'meta']),
+            default => $envelope
+                ->addProperty('links', PaginationEnvelope::pageLinks())
+                ->addProperty('meta', PaginationEnvelope::paginatorMeta())
+                ->addRequired(['links', 'meta']),
+        };
+    }
+
+    /**
+     * @param  class-string<Data>  $dataClass
+     */
+    private function itemsType(string $dataClass, Components $components): Type
+    {
+        $mapping = $this->oneOfMapping($dataClass);
+
+        return $mapping === null
+            ? $this->reference($dataClass, $components)
+            : $this->oneOfSchema($dataClass, $mapping, $components);
     }
 
     /**
