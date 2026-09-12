@@ -322,7 +322,7 @@ it('documents the json api resource response from the workbench endpoint', funct
             'name' => ['type' => 'string'],
             'email' => ['type' => 'string'],
         ])
-        ->and($userResource['properties']['relationships']['properties']['roles']['properties']['data']['properties']['type'])
+        ->and($userResource['properties']['relationships']['properties']['roles']['properties']['data']['items']['properties']['type'])
         ->toBe(['type' => 'string', 'const' => 'roles'])
         ->and($roleResource['type'])->toBe('object')
         ->and($roleResource['required'])->toBe(['id', 'type'])

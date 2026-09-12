@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Extensions;
 
+use Bambamboole\Spectacular\OpenApi\PaginationEnvelope;
 use Bambamboole\Spectacular\OpenApi\PaginationResponseType;
 use Bambamboole\Spectacular\OpenApi\Transformers\ValidationErrorResponses;
 use Bambamboole\Spectacular\PaginationMode;
@@ -13,7 +14,6 @@ use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\Response;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType;
-use Dedoc\Scramble\Support\Generator\Types\BooleanType;
 use Dedoc\Scramble\Support\Generator\Types\IntegerType;
 use Dedoc\Scramble\Support\Generator\Types\ObjectType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
@@ -186,7 +186,8 @@ final class PaginationExtension extends AbstractQueryBuilderExtension
                 if (! $content instanceof Schema
                     || ! $content->type instanceof ObjectType
                     || ! $content->type->hasProperty('data')
-                    || ! $content->type->getProperty('data') instanceof ArrayType) {
+                    || ! $content->type->getProperty('data') instanceof ArrayType
+                    || $this->documentsPaginatorArray($content->type)) {
                     continue;
                 }
 
@@ -209,6 +210,16 @@ final class PaginationExtension extends AbstractQueryBuilderExtension
         }
     }
 
+    /**
+     * A laravel-data collectable documents the paginator's own array, where
+     * `links` is the page-link list. Rewriting that into the JsonResource
+     * envelope would describe a payload laravel-data never emits.
+     */
+    private function documentsPaginatorArray(ObjectType $type): bool
+    {
+        return $type->hasProperty('links') && $type->getProperty('links') instanceof ArrayType;
+    }
+
     private function paginationResponse(ObjectType $base, PaginationMode $mode): ObjectType
     {
         $response = $base->clone();
@@ -217,69 +228,9 @@ final class PaginationExtension extends AbstractQueryBuilderExtension
 
         return $response
             ->setRequired(array_values(array_diff($response->required, ['links', 'meta'])))
-            ->addProperty('links', $this->paginationLinks())
-            ->addProperty('meta', $this->paginationMeta($mode))
+            ->addProperty('links', PaginationEnvelope::resourceLinks())
+            ->addProperty('meta', PaginationEnvelope::resourceMeta($mode))
             ->addRequired(['data', 'links', 'meta']);
-    }
-
-    private function paginationLinks(): ObjectType
-    {
-        return (new ObjectType)
-            ->addProperty('first', (new StringType)->nullable(true))
-            ->addProperty('last', (new StringType)->nullable(true))
-            ->addProperty('prev', (new StringType)->nullable(true))
-            ->addProperty('next', (new StringType)->nullable(true))
-            ->setRequired(['first', 'last', 'prev', 'next']);
-    }
-
-    private function paginationMeta(PaginationMode $mode): ObjectType
-    {
-        return match ($mode) {
-            PaginationMode::Default => $this->defaultPaginationMeta(),
-            PaginationMode::Simple => $this->simplePaginationMeta(),
-            PaginationMode::Cursor => $this->cursorPaginationMeta(),
-        };
-    }
-
-    private function defaultPaginationMeta(): ObjectType
-    {
-        $link = (new ObjectType)
-            ->addProperty('url', (new StringType)->nullable(true))
-            ->addProperty('label', new StringType)
-            ->addProperty('active', new BooleanType)
-            ->setRequired(['url', 'label', 'active']);
-
-        return (new ObjectType)
-            ->addProperty('current_page', (new IntegerType)->setMin(1))
-            ->addProperty('from', (new IntegerType)->setMin(1)->nullable(true))
-            ->addProperty('last_page', (new IntegerType)->setMin(1))
-            ->addProperty('links', (new ArrayType)->setItems($link))
-            ->addProperty('path', (new StringType)->nullable(true))
-            ->addProperty('per_page', (new IntegerType)->setMin(0))
-            ->addProperty('to', (new IntegerType)->setMin(1)->nullable(true))
-            ->addProperty('total', (new IntegerType)->setMin(0))
-            ->setRequired(['current_page', 'from', 'last_page', 'links', 'path', 'per_page', 'to', 'total']);
-    }
-
-    private function simplePaginationMeta(): ObjectType
-    {
-        return (new ObjectType)
-            ->addProperty('current_page', (new IntegerType)->setMin(1))
-            ->addProperty('from', (new IntegerType)->setMin(1)->nullable(true))
-            ->addProperty('path', (new StringType)->nullable(true))
-            ->addProperty('per_page', (new IntegerType)->setMin(0))
-            ->addProperty('to', (new IntegerType)->setMin(1)->nullable(true))
-            ->setRequired(['current_page', 'from', 'path', 'per_page', 'to']);
-    }
-
-    private function cursorPaginationMeta(): ObjectType
-    {
-        return (new ObjectType)
-            ->addProperty('path', (new StringType)->nullable(true))
-            ->addProperty('per_page', (new IntegerType)->setMin(0))
-            ->addProperty('next_cursor', (new StringType)->nullable(true))
-            ->addProperty('prev_cursor', (new StringType)->nullable(true))
-            ->setRequired(['path', 'per_page', 'next_cursor', 'prev_cursor']);
     }
 
     private function pageParameter(Expr\MethodCall $call): Parameter
