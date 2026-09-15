@@ -33,6 +33,91 @@ This writes `config/spectacular.php`.
 
 ## OpenAPI
 
+### Describe endpoints from the consuming application
+
+Implement `Bambamboole\Spectacular\OpenApi\EndpointDefinition` and register its class in
+`spectacular.openapi.endpoints`. Definitions resolve through the container during generation, so they can use
+application configuration. They describe existing Laravel routes; they do not register HTTP endpoints.
+
+```php
+use Bambamboole\Spectacular\OpenApi\Endpoint;
+use Bambamboole\Spectacular\OpenApi\EndpointDefinition;
+
+final class AuthEndpoints implements EndpointDefinition
+{
+    public function endpoints(): array
+    {
+        return [Endpoint::route('oauth.token', 'POST', [
+            'summary' => 'Issue an access token',
+            'tags' => ['Auth'],
+            'security' => [],
+            'requestBody' => [
+                'required' => true,
+                'content' => ['application/x-www-form-urlencoded' => [
+                    'schema' => [
+                        'type' => 'object',
+                        'required' => ['grant_type'],
+                        'properties' => ['grant_type' => ['const' => 'client_credentials']],
+                    ],
+                ]],
+            ],
+            'responses' => [
+                200 => [
+                    'description' => 'Token issued',
+                    'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/Token']]],
+                ],
+                422 => null,
+            ],
+        ])];
+    }
+
+    public function schemas(): array
+    {
+        return ['Token' => [
+            'type' => 'object',
+            'required' => ['access_token'],
+            'properties' => ['access_token' => ['type' => 'string']],
+        ]];
+    }
+}
+```
+
+Register `AuthEndpoints::class` in the `openapi.endpoints` list in `config/spectacular.php`.
+`Endpoint::path('/oauth/token', 'POST', [...])` alternatively targets an exact Laravel URI template.
+Both selectors require a registered route supporting the selected method. Declare GET and POST separately when they
+have different parameters or bodies; both operations are emitted even when Scramble normally selects one method.
+
+Operation fields use native OpenAPI arrays, including response headers, examples, `$ref` and `oneOf`:
+
+- `parameters` entries replace or add by `in` and `name` (`query`, `path`, `header`, or `cookie`). Remove one with
+  `['in' => 'query', 'name' => 'scope', 'x-remove' => true]`.
+- `requestBody` replaces the whole inferred body. `null` removes it.
+- Each `responses` status replaces the whole response for that status; a `null` status value removes it.
+- Other fields replace the inferred value, including `summary`, `description`, `tags` and `security`.
+  Use `security: []` for public operations that must not inherit document security.
+- `schemas()` registers reusable component schemas. Duplicate names and unresolved local references in declarations fail
+  generation. Remote references are passed through without fetching them.
+
+Explicit fields win over inference and later operation mutations. Undeclared fields keep Scramble's inference.
+Routes outside `api_path` use an operation-level root server, preserving the existing API's server and relative paths.
+Optional path segments produce separate OpenAPI paths, with required parameters only on variants that contain them.
+Existing operation IDs remain stable; optional variants receive deterministic suffixes. Duplicate declared paths and
+methods fail generation.
+
+For a named Scramble API, register the transformer and definitions on that API instead. Global definitions apply only
+to the default API:
+
+```php
+use Bambamboole\Spectacular\OpenApi\Transformers\DocumentsEndpoints;
+use Dedoc\Scramble\Scramble;
+
+Scramble::registerApi('partner', [
+    'api_path' => 'partner',
+    'spectacular' => ['endpoints' => [AuthEndpoints::class]],
+])->withDocumentTransformers(DocumentsEndpoints::class);
+```
+
+
 Spectacular ships Scramble [operation extensions](https://scramble.dedoc.co/usage/extending) for query builder
 parameters, pagination and its own documentation attributes, along with transformers that document validation errors,
 rate limits, laravel-data request bodies and responses, and the info object. The service provider registers them for
