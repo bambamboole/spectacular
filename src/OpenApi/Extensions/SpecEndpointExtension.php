@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Extensions;
 
+use BackedEnum;
 use Bambamboole\Spectacular\Attributes\SpecEndpoint;
 use Dedoc\Scramble\Extensions\OperationExtension;
 use Dedoc\Scramble\Support\Generator\Operation;
@@ -25,8 +26,9 @@ final class SpecEndpointExtension extends OperationExtension
             $operation->setExtensionProperty('tooltip', $endpoint->tooltip);
         }
 
-        if ($endpoint->internal) {
-            $operation->setExtensionProperty('internal', true);
+        if ($endpoint->group !== null) {
+            $group = $endpoint->group instanceof BackedEnum ? $endpoint->group->value : $endpoint->group;
+            $operation->setExtensionProperty('group', (string) $group);
         }
     }
 }

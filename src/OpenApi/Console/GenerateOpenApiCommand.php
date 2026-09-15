@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Bambamboole\Spectacular\OpenApi\Console;
 
 use Bambamboole\Spectacular\Console\AbstractGenerateDocumentCommand;
-use Bambamboole\Spectacular\OpenApi\PublicOpenApiDocument;
+use Bambamboole\Spectacular\OpenApi\GroupedOpenApiDocuments;
 use Dedoc\Scramble\Generator;
 use JsonException;
 
@@ -29,21 +29,20 @@ final class GenerateOpenApiCommand extends AbstractGenerateDocumentCommand
 
         $result = $this->outputDocument($document);
         $path = $this->option('path');
-        $publicDocument = PublicOpenApiDocument::create($document);
 
-        if (is_string($path) && $path !== '' && $publicDocument !== null) {
-            $this->writeDocument($publicDocument, $this->publicPath($path));
+        if (is_string($path) && $path !== '') {
+            foreach (GroupedOpenApiDocuments::create($document) as $group => $groupDocument) {
+                $this->writeDocument($groupDocument, $this->groupPath($path, (string) $group));
+            }
         }
 
         return $result;
     }
 
-    private function publicPath(string $path): string
+    private function groupPath(string $path, string $group): string
     {
-        if (str_ends_with($path, '.json')) {
-            return substr($path, 0, -5).'.public.json';
-        }
+        $base = str_ends_with($path, '.json') ? substr($path, 0, -5) : $path;
 
-        return $path.'.public.json';
+        return $base.'.'.rawurlencode($group).'.json';
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Bambamboole\Spectacular\Attributes;
 
 use Attribute;
+use BackedEnum;
 
 /**
  * Adds Spectacular-specific documentation to an endpoint.
@@ -16,6 +17,6 @@ final readonly class SpecEndpoint
          * HTML rendered next to the endpoint, links included.
          */
         public ?string $tooltip = null,
-        public bool $internal = false,
+        public BackedEnum|string|null $group = null,
     ) {}
 }

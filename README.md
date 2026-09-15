@@ -561,12 +561,16 @@ use Bambamboole\Spectacular\Attributes\SpecEndpoint;
 public function __invoke(StoreCategoryData $data): CategoryResource
 ```
 
-Set `internal: true` to keep an operation in the complete document while excluding it from the public document:
+Set `group` to a string or a backed enum to include an operation in a group document:
 
 ```php
-#[SpecEndpoint(internal: true)]
+#[SpecEndpoint(group: 'internal')]
 public function __invoke(): InternalMetricsResource
 ```
+
+For an enum, use `#[SpecEndpoint(group: ApiGroup::Internal)]`. Its backed value becomes the group name,
+with integer values converted to strings. The operation exposes this name as `x-group`.
+This replaces `internal: true`; assign `group: 'public'` explicitly to endpoints intended for a public group.
 
 Response resources are not covered: a `JsonResource::toArray()` describes its fields through docblocks, and a PHP
 attribute cannot attach to a key of an array literal.
@@ -579,9 +583,11 @@ php artisan spectacular:openapi --path=openapi.json
 php artisan spectacular:openapi --pretty=false  # compact JSON
 ```
 
-The command renders the same document Scramble produces, so all of Scramble's own configuration applies. When a document
-written with `--path` contains an internal operation, the command also writes a `.public.json` sibling without internal
-operations. For example, `--path=openapi.json` writes both `openapi.json` and `openapi.public.json`.
+The command renders the same document Scramble produces, so all of Scramble's own configuration applies.
+With `--path=openapi.json`, it writes the complete document to `openapi.json` and each declared group to
+`openapi.<group>.json`, for example `openapi.internal.json`. Each group document contains only that group's
+operations and retains the complete document's components and metadata. Group names are URL-encoded in filenames.
+Endpoints without a group appear only in the complete document. Without `--path`, stdout contains the complete document.
 
 ## AsyncAPI
 
