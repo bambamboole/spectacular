@@ -15,6 +15,7 @@ use Bambamboole\Spectacular\OpenApi\Console\GenerateOpenApiCommand;
 use Bambamboole\Spectacular\OpenApi\Extensions\DataCollectableToSchemaExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\DataCollectReturnTypeExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\DataToSchemaExtension;
+use Bambamboole\Spectacular\OpenApi\Extensions\EndpointRouteExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\ModelStateToSchemaExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\PaginationExtension;
 use Bambamboole\Spectacular\OpenApi\Extensions\QueryBuilderExtension;
@@ -28,6 +29,7 @@ use Bambamboole\Spectacular\OpenApi\RateLimiting\RateLimitResponses;
 use Bambamboole\Spectacular\OpenApi\Security\DocumentsConfiguredSecurity;
 use Bambamboole\Spectacular\OpenApi\Security\MarksUnauthenticatedRoutesPublic;
 use Bambamboole\Spectacular\OpenApi\Security\SecurityConfig;
+use Bambamboole\Spectacular\OpenApi\Transformers\DocumentsEndpoints;
 use Bambamboole\Spectacular\OpenApi\Transformers\ValidationErrorResponses;
 use Bambamboole\Spectacular\Support\ClassDiscoverer;
 use Brick\Math\BigDecimal;
@@ -69,6 +71,7 @@ final class SpectacularServiceProvider extends ServiceProvider
         }
 
         Scramble::registerExtension(SpecEndpointExtension::class);
+        Scramble::registerExtension(EndpointRouteExtension::class);
 
         // The query builder and pagination extensions replace the operation parameters
         // they generate, so documenting a parameter has to happen after them. Scramble
@@ -106,6 +109,8 @@ final class SpectacularServiceProvider extends ServiceProvider
      */
     private function configureScramble(): void
     {
+        Scramble::configure()->withDocumentTransformers(DocumentsEndpoints::class);
+
         Scramble::configure()
             ->withDocumentTransformers(DocumentsConfiguredInfo::class)
             ->withOperationTransformers([

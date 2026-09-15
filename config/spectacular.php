@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 return [
     'openapi' => [
+        'endpoints' => [],
+
         'validation' => [
             'path' => base_path('openapi.json'),
         ],
