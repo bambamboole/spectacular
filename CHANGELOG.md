@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.29.0](https://github.com/bambamboole/spectacular/compare/0.28.0...0.29.0) (2026-09-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* replace internal endpoints with OpenAPI groups ([#97](https://github.com/bambamboole/spectacular/issues/97))
+
+### Features
+
+* **asyncapi:** publish payloads and enums as component schemas ([#96](https://github.com/bambamboole/spectacular/issues/96)) ([0c7d749](https://github.com/bambamboole/spectacular/commit/0c7d749a165d70bc3745eff936bd55e975254a1b))
+* replace internal endpoints with OpenAPI groups ([#97](https://github.com/bambamboole/spectacular/issues/97)) ([6f8e039](https://github.com/bambamboole/spectacular/commit/6f8e0391869e831cbc879029467777f8efb518ab))
+
 ## [0.28.0](https://github.com/bambamboole/spectacular/compare/0.27.0...0.28.0) (2026-09-15)
 
 
