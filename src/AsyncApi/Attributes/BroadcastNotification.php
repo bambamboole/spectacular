@@ -21,6 +21,7 @@ readonly class BroadcastNotification extends Message
         ?string $description = null,
         array $tags = [],
         ?string $payload = null,
+        ?string $key = null,
     ) {
         parent::__construct(
             channels: $channels,
@@ -29,6 +30,7 @@ readonly class BroadcastNotification extends Message
             description: $description,
             tags: $tags,
             payload: $payload,
+            key: $key,
         );
     }
 }

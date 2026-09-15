@@ -9,8 +9,8 @@
         "private-users.{userId}": {
             "address": "private-users.{userId}",
             "messages": {
-                "Workbench.App.Events.UserNotificationReceived": {
-                    "$ref": "#/components/messages/Workbench.App.Events.UserNotificationReceived"
+                "user.notification.received": {
+                    "$ref": "#/components/messages/user.notification.received"
                 }
             },
             "x-laravel-channel-type": "private"
@@ -29,17 +29,6 @@
         }
     },
     "operations": {
-        "Workbench.App.Events.UserNotificationReceived.send": {
-            "action": "send",
-            "channel": {
-                "$ref": "#/channels/private-users.{userId}"
-            },
-            "messages": [
-                {
-                    "$ref": "#/channels/private-users.{userId}/messages/Workbench.App.Events.UserNotificationReceived"
-                }
-            ]
-        },
         "category.published.send": {
             "action": "send",
             "channel": {
@@ -61,41 +50,21 @@
                     "$ref": "#/channels/webhooks/messages/invoice.paid"
                 }
             ]
+        },
+        "user.notification.received.send": {
+            "action": "send",
+            "channel": {
+                "$ref": "#/channels/private-users.{userId}"
+            },
+            "messages": [
+                {
+                    "$ref": "#/channels/private-users.{userId}/messages/user.notification.received"
+                }
+            ]
         }
     },
     "components": {
         "messages": {
-            "Workbench.App.Events.UserNotificationReceived": {
-                "name": "user.notification.received",
-                "summary": "User notification received",
-                "description": "Sent when a user receives a notification in the workbench app.",
-                "tags": [
-                    {
-                        "name": "notifications"
-                    }
-                ],
-                "payload": {
-                    "type": "object",
-                    "properties": {
-                        "userId": {
-                            "type": "integer"
-                        },
-                        "team": {
-                            "type": "string"
-                        },
-                        "unreadCount": {
-                            "type": "integer"
-                        }
-                    },
-                    "required": [
-                        "userId",
-                        "team",
-                        "unreadCount"
-                    ]
-                },
-                "x-laravel-event": "Workbench\\App\\Events\\UserNotificationReceived",
-                "x-laravel-broadcast-now": false
-            },
             "category.published": {
                 "name": "category.published",
                 "title": "Category Published",
@@ -233,6 +202,37 @@
                 },
                 "x-spectacular-webhook-event": "invoice.paid",
                 "x-spectacular-source-class": "Workbench\\App\\Events\\InvoicePaid"
+            },
+            "user.notification.received": {
+                "name": "user.notification.received",
+                "summary": "User notification received",
+                "description": "Sent when a user receives a notification in the workbench app.",
+                "tags": [
+                    {
+                        "name": "notifications"
+                    }
+                ],
+                "payload": {
+                    "type": "object",
+                    "properties": {
+                        "userId": {
+                            "type": "integer"
+                        },
+                        "team": {
+                            "type": "string"
+                        },
+                        "unreadCount": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "userId",
+                        "team",
+                        "unreadCount"
+                    ]
+                },
+                "x-laravel-event": "Workbench\\App\\Events\\UserNotificationReceived",
+                "x-laravel-broadcast-now": false
             }
         },
         "schemas": {

@@ -59,7 +59,7 @@ final readonly class MessageDefinitionFactory
             ] : [],
         );
 
-        return $this->definition($event->getName(), $channels, $message);
+        return $this->definition($this->messageKey($event, $attribute), $channels, $message);
     }
 
     /**
@@ -86,7 +86,7 @@ final readonly class MessageDefinitionFactory
             ] : [],
         );
 
-        return $this->definition($notification->getName(), $channels, $message);
+        return $this->definition($this->messageKey($notification, $attribute), $channels, $message);
     }
 
     /**
@@ -168,10 +168,10 @@ final readonly class MessageDefinitionFactory
      * @param  list<string>  $channels
      * @param  array<string, mixed>  $message
      */
-    private function definition(string $class, array $channels, array $message): AsyncMessageDefinition
+    private function definition(string $key, array $channels, array $message): AsyncMessageDefinition
     {
         return new AsyncMessageDefinition(
-            key: $this->componentKey($class),
+            key: $key,
             channels: array_map(fn (string $channel): AsyncChannelDefinition => new AsyncChannelDefinition(
                 key: $channel,
                 address: $channel,
@@ -289,13 +289,29 @@ final readonly class MessageDefinitionFactory
     }
 
     /**
+     * @param  ReflectionClass<object>  $class
+     */
+    private function messageKey(ReflectionClass $class, Message $attribute): string
+    {
+        return $attribute->key ?: $this->broadcastAs($class) ?? $this->componentKey($class->getName());
+    }
+
+    /**
+     * @param  ReflectionClass<object>  $class
+     */
+    private function broadcastAs(ReflectionClass $class): ?string
+    {
+        $name = $this->invokeZeroArgMethod($class, 'broadcastAs');
+
+        return is_string($name) && $name !== '' ? $name : null;
+    }
+
+    /**
      * @param  ReflectionClass<object>  $event
      */
     private function broadcastName(ReflectionClass $event): string
     {
-        $name = $this->invokeZeroArgMethod($event, 'broadcastAs');
-
-        return is_string($name) && $name !== '' ? $name : $event->getName();
+        return $this->broadcastAs($event) ?? $event->getName();
     }
 
     /**
@@ -303,9 +319,7 @@ final readonly class MessageDefinitionFactory
      */
     private function notificationBroadcastName(ReflectionClass $notification): string
     {
-        $name = $this->invokeZeroArgMethod($notification, 'broadcastAs');
-
-        return is_string($name) && $name !== '' ? $name : BroadcastNotificationCreated::class;
+        return $this->broadcastAs($notification) ?? BroadcastNotificationCreated::class;
     }
 
     private function componentKey(string $class): string
