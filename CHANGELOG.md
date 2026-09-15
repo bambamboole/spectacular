@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.0](https://github.com/bambamboole/spectacular/compare/0.27.0...0.28.0) (2026-09-15)
+
+
+### Features
+
+* **asyncapi:** name messages from broadcastAs or an attribute key ([#93](https://github.com/bambamboole/spectacular/issues/93)) ([ceb84fc](https://github.com/bambamboole/spectacular/commit/ceb84fc2f6f1ed5e045b186a87e6df212b491bca))
+* support declarative OpenAPI endpoint overrides ([#94](https://github.com/bambamboole/spectacular/issues/94)) ([b45cb02](https://github.com/bambamboole/spectacular/commit/b45cb024b2bf16b2a490602c4c432ca3b2eaa679))
+
 ## [0.27.0](https://github.com/bambamboole/spectacular/compare/0.26.0...0.27.0) (2026-09-12)
 
 
