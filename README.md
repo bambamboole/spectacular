@@ -542,6 +542,9 @@ From an event, Spectacular derives:
 - **Channels** — from the `#[Message(channels: [...])]` argument, or inferred by invoking `broadcastOn()` when the
   attribute omits them. Channel type (`public`, `private`, `presence`, `private-encrypted`) is detected from the name.
 - **Message name** — from `broadcastAs()` when present, otherwise the fully-qualified class name.
+- **Component key** — the key used for `components/messages`, the channel message entries, the `.send` operation and
+  every `$ref`. It comes from `#[Message(key: '...')]`, or from `broadcastAs()` when the attribute omits it, or from
+  the dotted class name (`App.Events.OrderShipped`) as a last resort.
 - **Payload schema** — from the `broadcastWith()` `@return` PHPDoc (array shapes, `list<>`, `array<string, T>`,
   nullable and union types are all understood). When `broadcastWith()` is absent, the event's public properties are
   used, mapping scalars, enums, `DateTimeInterface` and nested objects to JSON Schema.
@@ -577,6 +580,7 @@ That is what lets events sharing an abstract base class document their payload: 
     description: null,     // longer description
     tags: [],              // AsyncAPI message tags
     payload: null,         // reference an external payload schema ($ref) instead of inferring
+    key: null,             // AsyncAPI component/operation key; defaults to broadcastAs(), then the dotted class name
 )]
 ```
 
@@ -614,6 +618,9 @@ final class InvoicePaidNotification extends Notification
     }
 }
 ```
+
+`#[BroadcastNotification]` accepts the same `key` argument as `#[Message]`, defaulting to the notification's
+`broadcastAs()` and then to its dotted class name.
 
 Spectacular infers notification channels from the `notifiables` classes. If a notifiable exposes
 `receivesBroadcastNotificationsOn()`, that value is used; otherwise the channel defaults to a private placeholder such

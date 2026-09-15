@@ -19,5 +19,6 @@ readonly class Message
         public ?string $description = null,
         public array $tags = [],
         public ?string $payload = null,
+        public ?string $key = null,
     ) {}
 }

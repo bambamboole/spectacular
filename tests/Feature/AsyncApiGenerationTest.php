@@ -93,7 +93,7 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
     configureFixtureAsyncApi();
 
     $document = app(AsyncApiGenerator::class)->generate();
-    $notificationMessage = $document['components']['messages']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast'];
+    $notificationMessage = $document['components']['messages']['user.notification.created'];
     $immediateMessage = $document['components']['messages']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.ImmediateBroadcast'];
     $webhookMessage = $document['components']['messages']['invoice.paid'];
     $broadcastNotificationMessage = $document['components']['messages']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.InvoicePaidBroadcastNotification'];
@@ -110,8 +110,8 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
         ->and($document['channels']['webhooks']['messages'])->toHaveKey('invoice.paid')
         ->and($document['operations']['invoice.paid.send']['channel']['$ref'])->toBe('#/channels/webhooks')
         ->and($document['operations']['invoice.paid.send']['messages'][0]['$ref'])->toBe('#/channels/webhooks/messages/invoice.paid')
-        ->and($document['operations']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast.send']['action'])->toBe('send')
-        ->and($document['operations']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast.send']['messages'][0]['$ref'])->toBe('#/channels/private-users.{userId}/messages/Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast')
+        ->and($document['operations']['user.notification.created.send']['action'])->toBe('send')
+        ->and($document['operations']['user.notification.created.send']['messages'][0]['$ref'])->toBe('#/channels/private-users.{userId}/messages/user.notification.created')
         ->and($webhookMessage['name'])->toBe('invoice.paid')
         ->and($webhookMessage['title'])->toBe('Invoice Paid')
         ->and($webhookMessage['headers']['properties']['Content-Type'])->toBe(['type' => 'string', 'enum' => ['application/json']])
@@ -135,6 +135,17 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
         ->and($notificationMessage['x-laravel-broadcast-now'])->toBeFalse()
         ->and($immediateMessage['name'])->toBe(ImmediateBroadcast::class)
         ->and($immediateMessage['x-laravel-broadcast-now'])->toBeTrue();
+});
+
+it('prefers the attribute key over broadcastAs as the component key', function (): void {
+    configureFixtureAsyncApi();
+
+    $document = app(AsyncApiGenerator::class)->generate();
+
+    expect($document['components']['messages']['product.published']['name'])->toBe('catalog.product.published')
+        ->and($document['channels']['catalog']['messages'])->toHaveKey('product.published')
+        ->and($document['operations']['product.published.send']['messages'][0]['$ref'])
+        ->toBe('#/channels/catalog/messages/product.published');
 });
 
 it('applies configured webhook channels', function (): void {
@@ -301,7 +312,7 @@ it('can omit Laravel extension fields', function (): void {
     config()->set('spectacular.asyncapi.laravel_extensions', false);
 
     $document = app(AsyncApiGenerator::class)->generate();
-    $message = $document['components']['messages']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast'];
+    $message = $document['components']['messages']['user.notification.created'];
 
     expect($document['channels']['private-users.{userId}'])->not->toHaveKey('x-laravel-channel-type')
         ->and($message)->not->toHaveKey('x-laravel-event')
@@ -312,7 +323,7 @@ it('uses broadcastWith array shapes as the message payload schema', function ():
     configureFixtureAsyncApi();
 
     $payload = app(AsyncApiGenerator::class)
-        ->generate()['components']['messages']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast']['payload'];
+        ->generate()['components']['messages']['user.notification.created']['payload'];
 
     expect($payload['type'])->toBe('object')
         ->and($payload['required'])->toBe(['notificationId', 'team', 'urgent', 'tags', 'sentAt', 'status'])
@@ -355,7 +366,7 @@ it('documents broadcasts without the laravel-webhooks package', function (): voi
 
     $document = (new AsyncApiGenerator(new ClassDiscoverer, app(MessageDefinitionFactory::class)))->generate();
 
-    expect($document['components']['messages'])->toHaveKey('Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotificationBroadcast')
+    expect($document['components']['messages'])->toHaveKey('user.notification.created')
         ->and($document['components']['messages'])->not->toHaveKey('invoice.paid')
         ->and($document['channels'])->not->toHaveKey('webhooks');
 });
