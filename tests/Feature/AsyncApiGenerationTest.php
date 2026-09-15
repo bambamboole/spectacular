@@ -79,14 +79,15 @@ it('documents webhook definitions discovered by Laravel Webhooks', function (): 
 
     $document = app(AsyncApiGenerator::class)->generate();
     $paid = $document['components']['messages']['invoice.paid'];
-    $refunded = $document['components']['messages']['invoice.refunded'];
+    $paidPayload = resolveAsyncApiSchema($document, $paid['payload']);
+    $refundedPayload = resolveAsyncApiSchema($document, $document['components']['messages']['invoice.refunded']['payload']);
 
     expect($paid['title'])->toBe('Invoice Paid')
         ->and($paid['tags'])->toBe([['name' => 'billing']])
-        ->and($paid['payload']['properties']['data']['properties']['invoiceId'])->toBe(['type' => 'integer'])
-        ->and($paid['payload']['properties']['links']['properties']['self'])->toBe(['type' => 'string'])
-        ->and($paid['payload']['required'])->toBe(['id', 'event', 'createdAt', 'data'])
-        ->and($refunded['payload']['properties'])->not->toHaveKey('links');
+        ->and(resolveAsyncApiSchema($document, $paidPayload['properties']['data'])['properties']['invoiceId'])->toBe(['type' => 'integer'])
+        ->and(resolveAsyncApiSchema($document, $paidPayload['properties']['links'])['properties']['self'])->toBe(['type' => 'string'])
+        ->and($paidPayload['required'])->toBe(['id', 'event', 'createdAt', 'data'])
+        ->and($refundedPayload['properties'])->not->toHaveKey('links');
 });
 
 it('generates an AsyncAPI document for tagged Laravel broadcast events', function (): void {
@@ -98,6 +99,7 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
     $webhookMessage = $document['components']['messages']['invoice.paid'];
     $broadcastNotificationMessage = $document['components']['messages']['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.InvoicePaidBroadcastNotification'];
     $broadcastNotificationChannel = 'private-Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.UserNotifiable.{userNotifiableId}';
+    $webhookPayload = resolveAsyncApiSchema($document, $webhookMessage['payload']);
 
     expect($document['asyncapi'])->toBe('3.0.0')
         ->and($document['info'])->toBe(['title' => 'Test AsyncAPI', 'version' => '1.2.3'])
@@ -117,14 +119,14 @@ it('generates an AsyncAPI document for tagged Laravel broadcast events', functio
         ->and($webhookMessage['headers']['properties']['Content-Type'])->toBe(['type' => 'string', 'enum' => ['application/json']])
         ->and($webhookMessage['headers']['properties']['Signature'])->toBe(['type' => 'string'])
         ->and($webhookMessage['headers']['properties']['Timestamp'])->toBe(['type' => 'integer'])
-        ->and($webhookMessage['payload']['properties']['data']['properties']['invoiceId'])->toBe(['type' => 'integer'])
-        ->and($webhookMessage['payload']['required'])->toBe(['id', 'event', 'createdAt', 'data'])
+        ->and(resolveAsyncApiSchema($document, $webhookPayload['properties']['data'])['properties']['invoiceId'])->toBe(['type' => 'integer'])
+        ->and($webhookPayload['required'])->toBe(['id', 'event', 'createdAt', 'data'])
         ->and($webhookMessage['x-spectacular-webhook-event'])->toBe('invoice.paid')
         ->and($webhookMessage['x-spectacular-source-class'])->toBe(InvoicePaidWebhook::class)
         ->and($document['channels'])->toHaveKey($broadcastNotificationChannel)
         ->and($document['channels'][$broadcastNotificationChannel]['messages'])->toHaveKey('Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.InvoicePaidBroadcastNotification')
         ->and($broadcastNotificationMessage['name'])->toBe('Illuminate\Notifications\Events\BroadcastNotificationCreated')
-        ->and($broadcastNotificationMessage['payload']['properties']['type']['enum'])->toBe(['invoice.paid'])
+        ->and(resolveAsyncApiSchema($document, $broadcastNotificationMessage['payload'])['properties']['type']['enum'])->toBe(['invoice.paid'])
         ->and($broadcastNotificationMessage['x-laravel-notification'])->toBe(InvoicePaidBroadcastNotification::class)
         ->and($notificationMessage['name'])->toBe('user.notification.created')
         ->and($notificationMessage['title'])->toBe('User Notification')
@@ -191,19 +193,19 @@ it('rejects duplicate message and operation keys across broadcast and webhook de
 it('excludes protected webhookLinks methods from the documented envelope', function (): void {
     configureWebhookFixtureAsyncApi();
 
-    $properties = app(AsyncApiGenerator::class)
-        ->generate()['components']['messages']['protected.links']['payload']['properties'];
+    $document = app(AsyncApiGenerator::class)->generate();
+    $payload = resolveAsyncApiSchema($document, $document['components']['messages']['protected.links']['payload']);
 
-    expect($properties)->not->toHaveKey('links');
+    expect($payload['properties'])->not->toHaveKey('links');
 });
 
 it('excludes webhookLinks methods with required arguments from the documented envelope', function (): void {
     configureWebhookFixtureAsyncApi();
 
-    $properties = app(AsyncApiGenerator::class)
-        ->generate()['components']['messages']['required.links']['payload']['properties'];
+    $document = app(AsyncApiGenerator::class)->generate();
+    $payload = resolveAsyncApiSchema($document, $document['components']['messages']['required.links']['payload']);
 
-    expect($properties)->not->toHaveKey('links');
+    expect($payload['properties'])->not->toHaveKey('links');
 });
 
 it('honors custom notifiable broadcast channels that accept the notification', function (): void {
@@ -322,10 +324,12 @@ it('can omit Laravel extension fields', function (): void {
 it('uses broadcastWith array shapes as the message payload schema', function (): void {
     configureFixtureAsyncApi();
 
-    $payload = app(AsyncApiGenerator::class)
-        ->generate()['components']['messages']['user.notification.created']['payload'];
+    $document = app(AsyncApiGenerator::class)->generate();
+    $message = $document['components']['messages']['user.notification.created'];
+    $payload = resolveAsyncApiSchema($document, $message['payload']);
 
-    expect($payload['type'])->toBe('object')
+    expect($message['payload'])->toBe(['$ref' => '#/components/schemas/UserNotificationCreatedPayload'])
+        ->and($payload['type'])->toBe('object')
         ->and($payload['required'])->toBe(['notificationId', 'team', 'urgent', 'tags', 'sentAt', 'status'])
         ->and($payload['properties']['notificationId'])->toBe(['type' => 'integer'])
         ->and($payload['properties']['team'])->toBe(['type' => 'string'])
@@ -335,10 +339,21 @@ it('uses broadcastWith array shapes as the message payload schema', function ():
             'type' => 'string',
             'format' => 'date-time',
         ])
-        ->and($payload['properties']['status'])->toBe([
-            'type' => 'string',
-            'enum' => ['pending', 'sent'],
-        ]);
+        ->and($payload['properties']['status'])->toBe(['$ref' => '#/components/schemas/BroadcastStatus'])
+        ->and($document['components']['schemas']['BroadcastStatus']['enum'])->toBe(['pending', 'sent']);
+});
+
+it('names a payload schema after the message key', function (): void {
+    configureFixtureAsyncApi();
+
+    $messages = app(AsyncApiGenerator::class)->generate()['components']['messages'];
+
+    expect($messages['product.published']['payload'])
+        ->toBe(['$ref' => '#/components/schemas/ProductPublishedPayload'])
+        ->and($messages['invoice.paid']['payload'])
+        ->toBe(['$ref' => '#/components/schemas/InvoicePaidPayload'])
+        ->and($messages['Bambamboole.Spectacular.Tests.Fixtures.AsyncApi.ImmediateBroadcast']['payload'])
+        ->toBe(['$ref' => '#/components/schemas/ImmediateBroadcastPayload']);
 });
 
 it('writes the generated document to stdout or to a file path', function (): void {
@@ -375,7 +390,8 @@ it('resolves a resource named in a payload docblock to a published component sch
     app()->register(WorkbenchServiceProvider::class);
 
     $document = app(AsyncApiGenerator::class)->generate();
-    $data = $document['components']['messages']['category.published']['payload']['properties']['data'];
+    $payload = resolveAsyncApiSchema($document, $document['components']['messages']['category.published']['payload']);
+    $data = resolveAsyncApiSchema($document, $payload['properties']['data']);
 
     expect($data['properties']['category'])->toBe(['$ref' => '#/components/schemas/CategoryResource'])
         ->and($document['components']['schemas']['CategoryResource']['properties']['name'])->toBe(['type' => 'string'])
@@ -390,6 +406,21 @@ it('matches the workbench AsyncAPI fixture', function (): void {
         ->and(workbenchAsyncApiFixturePath())->toBeFile()
         ->and(generatedWorkbenchAsyncApiJson())->toBe(file_get_contents(workbenchAsyncApiFixturePath()));
 });
+
+/**
+ * @param  array<string, mixed>  $document
+ * @param  array<string, mixed>  $schema
+ * @return array<string, mixed>
+ */
+function resolveAsyncApiSchema(array $document, array $schema): array
+{
+    while (is_string($schema['$ref'] ?? null)) {
+        $name = substr($schema['$ref'], strlen('#/components/schemas/'));
+        $schema = $document['components']['schemas'][$name];
+    }
+
+    return $schema;
+}
 
 function configureFixtureAsyncApi(): void
 {

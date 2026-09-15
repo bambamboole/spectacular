@@ -92,44 +92,7 @@
                     }
                 },
                 "payload": {
-                    "type": "object",
-                    "properties": {
-                        "id": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "event": {
-                            "type": "string",
-                            "enum": [
-                                "category.published"
-                            ]
-                        },
-                        "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                        },
-                        "data": {
-                            "type": "object",
-                            "properties": {
-                                "category": {
-                                    "$ref": "#/components/schemas/CategoryResource"
-                                },
-                                "publishedBy": {
-                                    "type": "string"
-                                }
-                            },
-                            "required": [
-                                "category",
-                                "publishedBy"
-                            ]
-                        }
-                    },
-                    "required": [
-                        "id",
-                        "event",
-                        "createdAt",
-                        "data"
-                    ]
+                    "$ref": "#/components/schemas/CategoryPublishedPayload"
                 },
                 "x-spectacular-webhook-event": "category.published",
                 "x-spectacular-source-class": "Workbench\\App\\Events\\CategoryPublished"
@@ -161,44 +124,7 @@
                     }
                 },
                 "payload": {
-                    "type": "object",
-                    "properties": {
-                        "id": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "event": {
-                            "type": "string",
-                            "enum": [
-                                "invoice.paid"
-                            ]
-                        },
-                        "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                        },
-                        "data": {
-                            "type": "object",
-                            "properties": {
-                                "invoiceId": {
-                                    "type": "integer"
-                                },
-                                "amount": {
-                                    "type": "integer"
-                                }
-                            },
-                            "required": [
-                                "invoiceId",
-                                "amount"
-                            ]
-                        }
-                    },
-                    "required": [
-                        "id",
-                        "event",
-                        "createdAt",
-                        "data"
-                    ]
+                    "$ref": "#/components/schemas/InvoicePaidPayload"
                 },
                 "x-spectacular-webhook-event": "invoice.paid",
                 "x-spectacular-source-class": "Workbench\\App\\Events\\InvoicePaid"
@@ -213,29 +139,58 @@
                     }
                 ],
                 "payload": {
-                    "type": "object",
-                    "properties": {
-                        "userId": {
-                            "type": "integer"
-                        },
-                        "team": {
-                            "type": "string"
-                        },
-                        "unreadCount": {
-                            "type": "integer"
-                        }
-                    },
-                    "required": [
-                        "userId",
-                        "team",
-                        "unreadCount"
-                    ]
+                    "$ref": "#/components/schemas/UserNotificationReceivedPayload"
                 },
                 "x-laravel-event": "Workbench\\App\\Events\\UserNotificationReceived",
                 "x-laravel-broadcast-now": false
             }
         },
         "schemas": {
+            "CategoryPublishedData": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "$ref": "#/components/schemas/CategoryResource"
+                    },
+                    "publishedBy": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "category",
+                    "publishedBy"
+                ],
+                "title": "CategoryPublishedData"
+            },
+            "CategoryPublishedPayload": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "event": {
+                        "type": "string",
+                        "enum": [
+                            "category.published"
+                        ]
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/CategoryPublishedData"
+                    }
+                },
+                "required": [
+                    "id",
+                    "event",
+                    "createdAt",
+                    "data"
+                ],
+                "title": "CategoryPublishedPayload"
+            },
             "CategoryResource": {
                 "type": "object",
                 "properties": {
@@ -284,6 +239,71 @@
                     "archived"
                 ],
                 "title": "CategoryStatus"
+            },
+            "InvoicePaidData": {
+                "type": "object",
+                "properties": {
+                    "invoiceId": {
+                        "type": "integer"
+                    },
+                    "amount": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "invoiceId",
+                    "amount"
+                ],
+                "title": "InvoicePaidData"
+            },
+            "InvoicePaidPayload": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "event": {
+                        "type": "string",
+                        "enum": [
+                            "invoice.paid"
+                        ]
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/InvoicePaidData"
+                    }
+                },
+                "required": [
+                    "id",
+                    "event",
+                    "createdAt",
+                    "data"
+                ],
+                "title": "InvoicePaidPayload"
+            },
+            "UserNotificationReceivedPayload": {
+                "type": "object",
+                "properties": {
+                    "userId": {
+                        "type": "integer"
+                    },
+                    "team": {
+                        "type": "string"
+                    },
+                    "unreadCount": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "userId",
+                    "team",
+                    "unreadCount"
+                ],
+                "title": "UserNotificationReceivedPayload"
             }
         }
     }
