@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
+use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\BroadcastStatus;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\CustomBroadcastWithNotification;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidBroadcastNotification;
 use Bambamboole\Spectacular\Tests\Fixtures\AsyncApi\InvoicePaidWebhook;
@@ -20,7 +21,8 @@ it('infers scalar and array-shape payload entries from broadcastWith PHPDoc', fu
 });
 
 it('infers webhook payload schemas from configured payload methods', function (): void {
-    $schema = app(PayloadSchemaFactory::class)->forMethod(InvoicePaidWebhook::class, 'webhookPayload');
+    $factory = app(PayloadSchemaFactory::class);
+    $schema = $factory->forMethod(InvoicePaidWebhook::class, 'webhookPayload');
 
     expect($schema['required'])->toBe(['invoiceId', 'amount', 'paidAt', 'status'])
         ->and($schema['properties']['invoiceId'])->toBe(['type' => 'integer'])
@@ -29,10 +31,8 @@ it('infers webhook payload schemas from configured payload methods', function ()
             'type' => 'string',
             'format' => 'date-time',
         ])
-        ->and($schema['properties']['status'])->toBe([
-            'type' => 'string',
-            'enum' => ['pending', 'sent'],
-        ]);
+        ->and($schema['properties']['status'])->toBe(['$ref' => '#/components/schemas/BroadcastStatus'])
+        ->and($factory->referencedSchemas()['BroadcastStatus']['enum'])->toBe(['pending', 'sent']);
 });
 
 it('infers broadcast notification payload schemas from toBroadcast methods', function (): void {
@@ -95,8 +95,7 @@ it('maps dates, enums, nullable types, and objects', function (): void {
     $schema = $factory->forEvent(PublicPropertiesBroadcast::class);
 
     expect($schema['properties']['status'])->toBe([
-        'type' => 'string',
-        'enum' => ['pending', 'sent'],
+        '$ref' => '#/components/schemas/BroadcastStatus',
     ])->and($schema['properties']['createdAt'])->toBe([
         'type' => 'string',
         'format' => 'date-time',
@@ -123,6 +122,46 @@ it('documents a BigDecimal payload entry as number or decimal string', function 
         ],
     ]);
 });
+
+it('publishes enum payload entries as reusable component schemas', function (): void {
+    $factory = app(PayloadSchemaFactory::class);
+    $schema = $factory->forMethod(PureEnumPayload::class, 'webhookPayload');
+    $schemas = $factory->referencedSchemas();
+
+    expect($schema['properties']['status'])->toBe(['$ref' => '#/components/schemas/BroadcastStatus'])
+        ->and($schema['properties']['stage'])->toBe(['$ref' => '#/components/schemas/PureStage'])
+        ->and($schemas['BroadcastStatus']['enum'])->toBe(['pending', 'sent'])
+        ->and($schemas['PureStage']['enum'])->toBe(['Draft', 'Live']);
+});
+
+it('hoists a named payload schema and answers with a reference to it', function (): void {
+    $factory = app(PayloadSchemaFactory::class);
+    $schema = ['type' => 'object', 'properties' => ['id' => ['type' => 'integer']]];
+
+    expect($factory->named('InvoicePaidPayload', $schema))
+        ->toBe(['$ref' => '#/components/schemas/InvoicePaidPayload'])
+        ->and($factory->referencedSchemas()['InvoicePaidPayload'])
+        ->toBe($schema + ['title' => 'InvoicePaidPayload'])
+        ->and($factory->named('EmptyPayload', ['type' => 'object']))
+        ->toBe(['type' => 'object']);
+});
+
+enum PureStage
+{
+    case Draft;
+    case Live;
+}
+
+final class PureEnumPayload
+{
+    /**
+     * @return array{status: BroadcastStatus, stage: PureStage}
+     */
+    public function webhookPayload(): array
+    {
+        return ['status' => BroadcastStatus::Pending, 'stage' => PureStage::Draft];
+    }
+}
 
 final class MalformedArrayShapePayload
 {

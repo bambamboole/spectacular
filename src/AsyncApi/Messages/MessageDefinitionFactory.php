@@ -11,6 +11,7 @@ use Bambamboole\Spectacular\AsyncApi\Support\PayloadSchemaFactory;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Notifications\Events\BroadcastNotificationCreated;
+use Illuminate\Support\Str;
 use ReflectionClass;
 use Stringable;
 use Throwable;
@@ -52,7 +53,10 @@ final readonly class MessageDefinitionFactory
         $message = $this->message(
             $this->broadcastName($event),
             $attribute,
-            $this->payloads->forEvent($event->getName()),
+            $this->payloads->named(
+                $this->payloadSchemaName($event, $attribute),
+                $this->payloads->forEvent($event->getName()),
+            ),
             $includeLaravelExtensions ? [
                 'x-laravel-event' => $event->getName(),
                 'x-laravel-broadcast-now' => $event->implementsInterface(ShouldBroadcastNow::class),
@@ -78,7 +82,10 @@ final readonly class MessageDefinitionFactory
         $message = $this->message(
             $this->notificationBroadcastName($notification),
             $attribute,
-            $this->payloads->forNotification($notification->getName()),
+            $this->payloads->named(
+                $this->payloadSchemaName($notification, $attribute),
+                $this->payloads->forNotification($notification->getName()),
+            ),
             $includeLaravelExtensions ? [
                 'x-laravel-notification' => $notification->getName(),
                 'x-laravel-event' => BroadcastNotificationCreated::class,
@@ -98,11 +105,17 @@ final readonly class MessageDefinitionFactory
             'id' => ['type' => 'string', 'format' => 'uuid'],
             'event' => ['type' => 'string', 'enum' => [$definition->name]],
             'createdAt' => ['type' => 'string', 'format' => 'date-time'],
-            'data' => $this->payloads->forMethod($definition->class, 'webhookPayload'),
+            'data' => $this->payloads->named(
+                $this->schemaName($definition->name, 'Data'),
+                $this->payloads->forMethod($definition->class, 'webhookPayload'),
+            ),
         ];
 
         if ($this->publicZeroArgMethod(new ReflectionClass($definition->class), 'webhookLinks') !== null) {
-            $properties['links'] = $this->payloads->forMethod($definition->class, 'webhookLinks');
+            $properties['links'] = $this->payloads->named(
+                $this->schemaName($definition->name, 'Links'),
+                $this->payloads->forMethod($definition->class, 'webhookLinks'),
+            );
         }
 
         $message = array_filter([
@@ -112,11 +125,11 @@ final readonly class MessageDefinitionFactory
             'description' => $definition->description,
             'tags' => array_map(fn (string $tag): array => ['name' => $tag], $definition->tags),
             'headers' => $this->webhookHeaders($webhooks),
-            'payload' => [
+            'payload' => $this->payloads->named($this->schemaName($definition->name), [
                 'type' => 'object',
                 'properties' => $properties,
                 'required' => ['id', 'event', 'createdAt', 'data'],
-            ],
+            ]),
             'x-spectacular-webhook-event' => $definition->name,
             'x-spectacular-source-class' => $definition->class,
         ], fn (mixed $value): bool => $value !== null && $value !== []);
@@ -320,6 +333,22 @@ final readonly class MessageDefinitionFactory
     private function notificationBroadcastName(ReflectionClass $notification): string
     {
         return $this->broadcastAs($notification) ?? BroadcastNotificationCreated::class;
+    }
+
+    /**
+     * Mirrors messageKey(), except for the last resort: the dotted class name
+     * would read as one long word in a type name, so the short name stands in.
+     *
+     * @param  ReflectionClass<object>  $class
+     */
+    private function payloadSchemaName(ReflectionClass $class, Message $attribute): string
+    {
+        return $this->schemaName($attribute->key ?: $this->broadcastAs($class) ?? $class->getShortName());
+    }
+
+    private function schemaName(string $source, string $suffix = 'Payload'): string
+    {
+        return Str::studly(str_replace(['\\', '.', '-'], '_', $source)).$suffix;
     }
 
     private function componentKey(string $class): string
