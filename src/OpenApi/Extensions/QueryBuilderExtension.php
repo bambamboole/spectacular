@@ -16,6 +16,7 @@ use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\Schema;
 use Dedoc\Scramble\Support\Generator\Types\ArrayType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
+use Dedoc\Scramble\Support\OperationExtensions\RulesExtractor\DeepParametersMerger;
 use Dedoc\Scramble\Support\RouteInfo;
 use Illuminate\Support\Str;
 use PhpParser\Node\Arg;
@@ -92,7 +93,31 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             $parameters[] = $sortParameter;
         }
 
-        $this->applyParameters($operation, $parameters);
+        $this->applyParameters($operation, $this->mergeDeepParameters($parameters));
+    }
+
+    /**
+     * @param  list<Parameter>  $parameters
+     * @return list<Parameter>
+     */
+    private function mergeDeepParameters(array $parameters): array
+    {
+        if ($this->flattensDeepQueryParameters()) {
+            return $parameters;
+        }
+
+        $filterName = $this->parameterName('filter');
+
+        return array_values(array_map(
+            function (Parameter $parameter) use ($filterName): Parameter {
+                $parameter->setName(str_replace('\\.', '.', $parameter->name));
+
+                return $parameter->name === $filterName
+                    ? $parameter->setStyle('deepObject')->setExplode(true)
+                    : $parameter;
+            },
+            (new DeepParametersMerger(collect($parameters)))->handle(),
+        ));
     }
 
     /**
@@ -689,7 +714,14 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 
     private function nestedParameterName(string $type, string $name): string
     {
-        return sprintf('%s[%s]', $this->parameterName($type), $name);
+        return $this->flattensDeepQueryParameters()
+            ? sprintf('%s[%s]', $this->parameterName($type), $name)
+            : sprintf('%s.%s', $this->parameterName($type), str_replace('.', '\\.', $name));
+    }
+
+    private function flattensDeepQueryParameters(): bool
+    {
+        return (bool) $this->config->get('flatten_deep_query_parameters', true);
     }
 
     /**
