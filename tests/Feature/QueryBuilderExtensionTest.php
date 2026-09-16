@@ -152,6 +152,16 @@ it('follows helper methods of the action for allowed lists', function (): void {
         ->toBe(['name', '-name', 'created_at', '-created_at']);
 });
 
+it('documents a self documenting filter built from a static factory', function (): void {
+    RouteFacade::get('api/factory-filter-categories', FactoryFilterCategoriesController::class)
+        ->name('api.factory-filter-categories.index');
+
+    $parameters = generatedOperationParametersForUri('api/factory-filter-categories');
+
+    expect($parameters['filter[status]']['schema'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['draft', 'published']]]);
+});
+
 it('types an exact filter from the model it filters', function (): void {
     $parameters = generatedOperationParametersForUri('api/categories');
 
@@ -877,8 +887,16 @@ final class DynamicFilterCategoriesController
     public function __invoke(Request $request): AnonymousResourceCollection
     {
         return JsonResource::collection(QueryBuilder::for(Category::class)
-            ->allowedFilters(AllowedFilter::custom('status', new CategoryStatusFilter(...CategoryStatus::cases())))
+            ->allowedFilters(AllowedFilter::custom('status', new CategoryStatusFilter(...$this->statuses($request))))
             ->get());
+    }
+
+    /**
+     * @return list<CategoryStatus>
+     */
+    private function statuses(Request $request): array
+    {
+        return $request->boolean('archived') ? CategoryStatus::cases() : CategoryStatus::selectable();
     }
 }
 
@@ -927,6 +945,16 @@ final class HelperListUsersController
     private static function allowedSorts(): array
     {
         return ['name', 'created_at'];
+    }
+}
+
+final class FactoryFilterCategoriesController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(Category::class)
+            ->allowedFilters(AllowedFilter::custom('status', new CategoryStatusFilter(...CategoryStatus::selectable())))
+            ->get());
     }
 }
 
