@@ -73,6 +73,25 @@ it('documents supported spatie query builder parameters from the route action', 
         ]);
 });
 
+it('nests filters into an object when scramble does not flatten deep query parameters', function (): void {
+    Scramble::getGeneratorConfig('default')->useConfig([...config('scramble'), 'flatten_deep_query_parameters' => false]);
+
+    RouteFacade::get('api/nested-users', StandardUsersController::class)->name('api.nested-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/nested-users');
+
+    expect($parameters)
+        ->not->toHaveKey('filter[name]')
+        ->and($parameters['filter'])
+        ->toMatchArray(['in' => 'query', 'style' => 'deepObject', 'explode' => true])
+        ->and($parameters['filter']['schema']['type'])
+        ->toBe('object')
+        ->and($parameters['filter']['schema']['properties']['name'])
+        ->toMatchArray(['type' => 'array', 'items' => ['type' => 'string']])
+        ->and($parameters['filter']['schema']['properties']['email'])
+        ->toMatchArray(['type' => 'array', 'items' => ['type' => 'string']]);
+});
+
 it('types an exact filter from the model it filters', function (): void {
     $parameters = generatedOperationParametersForUri('api/categories');
 
