@@ -209,34 +209,26 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
      */
     private function constantArguments(array $arguments): ?array
     {
-        $evaluator = new ConstExprEvaluator(function (Expr $expression): mixed {
-            $constant = $expression instanceof Expr\ClassConstFetch
-                && $expression->class instanceof Name
-                && $expression->name instanceof Identifier
-                    ? $this->resolvedClassName($expression->class).'::'.$expression->name->name
-                    : null;
-
-            if ($constant === null || ! defined($constant)) {
-                throw new ConstExprEvaluationException;
-            }
-
-            return constant($constant);
-        });
-
         $values = [];
 
         foreach ($arguments as $argument) {
-            if (! $argument instanceof Arg || $argument->unpack) {
+            if (! $argument instanceof Arg) {
                 return null;
             }
 
             try {
-                $value = $evaluator->evaluateSilently($argument->value);
+                $value = $this->constExprEvaluator()->evaluateSilently($argument->value);
             } catch (ConstExprEvaluationException) {
                 return null;
             }
 
-            if ($argument->name instanceof Identifier) {
+            if ($argument->unpack) {
+                if (! is_array($value)) {
+                    return null;
+                }
+
+                $values = [...$values, ...$value];
+            } elseif ($argument->name instanceof Identifier) {
                 $values[$argument->name->name] = $value;
             } else {
                 $values[] = $value;
@@ -244,6 +236,66 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         }
 
         return $values;
+    }
+
+    /**
+     * The constructor of a self documenting filter is called anyway, so an argument
+     * may come from a static factory or a nested construction as long as everything
+     * it is given resolves statically too.
+     */
+    private function constExprEvaluator(): ConstExprEvaluator
+    {
+        return new ConstExprEvaluator(function (Expr $expression): mixed {
+            if ($expression instanceof Expr\ClassConstFetch) {
+                return $this->constantValue($expression);
+            }
+
+            if (! $expression instanceof Expr\New_ && ! $expression instanceof Expr\StaticCall) {
+                throw new ConstExprEvaluationException;
+            }
+
+            $class = $this->staticallyCalledClass($expression);
+            $arguments = $this->constantArguments($expression->getArgs());
+
+            if ($class === null || $arguments === null) {
+                throw new ConstExprEvaluationException;
+            }
+
+            try {
+                return $expression instanceof Expr\New_
+                    ? new $class(...$arguments)
+                    : $class::{$this->methodName($expression->name)}(...$arguments);
+            } catch (Throwable) {
+                throw new ConstExprEvaluationException;
+            }
+        });
+    }
+
+    /**
+     * @return class-string|null
+     */
+    private function staticallyCalledClass(Expr\New_|Expr\StaticCall $expression): ?string
+    {
+        if (! $expression->class instanceof Name) {
+            return null;
+        }
+
+        $class = $this->resolvedClassName($expression->class);
+
+        return class_exists($class) ? $class : null;
+    }
+
+    private function constantValue(Expr\ClassConstFetch $expression): mixed
+    {
+        $constant = $expression->class instanceof Name && $expression->name instanceof Identifier
+            ? $this->resolvedClassName($expression->class).'::'.$expression->name->name
+            : null;
+
+        if ($constant === null || ! defined($constant)) {
+            throw new ConstExprEvaluationException;
+        }
+
+        return constant($constant);
     }
 
     /**
