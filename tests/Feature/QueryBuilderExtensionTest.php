@@ -120,6 +120,19 @@ it('falls back to the generic custom filter schema when the arguments are not co
         ->not->toHaveKey('items');
 });
 
+it('follows helper methods of the action for allowed lists', function (): void {
+    RouteFacade::get('api/helper-list-users', HelperListUsersController::class)->name('api.helper-list-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/helper-list-users');
+
+    expect($parameters)
+        ->toHaveKeys(['filter[name]', 'filter[email]', 'include', 'sort'])
+        ->and($parameters['include']['schema']['items']['enum'])
+        ->toBe(['roles', 'rolesCount', 'rolesExists'])
+        ->and($parameters['sort']['schema']['items']['enum'])
+        ->toBe(['name', '-name', 'created_at', '-created_at']);
+});
+
 it('types an exact filter from the model it filters', function (): void {
     $parameters = generatedOperationParametersForUri('api/categories');
 
@@ -859,6 +872,42 @@ final class HiddenArgumentsFilterCategoriesController
         return JsonResource::collection(QueryBuilder::for(Category::class)
             ->allowedFilters(AllowedFilter::custom('status', $filter))
             ->get());
+    }
+}
+
+final class HelperListUsersController
+{
+    public function __invoke(Request $request): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(User::class, $request)
+            ->allowedFilters(...$this->allowedFilters())
+            ->allowedIncludes(...$this->allowedIncludes())
+            ->allowedSorts(...self::allowedSorts())
+            ->get());
+    }
+
+    /**
+     * @return list<AllowedFilter|string>
+     */
+    private function allowedFilters(): array
+    {
+        return ['name', AllowedFilter::exact('email')];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function allowedIncludes(): array
+    {
+        return ['roles'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function allowedSorts(): array
+    {
+        return ['name', 'created_at'];
     }
 }
 
