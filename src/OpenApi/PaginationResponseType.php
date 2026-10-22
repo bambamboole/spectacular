@@ -26,14 +26,25 @@ final class PaginationResponseType extends Type
         return $clone;
     }
 
+    public function serializeAs31(): mixed
+    {
+        return $this->titled($this->schema->serializeAs31());
+    }
+
+    public function serializeAs32(): mixed
+    {
+        return $this->titled($this->schema->serializeAs32());
+    }
+
     /**
+     * @param  array<string, mixed>  $schema
      * @return array<string, mixed>
      */
-    public function toArray(): array
+    private function titled(array $schema): array
     {
         return [
             'title' => Str::headline($this->mode->value).' pagination',
-            ...$this->schema->toArray(),
+            ...$schema,
         ];
     }
 }

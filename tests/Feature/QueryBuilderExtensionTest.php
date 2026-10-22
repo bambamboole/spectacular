@@ -287,7 +287,7 @@ it('writes the generated OpenAPI document to stdout or to a file path', function
     Scramble::routes(fn (Route $route): bool => in_array($route->uri(), ['api/users', 'api/users/{user}', 'api/roles', 'api/categories'], true));
 
     expect(Artisan::call('spectacular:openapi'))->toBe(0)
-        ->and(Artisan::output())->toContain('"openapi": "3.1.0"');
+        ->and(Artisan::output())->toContain('"openapi": "3.1.2"');
 
     Scramble::routes(fn (Route $route): bool => in_array($route->uri(), ['api/users', 'api/users/{user}', 'api/roles', 'api/categories'], true));
 

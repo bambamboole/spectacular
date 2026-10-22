@@ -20,11 +20,22 @@ final class ExplicitOperation extends Operation
         }
     }
 
-    /** @return array<string, mixed> */
-    public function toArray(): array
+    public function serializeAs31(): mixed
     {
-        $result = parent::toArray();
+        return $this->applyOverrides(parent::serializeAs31());
+    }
 
+    public function serializeAs32(): mixed
+    {
+        return $this->applyOverrides(parent::serializeAs32());
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function applyOverrides(array $result): array
+    {
         foreach ($this->overrides as $key => $value) {
             if ($value === null) {
                 unset($result[$key]);

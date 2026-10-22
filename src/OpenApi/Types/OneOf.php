@@ -16,11 +16,6 @@ final class OneOf extends Type
     /** @var list<Type|Reference> */
     public array $items = [];
 
-    private ?string $discriminatorProperty = null;
-
-    /** @var array<string, string> */
-    private array $discriminatorMapping = [];
-
     public function __construct()
     {
         parent::__construct('oneOf');
@@ -36,34 +31,25 @@ final class OneOf extends Type
         return $this;
     }
 
-    /**
-     * @param  array<string, string>  $mapping  discriminator value => schema ref
-     */
-    public function setDiscriminator(string $propertyName, array $mapping): self
+    public function serializeAs31(): mixed
     {
-        $this->discriminatorProperty = $propertyName;
-        $this->discriminatorMapping = $mapping;
+        return $this->withVariants(parent::serializeAs31(), array_map(fn (Type|Reference $item): mixed => $item->serializeAs31(), $this->items));
+    }
 
-        return $this;
+    public function serializeAs32(): mixed
+    {
+        return $this->withVariants(parent::serializeAs32(), array_map(fn (Type|Reference $item): mixed => $item->serializeAs32(), $this->items));
     }
 
     /**
+     * @param  array<string, mixed>  $schema
+     * @param  list<mixed>  $variants
      * @return array<string, mixed>
      */
-    public function toArray(): array
+    private function withVariants(array $schema, array $variants): array
     {
-        $array = parent::toArray();
-        unset($array['type']);
+        unset($schema['type']);
 
-        return array_merge(
-            $array,
-            ['oneOf' => array_map(fn ($item) => $item->toArray(), $this->items)],
-            $this->discriminatorProperty === null ? [] : [
-                'discriminator' => array_filter([
-                    'propertyName' => $this->discriminatorProperty,
-                    'mapping' => $this->discriminatorMapping,
-                ], fn ($value) => $value !== []),
-            ],
-        );
+        return [...$schema, 'oneOf' => $variants];
     }
 }

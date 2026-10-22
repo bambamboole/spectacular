@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace Bambamboole\Spectacular\OpenApi\Info;
 
+use Dedoc\Scramble\Support\Generator\Contact;
+use Dedoc\Scramble\Support\Generator\License;
+
 final class InfoConfig
 {
     /**
@@ -47,24 +50,31 @@ final class InfoConfig
         return $strings;
     }
 
+    public static function contact(): ?Contact
+    {
+        $contact = self::strings('contact', ['name', 'url', 'email']);
+
+        if ($contact === []) {
+            return null;
+        }
+
+        return new Contact($contact['name'] ?? null, $contact['url'] ?? null, $contact['email'] ?? null);
+    }
+
     /**
      * A licence is only a licence once it is named, and OpenAPI allows an SPDX
      * identifier or a URL but not both.
-     *
-     * @return array<string, string>
      */
-    public static function license(): array
+    public static function license(): ?License
     {
         $license = self::strings('license', ['name', 'identifier', 'url']);
 
         if (! array_key_exists('name', $license)) {
-            return [];
+            return null;
         }
 
-        if (array_key_exists('identifier', $license)) {
-            unset($license['url']);
-        }
+        $identifier = $license['identifier'] ?? null;
 
-        return $license;
+        return new License($license['name'], $identifier, $identifier === null ? $license['url'] ?? null : null);
     }
 }
