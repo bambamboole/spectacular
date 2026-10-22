@@ -14,7 +14,11 @@ use Illuminate\Support\Facades\Route as RouteFacade;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\QueryBuilder;
+use Workbench\App\Enums\CategoryStatus;
+use Workbench\App\Filters\CategoryStatusFilter;
+use Workbench\App\Filters\RoleNameFilter;
 use Workbench\App\Http\Resources\UserResource;
+use Workbench\App\Models\Category;
 use Workbench\App\Models\User;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
@@ -71,6 +75,72 @@ it('documents supported spatie query builder parameters from the route action', 
                 ],
             ],
         ]);
+});
+
+it('documents a self documenting filter declared inline in the action', function (): void {
+    RouteFacade::get('api/inline-filter-categories', InlineFilterCategoriesController::class)
+        ->name('api.inline-filter-categories.index');
+
+    $parameters = generatedOperationParametersForUri('api/inline-filter-categories');
+
+    expect($parameters['filter[status]']['schema'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['draft', 'published']]])
+        ->and($parameters['filter[status]']['description'])
+        ->toBe('Filter by `status`. Only `draft`, `published` are selectable.');
+});
+
+it('documents a self documenting filter held in a variable', function (): void {
+    RouteFacade::get('api/variable-filter-categories', VariableFilterCategoriesController::class)
+        ->name('api.variable-filter-categories.index');
+
+    $parameters = generatedOperationParametersForUri('api/variable-filter-categories');
+
+    expect($parameters['filter[roles]']['schema'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string']])
+        ->and($parameters['filter[roles]']['description'])
+        ->toBe('Only users holding any of the given role names.');
+});
+
+it('falls back to the generic custom filter schema when a variable hides the constructor arguments', function (): void {
+    RouteFacade::get('api/hidden-arguments-categories', HiddenArgumentsFilterCategoriesController::class)
+        ->name('api.hidden-arguments-categories.index');
+
+    $parameters = generatedOperationParametersForUri('api/hidden-arguments-categories');
+
+    expect($parameters['filter[status]']['schema'])->not->toHaveKey('items');
+});
+
+it('falls back to the generic custom filter schema when the arguments are not constant', function (): void {
+    RouteFacade::get('api/dynamic-filter-categories', DynamicFilterCategoriesController::class)
+        ->name('api.dynamic-filter-categories.index');
+
+    $parameters = generatedOperationParametersForUri('api/dynamic-filter-categories');
+
+    expect($parameters['filter[status]']['schema'])
+        ->not->toHaveKey('items');
+});
+
+it('follows helper methods of the action for allowed lists', function (): void {
+    RouteFacade::get('api/helper-list-users', HelperListUsersController::class)->name('api.helper-list-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/helper-list-users');
+
+    expect($parameters)
+        ->toHaveKeys(['filter[name]', 'filter[email]', 'include', 'sort'])
+        ->and($parameters['include']['schema']['items']['enum'])
+        ->toBe(['roles', 'rolesCount', 'rolesExists'])
+        ->and($parameters['sort']['schema']['items']['enum'])
+        ->toBe(['name', '-name', 'created_at', '-created_at']);
+});
+
+it('documents a self documenting filter built from a static factory', function (): void {
+    RouteFacade::get('api/factory-filter-categories', FactoryFilterCategoriesController::class)
+        ->name('api.factory-filter-categories.index');
+
+    $parameters = generatedOperationParametersForUri('api/factory-filter-categories');
+
+    expect($parameters['filter[status]']['schema'])
+        ->toBe(['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['draft', 'published']]]);
 });
 
 it('types an exact filter from the model it filters', function (): void {
@@ -767,6 +837,104 @@ final class DynamicSubjectUsersController
 
         return UserResource::collection(QueryBuilder::for($subject)
             ->allowedFilters(AllowedFilter::exact('id'))
+            ->get());
+    }
+}
+
+final class InlineFilterCategoriesController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(Category::class)
+            ->allowedFilters(AllowedFilter::custom('status', new CategoryStatusFilter(CategoryStatus::Draft, CategoryStatus::Published)))
+            ->get());
+    }
+}
+
+final class VariableFilterCategoriesController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        $filter = new RoleNameFilter;
+
+        return JsonResource::collection(QueryBuilder::for(User::class)
+            ->allowedFilters(AllowedFilter::custom('roles', $filter))
+            ->get());
+    }
+}
+
+final class DynamicFilterCategoriesController
+{
+    public function __invoke(Request $request): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(Category::class)
+            ->allowedFilters(AllowedFilter::custom('status', new CategoryStatusFilter(...$this->statuses($request))))
+            ->get());
+    }
+
+    /**
+     * @return list<CategoryStatus>
+     */
+    private function statuses(Request $request): array
+    {
+        return $request->boolean('archived') ? CategoryStatus::cases() : CategoryStatus::selectable();
+    }
+}
+
+final class HiddenArgumentsFilterCategoriesController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        $filter = new CategoryStatusFilter(CategoryStatus::Draft);
+
+        return JsonResource::collection(QueryBuilder::for(Category::class)
+            ->allowedFilters(AllowedFilter::custom('status', $filter))
+            ->get());
+    }
+}
+
+final class HelperListUsersController
+{
+    public function __invoke(Request $request): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(User::class, $request)
+            ->allowedFilters(...$this->allowedFilters())
+            ->allowedIncludes(...$this->allowedIncludes())
+            ->allowedSorts(...self::allowedSorts())
+            ->get());
+    }
+
+    /**
+     * @return list<AllowedFilter|string>
+     */
+    private function allowedFilters(): array
+    {
+        return ['name', AllowedFilter::exact('email')];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function allowedIncludes(): array
+    {
+        return ['roles'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function allowedSorts(): array
+    {
+        return ['name', 'created_at'];
+    }
+}
+
+final class FactoryFilterCategoriesController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(Category::class)
+            ->allowedFilters(AllowedFilter::custom('status', new CategoryStatusFilter(...CategoryStatus::selectable())))
             ->get());
     }
 }

@@ -9,4 +9,12 @@ enum CategoryStatus: string
     case Draft = 'draft';
     case Published = 'published';
     case Archived = 'archived';
+
+    /**
+     * @return list<self>
+     */
+    public static function selectable(): array
+    {
+        return [self::Draft, self::Published];
+    }
 }
