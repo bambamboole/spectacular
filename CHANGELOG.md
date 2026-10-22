@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.30.0](https://github.com/bambamboole/spectacular/compare/0.29.0...0.30.0) (2026-10-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* requires dedoc/scramble ^0.13.48. OneOf::setDiscriminator() takes Scramble's Discriminator, and the package's own InfoObject is removed.
+
+### Features
+
+* **openapi:** respect scramble flatten_deep_query_parameters for filters ([#99](https://github.com/bambamboole/spectacular/issues/99)) ([7fcdede](https://github.com/bambamboole/spectacular/commit/7fcdedef9f2679079cd71382064008b19125f2bc))
+
+
+### Bug Fixes
+
+* support Scramble 0.13.48 serialisation ([#101](https://github.com/bambamboole/spectacular/issues/101)) ([ab56a11](https://github.com/bambamboole/spectacular/commit/ab56a112ab69cb68dd3d859b4fe539fd41debe7a))
+
 ## [0.29.0](https://github.com/bambamboole/spectacular/compare/0.28.0...0.29.0) (2026-09-15)
 
 
