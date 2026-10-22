@@ -14,8 +14,12 @@ final class ExplicitSchema extends Schema
         $this->type = new UnknownType;
     }
 
-    /** @return array<string, mixed> */
-    public function toArray(): array
+    public function serializeAs31(): mixed
+    {
+        return $this->definition;
+    }
+
+    public function serializeAs32(): mixed
     {
         return $this->definition;
     }

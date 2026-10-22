@@ -19,14 +19,12 @@ final readonly class DocumentsConfiguredInfo implements DocumentTransformer
             return;
         }
 
-        $info = InfoObject::from($document->info);
+        $info = $document->info;
         $info->title = InfoConfig::string('title') ?? $info->title;
         $info->version = InfoConfig::string('version') ?? $info->version;
         $info->description = InfoConfig::string('description') ?? $info->description;
-        $info->termsOfService = InfoConfig::string('terms_of_service');
-        $info->contact = InfoConfig::strings('contact', ['name', 'url', 'email']);
-        $info->license = InfoConfig::license();
-
-        $document->setInfo($info);
+        $info->termsOfService = InfoConfig::string('terms_of_service') ?? $info->termsOfService;
+        $info->contact = InfoConfig::contact() ?? $info->contact;
+        $info->license = InfoConfig::license() ?? $info->license;
     }
 }

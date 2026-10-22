@@ -17,9 +17,9 @@ it('documents a property-morphable collection as a discriminated oneOf', functio
     expect($blocks['items']['oneOf'] ?? null)->toBe([
         ['$ref' => '#/components/schemas/TextBlockData'],
         ['$ref' => '#/components/schemas/ImageBlockData'],
-    ])->and($blocks['items']['discriminator'] ?? null)->toBe([
+    ])->and($blocks['items']['discriminator'] ?? null)->toEqual([
         'propertyName' => 'type',
-        'mapping' => [
+        'mapping' => (object) [
             'text' => '#/components/schemas/TextBlockData',
             'image' => '#/components/schemas/ImageBlockData',
         ],

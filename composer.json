@@ -19,7 +19,7 @@
     ],
     "require": {
         "php": "^8.4",
-        "dedoc/scramble": "^0.13.30",
+        "dedoc/scramble": "^0.13.48",
         "illuminate/support": "^13.0",
         "league/openapi-psr7-validator": "^0.24",
         "nyholm/psr7": "^1.8",

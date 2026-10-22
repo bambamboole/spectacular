@@ -10,6 +10,7 @@ use Bambamboole\Spectacular\OpenApi\Types\OneOf;
 use Brick\Math\BigDecimal;
 use Dedoc\Scramble\Support\Generator\Combined\AnyOf;
 use Dedoc\Scramble\Support\Generator\Components;
+use Dedoc\Scramble\Support\Generator\Discriminator;
 use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\Reference;
 use Dedoc\Scramble\Support\Generator\RequestBodyObject;
@@ -268,7 +269,7 @@ final readonly class DataSchemaFactory
         $oneOf = new OneOf()->setItems($items);
 
         if ($discriminator !== null) {
-            $oneOf->setDiscriminator($discriminator, $references);
+            $oneOf->setDiscriminator(new Discriminator($discriminator, $references));
         }
 
         return $oneOf;
