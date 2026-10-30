@@ -861,9 +861,15 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             return [];
         }
 
+        $finder = new NodeFinder;
+        $nestedReturns = $finder->findInstanceOf(
+            $finder->findInstanceOf($node->getStmts() ?? [], FunctionLike::class),
+            Return_::class,
+        );
+
         return array_values(array_filter(array_map(
-            fn (Return_ $return): ?Expr => $return->expr,
-            (new NodeFinder)->findInstanceOf($node, Return_::class),
+            fn (Return_ $return): ?Expr => in_array($return, $nestedReturns, true) ? null : $return->expr,
+            $finder->findInstanceOf($node, Return_::class),
         )));
     }
 

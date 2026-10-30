@@ -168,6 +168,14 @@ it('stops expanding a helper method that calls itself', function (): void {
     expect($parameters)->toHaveKey('filter[name]');
 });
 
+it('ignores returns of closures nested in a helper method', function (): void {
+    RouteFacade::get('api/closure-helper-users', ClosureHelperUsersController::class)->name('api.closure-helper-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/closure-helper-users');
+
+    expect($parameters)->not->toHaveKey('sort');
+});
+
 it('documents a self documenting filter built from a static factory', function (): void {
     RouteFacade::get('api/factory-filter-categories', FactoryFilterCategoriesController::class)
         ->name('api.factory-filter-categories.index');
@@ -998,6 +1006,26 @@ final class RecursiveHelperUsersController
     private function fields(): array
     {
         return ['name', ...$this->fields()];
+    }
+}
+
+final class ClosureHelperUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(User::class)
+            ->allowedSorts(...$this->sorts())
+            ->get());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function sorts(): array
+    {
+        return array_map(function (string $sort): string {
+            return 'created_at';
+        }, ['created']);
     }
 }
 
