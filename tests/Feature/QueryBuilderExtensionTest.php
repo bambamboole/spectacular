@@ -152,6 +152,22 @@ it('follows helper methods of the action for allowed lists', function (): void {
         ->toBe(['name', '-name', 'created_at', '-created_at']);
 });
 
+it('expands a helper method feeding more than one allowed list', function (): void {
+    RouteFacade::get('api/shared-helper-users', SharedHelperUsersController::class)->name('api.shared-helper-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/shared-helper-users');
+
+    expect($parameters)->toHaveKeys(['filter[name]', 'sort']);
+});
+
+it('stops expanding a helper method that calls itself', function (): void {
+    RouteFacade::get('api/recursive-helper-users', RecursiveHelperUsersController::class)->name('api.recursive-helper-users.index');
+
+    $parameters = generatedOperationParametersForUri('api/recursive-helper-users');
+
+    expect($parameters)->toHaveKey('filter[name]');
+});
+
 it('documents a self documenting filter built from a static factory', function (): void {
     RouteFacade::get('api/factory-filter-categories', FactoryFilterCategoriesController::class)
         ->name('api.factory-filter-categories.index');
@@ -945,6 +961,43 @@ final class HelperListUsersController
     private static function allowedSorts(): array
     {
         return ['name', 'created_at'];
+    }
+}
+
+final class SharedHelperUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(User::class)
+            ->allowedFilters(...$this->fields())
+            ->allowedSorts(...$this->fields())
+            ->get());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fields(): array
+    {
+        return ['name'];
+    }
+}
+
+final class RecursiveHelperUsersController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(User::class)
+            ->allowedFilters(...$this->fields())
+            ->get());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fields(): array
+    {
+        return ['name', ...$this->fields()];
     }
 }
 

@@ -11,6 +11,7 @@ use Bambamboole\Spectacular\Contracts\HasApiSorts;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterKind;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterSchemaFactory;
 use Bambamboole\Spectacular\QueryBuilder as SpectacularQueryBuilder;
+use Closure;
 use Dedoc\Scramble\Infer\Reflector\MethodReflector;
 use Dedoc\Scramble\Infer\Services\ReferenceTypeResolver;
 use Dedoc\Scramble\Support\Generator\Operation;
@@ -59,7 +60,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     private ?FilterSchemaFactory $filterSchemas = null;
 
     /** @var list<string> */
-    private array $expandedMethods = [];
+    private array $expandingMethods = [];
 
     public function handle(Operation $operation, RouteInfo $routeInfo): void
     {
@@ -69,7 +70,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             return;
         }
 
-        $this->expandedMethods = [];
+        $this->expandingMethods = [];
 
         $singleResultSubjects = $this->singleResultSubjectCalls($actionNode);
         $apiModels = $this->apiDeclarationModelClasses($actionNode, $singleResultSubjects);
@@ -788,19 +789,14 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             return $declarations;
         }
 
-        $returned = $this->returnedExpressions($expression, $routeInfo);
+        $returned = $this->expandReturnedExpressions(
+            $expression,
+            $routeInfo,
+            fn (Expr $returnedExpression): array => $this->argumentExpressionDeclarations($returnedExpression, $allowedClass, $routeInfo, $defaultFactoryName),
+        );
 
-        if ($returned !== []) {
-            $declarations = [];
-
-            foreach ($returned as $returnedExpression) {
-                $declarations = [
-                    ...$declarations,
-                    ...$this->argumentExpressionDeclarations($returnedExpression, $allowedClass, $routeInfo, $defaultFactoryName),
-                ];
-            }
-
-            return $declarations;
+        if ($returned !== null) {
+            return $returned;
         }
 
         $declaration = $this->factoryDeclaration($expression, $allowedClass, $defaultFactoryName);
@@ -811,28 +807,50 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     /**
      * An action may build its allowed lists in a helper method
      * (`->allowedIncludes(...$this->allowedIncludes())`), so a call on the action's
-     * own class is followed into the expressions it returns. Each helper is
-     * expanded once per operation, which also stops a self-recursive helper.
+     * own class is followed into the expressions it returns. A helper already being
+     * expanded is skipped, which stops a self-recursive helper while still letting
+     * one helper feed several lists.
      *
-     * @return list<Expr>
+     * @template TItem
+     *
+     * @param  Closure(Expr): list<TItem>  $expand
+     * @return list<TItem>|null
      */
-    private function returnedExpressions(Expr $expression, RouteInfo $routeInfo): array
+    private function expandReturnedExpressions(Expr $expression, RouteInfo $routeInfo, Closure $expand): ?array
     {
         $class = $routeInfo->className();
         $method = $this->ownMethodName($expression);
 
         if ($class === null || $method === null || ! method_exists($class, $method)) {
-            return [];
+            return null;
         }
 
         $key = "{$class}@{$method}";
 
-        if (in_array($key, $this->expandedMethods, true)) {
-            return [];
+        if (in_array($key, $this->expandingMethods, true)) {
+            return null;
         }
 
-        $this->expandedMethods[] = $key;
+        $returned = $this->returnedExpressions($class, $method);
 
+        if ($returned === []) {
+            return null;
+        }
+
+        $this->expandingMethods[] = $key;
+
+        try {
+            return array_merge(...array_map($expand, $returned));
+        } finally {
+            array_pop($this->expandingMethods);
+        }
+    }
+
+    /**
+     * @return list<Expr>
+     */
+    private function returnedExpressions(string $class, string $method): array
+    {
         try {
             $node = MethodReflector::make($class, $method)->getAstNode();
         } catch (Throwable) {
@@ -892,16 +910,14 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             return $names;
         }
 
-        $returned = $this->returnedExpressions($expression, $routeInfo);
+        $returned = $this->expandReturnedExpressions(
+            $expression,
+            $routeInfo,
+            fn (Expr $returnedExpression): array => $this->includeArgumentNames($returnedExpression, $routeInfo),
+        );
 
-        if ($returned !== []) {
-            $names = [];
-
-            foreach ($returned as $returnedExpression) {
-                $names = [...$names, ...$this->includeArgumentNames($returnedExpression, $routeInfo)];
-            }
-
-            return $names;
+        if ($returned !== null) {
+            return $returned;
         }
 
         $declaration = $this->factoryDeclaration($expression, AllowedInclude::class);
