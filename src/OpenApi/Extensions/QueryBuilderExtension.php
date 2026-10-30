@@ -11,6 +11,9 @@ use Bambamboole\Spectacular\Contracts\HasApiSorts;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterKind;
 use Bambamboole\Spectacular\OpenApi\Filters\FilterSchemaFactory;
 use Bambamboole\Spectacular\QueryBuilder as SpectacularQueryBuilder;
+use Closure;
+use Dedoc\Scramble\Infer\Reflector\MethodReflector;
+use Dedoc\Scramble\Infer\Services\ReferenceTypeResolver;
 use Dedoc\Scramble\Support\Generator\Operation;
 use Dedoc\Scramble\Support\Generator\Parameter;
 use Dedoc\Scramble\Support\Generator\Schema;
@@ -18,13 +21,20 @@ use Dedoc\Scramble\Support\Generator\Types\ArrayType;
 use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\OperationExtensions\RulesExtractor\DeepParametersMerger;
 use Dedoc\Scramble\Support\RouteInfo;
+use Dedoc\Scramble\Support\Type\ObjectType;
 use Illuminate\Support\Str;
+use PhpParser\ConstExprEvaluationException;
+use PhpParser\ConstExprEvaluator;
+use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\FunctionLike;
+use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
+use PhpParser\Node\Stmt\Return_;
 use PhpParser\NodeFinder;
+use ReflectionClass;
 use ReflectionMethod;
 use ReflectionProperty;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -49,6 +59,9 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 
     private ?FilterSchemaFactory $filterSchemas = null;
 
+    /** @var list<string> */
+    private array $expandingMethods = [];
+
     public function handle(Operation $operation, RouteInfo $routeInfo): void
     {
         $actionNode = $routeInfo->actionNode();
@@ -56,6 +69,8 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         if (! $actionNode instanceof FunctionLike) {
             return;
         }
+
+        $this->expandingMethods = [];
 
         $singleResultSubjects = $this->singleResultSubjectCalls($actionNode);
         $apiModels = $this->apiDeclarationModelClasses($actionNode, $singleResultSubjects);
@@ -77,9 +92,9 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             $parameters = [
                 ...$parameters,
                 ...match ($method) {
-                    'allowedFilters' => $this->filterParameters($call),
-                    'allowedIncludes' => $this->includeParameters($call, $apiIncludeNames),
-                    'allowedSorts' => $this->sortParameters($call, $apiSortNames),
+                    'allowedFilters' => $this->filterParameters($call, $routeInfo),
+                    'allowedIncludes' => $this->includeParameters($call, $apiIncludeNames, $routeInfo),
+                    'allowedSorts' => $this->sortParameters($call, $apiSortNames, $routeInfo),
                     default => [],
                 },
             ];
@@ -123,18 +138,190 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     /**
      * @return list<Parameter>
      */
-    private function filterParameters(Expr\MethodCall $call): array
+    private function filterParameters(Expr\MethodCall $call, RouteInfo $routeInfo): array
     {
         $model = $this->subjectModelClass($call->var);
 
         return array_map(
-            function (array $declaration) use ($model): Parameter {
-                ['name' => $name, 'factory' => $factory, 'internal' => $internal] = $declaration;
+            function (array $declaration) use ($model, $routeInfo): Parameter {
+                ['name' => $name, 'factory' => $factory, 'internal' => $internal, 'filter' => $filter] = $declaration;
 
-                return $this->filterParameter($model, $name, FilterKind::tryFromFactory($factory), internalName: $internal);
+                return $this->filterParameter(
+                    $model,
+                    $name,
+                    FilterKind::tryFromFactory($factory),
+                    internalName: $internal,
+                    filterInstance: $this->selfDocumentingFilter($filter, $routeInfo),
+                );
             },
-            $this->argumentDeclarations($call->args, AllowedFilter::class, 'trashed'),
+            $this->argumentDeclarations($call->args, AllowedFilter::class, $routeInfo, 'trashed'),
         );
+    }
+
+    /**
+     * A custom filter documents itself only as a live instance, so the declared
+     * filter is rebuilt here. Anything that cannot be resolved statically falls
+     * back to the generic schema rather than to a guessed instance.
+     *
+     * @return Filter<*>|null
+     */
+    private function selfDocumentingFilter(?Expr $expression, RouteInfo $routeInfo): ?Filter
+    {
+        if ($expression === null) {
+            return null;
+        }
+
+        $class = $this->filterClassName($expression, $routeInfo);
+
+        if ($class === null || ! is_a($class, DocumentsFilterSchema::class, true)) {
+            return null;
+        }
+
+        $arguments = $expression instanceof Expr\New_
+            ? $this->constantArguments($expression->args)
+            : $this->defaultConstructorArguments($class);
+
+        if ($arguments === null) {
+            return null;
+        }
+
+        try {
+            $filter = new $class(...$arguments);
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $filter instanceof Filter ? $filter : null;
+    }
+
+    /**
+     * A filter reached through a variable or a property hides the arguments it
+     * was constructed with, so only a filter that takes none can be rebuilt.
+     *
+     * @param  class-string  $class
+     * @return array{}|null
+     */
+    private function defaultConstructorArguments(string $class): ?array
+    {
+        $constructor = (new ReflectionClass($class))->getConstructor();
+
+        return $constructor === null || $constructor->getNumberOfParameters() === 0 ? [] : null;
+    }
+
+    /**
+     * @return class-string|null
+     */
+    private function filterClassName(Expr $expression, RouteInfo $routeInfo): ?string
+    {
+        if ($expression instanceof Expr\New_ && $expression->class instanceof Name) {
+            $class = $this->resolvedClassName($expression->class);
+
+            return class_exists($class) ? $class : null;
+        }
+
+        try {
+            $scope = $routeInfo->getScope();
+            $type = ReferenceTypeResolver::getInstance()->resolve($scope, $scope->getType($expression));
+        } catch (Throwable) {
+            return null;
+        }
+
+        return $type instanceof ObjectType && class_exists($type->name) ? $type->name : null;
+    }
+
+    /**
+     * @param  list<Arg|Node\VariadicPlaceholder>  $arguments
+     * @return array<array-key, mixed>|null
+     */
+    private function constantArguments(array $arguments): ?array
+    {
+        $values = [];
+
+        foreach ($arguments as $argument) {
+            if (! $argument instanceof Arg) {
+                return null;
+            }
+
+            try {
+                $value = $this->constExprEvaluator()->evaluateSilently($argument->value);
+            } catch (ConstExprEvaluationException) {
+                return null;
+            }
+
+            if ($argument->unpack) {
+                if (! is_array($value)) {
+                    return null;
+                }
+
+                $values = [...$values, ...$value];
+            } elseif ($argument->name instanceof Identifier) {
+                $values[$argument->name->name] = $value;
+            } else {
+                $values[] = $value;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * The constructor of a self documenting filter is called anyway, so an argument
+     * may come from a static factory or a nested construction as long as everything
+     * it is given resolves statically too.
+     */
+    private function constExprEvaluator(): ConstExprEvaluator
+    {
+        return new ConstExprEvaluator(function (Expr $expression): mixed {
+            if ($expression instanceof Expr\ClassConstFetch) {
+                return $this->constantValue($expression);
+            }
+
+            if (! $expression instanceof Expr\New_ && ! $expression instanceof Expr\StaticCall) {
+                throw new ConstExprEvaluationException;
+            }
+
+            $class = $this->staticallyCalledClass($expression);
+            $arguments = $this->constantArguments($expression->getArgs());
+
+            if ($class === null || $arguments === null) {
+                throw new ConstExprEvaluationException;
+            }
+
+            try {
+                return $expression instanceof Expr\New_
+                    ? new $class(...$arguments)
+                    : $class::{$this->methodName($expression->name)}(...$arguments);
+            } catch (Throwable) {
+                throw new ConstExprEvaluationException;
+            }
+        });
+    }
+
+    /**
+     * @return class-string|null
+     */
+    private function staticallyCalledClass(Expr\New_|Expr\StaticCall $expression): ?string
+    {
+        if (! $expression->class instanceof Name) {
+            return null;
+        }
+
+        $class = $this->resolvedClassName($expression->class);
+
+        return class_exists($class) ? $class : null;
+    }
+
+    private function constantValue(Expr\ClassConstFetch $expression): mixed
+    {
+        $constant = $expression->class instanceof Name && $expression->name instanceof Identifier
+            ? $this->resolvedClassName($expression->class).'::'.$expression->name->name
+            : null;
+
+        if ($constant === null || ! defined($constant)) {
+            throw new ConstExprEvaluationException;
+        }
+
+        return constant($constant);
     }
 
     /**
@@ -455,11 +642,11 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
      * @param  list<string>  $apiSortNames
      * @return list<Parameter>
      */
-    private function sortParameters(Expr\MethodCall $call, array $apiSortNames): array
+    private function sortParameters(Expr\MethodCall $call, array $apiSortNames, RouteInfo $routeInfo): array
     {
         $sorts = array_map(
             fn (string $sort): string => ltrim($sort, '-'),
-            $this->argumentNames($call->args, AllowedSort::class),
+            $this->argumentNames($call->args, AllowedSort::class, $routeInfo),
         );
         $parameter = $this->sortParameter([...$sorts, ...$apiSortNames]);
 
@@ -499,14 +686,14 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
      * @param  list<string>  $apiIncludeNames
      * @return list<Parameter>
      */
-    private function includeParameters(Expr\MethodCall $call, array $apiIncludeNames): array
+    private function includeParameters(Expr\MethodCall $call, array $apiIncludeNames, RouteInfo $routeInfo): array
     {
         $includes = [];
 
         foreach ($call->args as $argument) {
             $includes = [
                 ...$includes,
-                ...$this->includeArgumentNames($argument->value),
+                ...$this->includeArgumentNames($argument->value, $routeInfo),
             ];
         }
 
@@ -552,10 +739,10 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
      * @param  class-string  $allowedClass
      * @return list<string>
      */
-    private function argumentNames(array $arguments, string $allowedClass, ?string $defaultFactoryName = null): array
+    private function argumentNames(array $arguments, string $allowedClass, RouteInfo $routeInfo, ?string $defaultFactoryName = null): array
     {
         return $this->uniqueStrings(array_column(
-            $this->argumentDeclarations($arguments, $allowedClass, $defaultFactoryName),
+            $this->argumentDeclarations($arguments, $allowedClass, $routeInfo, $defaultFactoryName),
             'name',
         ));
     }
@@ -563,16 +750,16 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     /**
      * @param  list<Arg>  $arguments
      * @param  class-string  $allowedClass
-     * @return list<array{name: string, factory: string|null, internal: string|null}>
+     * @return list<array{name: string, factory: string|null, internal: string|null, filter: Expr|null}>
      */
-    private function argumentDeclarations(array $arguments, string $allowedClass, ?string $defaultFactoryName = null): array
+    private function argumentDeclarations(array $arguments, string $allowedClass, RouteInfo $routeInfo, ?string $defaultFactoryName = null): array
     {
         $declarations = [];
 
         foreach ($arguments as $argument) {
             $declarations = [
                 ...$declarations,
-                ...$this->argumentExpressionDeclarations($argument->value, $allowedClass, $defaultFactoryName),
+                ...$this->argumentExpressionDeclarations($argument->value, $allowedClass, $routeInfo, $defaultFactoryName),
             ];
         }
 
@@ -581,12 +768,12 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 
     /**
      * @param  class-string  $allowedClass
-     * @return list<array{name: string, factory: string|null, internal: string|null}>
+     * @return list<array{name: string, factory: string|null, internal: string|null, filter: Expr|null}>
      */
-    private function argumentExpressionDeclarations(Expr $expression, string $allowedClass, ?string $defaultFactoryName = null): array
+    private function argumentExpressionDeclarations(Expr $expression, string $allowedClass, RouteInfo $routeInfo, ?string $defaultFactoryName = null): array
     {
         if ($expression instanceof String_) {
-            return [['name' => $expression->value, 'factory' => null, 'internal' => null]];
+            return [['name' => $expression->value, 'factory' => null, 'internal' => null, 'filter' => null]];
         }
 
         if ($expression instanceof Expr\Array_) {
@@ -595,11 +782,21 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             foreach ($expression->items as $item) {
                 $declarations = [
                     ...$declarations,
-                    ...$this->argumentExpressionDeclarations($item->value, $allowedClass, $defaultFactoryName),
+                    ...$this->argumentExpressionDeclarations($item->value, $allowedClass, $routeInfo, $defaultFactoryName),
                 ];
             }
 
             return $declarations;
+        }
+
+        $returned = $this->expandReturnedExpressions(
+            $expression,
+            $routeInfo,
+            fn (Expr $returnedExpression): array => $this->argumentExpressionDeclarations($returnedExpression, $allowedClass, $routeInfo, $defaultFactoryName),
+        );
+
+        if ($returned !== null) {
+            return $returned;
         }
 
         $declaration = $this->factoryDeclaration($expression, $allowedClass, $defaultFactoryName);
@@ -608,9 +805,99 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     }
 
     /**
+     * An action may build its allowed lists in a helper method
+     * (`->allowedIncludes(...$this->allowedIncludes())`), so a call on the action's
+     * own class is followed into the expressions it returns. A helper already being
+     * expanded is skipped, which stops a self-recursive helper while still letting
+     * one helper feed several lists.
+     *
+     * @template TItem
+     *
+     * @param  Closure(Expr): list<TItem>  $expand
+     * @return list<TItem>|null
+     */
+    private function expandReturnedExpressions(Expr $expression, RouteInfo $routeInfo, Closure $expand): ?array
+    {
+        $class = $routeInfo->className();
+        $method = $this->ownMethodName($expression);
+
+        if ($class === null || $method === null || ! method_exists($class, $method)) {
+            return null;
+        }
+
+        $key = "{$class}@{$method}";
+
+        if (in_array($key, $this->expandingMethods, true)) {
+            return null;
+        }
+
+        $returned = $this->returnedExpressions($class, $method);
+
+        if ($returned === []) {
+            return null;
+        }
+
+        $this->expandingMethods[] = $key;
+
+        try {
+            return array_merge(...array_map($expand, $returned));
+        } finally {
+            array_pop($this->expandingMethods);
+        }
+    }
+
+    /**
+     * @return list<Expr>
+     */
+    private function returnedExpressions(string $class, string $method): array
+    {
+        try {
+            $node = MethodReflector::make($class, $method)->getAstNode();
+        } catch (Throwable) {
+            return [];
+        }
+
+        if ($node === null) {
+            return [];
+        }
+
+        $finder = new NodeFinder;
+        $nestedReturns = $finder->findInstanceOf(
+            $finder->findInstanceOf($node->getStmts() ?? [], FunctionLike::class),
+            Return_::class,
+        );
+
+        return array_values(array_filter(array_map(
+            fn (Return_ $return): ?Expr => in_array($return, $nestedReturns, true) ? null : $return->expr,
+            $finder->findInstanceOf($node, Return_::class),
+        )));
+    }
+
+    /**
+     * The method name of a call the action makes on itself, be it through `$this`
+     * or the class itself.
+     */
+    private function ownMethodName(Expr $expression): ?string
+    {
+        if ($expression instanceof Expr\MethodCall) {
+            return $expression->var instanceof Expr\Variable && $expression->var->name === 'this'
+                ? $this->methodName($expression->name)
+                : null;
+        }
+
+        if (! $expression instanceof Expr\StaticCall || ! $expression->class instanceof Name) {
+            return null;
+        }
+
+        return in_array($expression->class->toString(), ['self', 'static'], true)
+            ? $this->methodName($expression->name)
+            : null;
+    }
+
+    /**
      * @return list<string>
      */
-    private function includeArgumentNames(Expr $expression): array
+    private function includeArgumentNames(Expr $expression, RouteInfo $routeInfo): array
     {
         if ($expression instanceof String_) {
             return $this->expandedStringIncludeNames($expression->value);
@@ -622,11 +909,21 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
             foreach ($expression->items as $item) {
                 $names = [
                     ...$names,
-                    ...$this->includeArgumentNames($item->value),
+                    ...$this->includeArgumentNames($item->value, $routeInfo),
                 ];
             }
 
             return $names;
+        }
+
+        $returned = $this->expandReturnedExpressions(
+            $expression,
+            $routeInfo,
+            fn (Expr $returnedExpression): array => $this->includeArgumentNames($returnedExpression, $routeInfo),
+        );
+
+        if ($returned !== null) {
+            return $returned;
         }
 
         $declaration = $this->factoryDeclaration($expression, AllowedInclude::class);
@@ -662,7 +959,7 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
 
     /**
      * @param  class-string  $allowedClass
-     * @return array{name: string, factory: string|null, internal: string|null}|null
+     * @return array{name: string, factory: string|null, internal: string|null, filter: Expr|null}|null
      */
     private function factoryDeclaration(Expr $expression, string $allowedClass, ?string $defaultFactoryName = null): ?array
     {
@@ -679,11 +976,16 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
         $name = $strings[0] ?? null;
 
         if ($name !== null) {
-            return ['name' => $name, 'factory' => $factory, 'internal' => $strings[1] ?? null];
+            return [
+                'name' => $name,
+                'factory' => $factory,
+                'internal' => $strings[1] ?? null,
+                'filter' => $factory === 'custom' ? ($expression->args[1]->value ?? null) : null,
+            ];
         }
 
         return $factory === $defaultFactoryName && $factory !== null
-            ? ['name' => $factory, 'factory' => $factory, 'internal' => null]
+            ? ['name' => $factory, 'factory' => $factory, 'internal' => null, 'filter' => null]
             : null;
     }
 
@@ -734,8 +1036,8 @@ final class QueryBuilderExtension extends AbstractQueryBuilderExtension
     }
 
     /**
-     * @param  list<array{name: string, factory: string|null, internal: string|null}>  $declarations
-     * @return list<array{name: string, factory: string|null, internal: string|null}>
+     * @param  list<array{name: string, factory: string|null, internal: string|null, filter: Expr|null}>  $declarations
+     * @return list<array{name: string, factory: string|null, internal: string|null, filter: Expr|null}>
      */
     private function uniqueDeclarations(array $declarations): array
     {
