@@ -176,6 +176,11 @@ it. `exact`, `belongsTo` and `operator` compare a whole column value, so the sch
 value. A filter whose semantics Spectacular cannot know (`callback`, `custom`) and a chain opened with something other
 than a model class stay untyped.
 
+A custom filter class implementing `Bambamboole\Spectacular\Contracts\DocumentsFilterSchema` documents itself through
+`filterSchema()` and `filterDescription()`. To read them, Spectacular instantiates the filter with the constructor
+arguments written in the action, calling any static factories among them, so their side effects run whenever the
+documentation is generated.
+
 A `scope` filter points at a method the developer already documented: when the scope method — `#[Scope]`-attributed or
 legacy `scope`-prefixed, own, inherited, or from a trait — carries a docblock summary, that summary becomes the
 parameter description instead of the generic template.
