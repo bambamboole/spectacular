@@ -49,6 +49,20 @@ it('documents a query parameter the query builder extension generated', function
         ->and($filter['schema'])->toBe(['type' => 'array', 'items' => ['type' => 'string']]);
 });
 
+it('documents a filter alike whether scramble flattens deep query parameters or not', function (bool $flatten): void {
+    Scramble::getGeneratorConfig('default')->useConfig([...config('scramble'), 'flatten_deep_query_parameters' => $flatten]);
+
+    RouteFacade::get('api/defaulted-filter-users', DefaultedFilterUsersController::class);
+
+    $parameters = documentedParametersForUri('api/defaulted-filter-users');
+    $filter = $flatten ? $parameters['filter[email]'] : $parameters['filter']['schema']['properties']['email'];
+    $schema = $flatten ? $filter['schema'] : $filter;
+
+    expect($filter['description'])->toBe('Exact email address to look for.')
+        ->and($filter['x-tooltip'])->toBe('<a href="https://example.com/docs/filters">Filtering guide</a>')
+        ->and($schema['default'])->toBe(['admin@example.com']);
+})->with(['flattened' => true, 'nested' => false]);
+
 it('documents a query parameter the pagination extension generated', function (): void {
     expect(documentedAttributedParameters()['per_page']['schema']['default'])->toBe(25);
 });
@@ -172,6 +186,22 @@ final class AttributedUsersController
         return UserResource::collection(QueryBuilder::for(User::class)
             ->allowedFilters(AllowedFilter::exact('email'))
             ->paginate($request->integer('per_page', 15)));
+    }
+}
+
+final class DefaultedFilterUsersController
+{
+    #[SpecParameter(
+        'filter[email]',
+        description: 'Exact email address to look for.',
+        tooltip: '<a href="https://example.com/docs/filters">Filtering guide</a>',
+        default: ['admin@example.com'],
+    )]
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return UserResource::collection(QueryBuilder::for(User::class)
+            ->allowedFilters(AllowedFilter::exact('email'))
+            ->get());
     }
 }
 
