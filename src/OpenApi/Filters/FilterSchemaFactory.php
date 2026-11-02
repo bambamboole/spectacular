@@ -50,7 +50,7 @@ final class FilterSchemaFactory
             return $this->keyType($related);
         }
 
-        $columnType = $this->columnType($model, $kind === FilterKind::Between ? ($internalName ?? $name) : $name);
+        $columnType = $this->columnTypeAtPath($model, $kind === FilterKind::BelongsTo ? $name : ($internalName ?? $name));
 
         if ($operator === FilterOperator::DYNAMIC) {
             return $this->dynamicOperatorType($columnType);
@@ -62,8 +62,9 @@ final class FilterSchemaFactory
     /**
      * A belongsTo filter names its relation in the internal name — dot-nested
      * for a relation reached through others, exactly how FiltersBelongsTo
-     * resolves it at runtime. The name-based heuristic in relatedModel() stays
-     * the fallback for filters that follow the `{relation}_id` convention.
+     * resolves it at runtime; a column filter prefixes its column with that
+     * path. The name-based heuristic in relatedModel() stays the fallback for
+     * filters that follow the `{relation}_id` convention.
      */
     private function relatedModelFromRelationPath(Model $model, string $path): ?Model
     {
@@ -109,6 +110,21 @@ final class FilterSchemaFactory
         }
 
         return $type;
+    }
+
+    /**
+     * A dotted column (`categories.id`) is filtered through the relations before
+     * its last segment, as the query builder does at runtime.
+     */
+    private function columnTypeAtPath(Model $model, string $path): Type
+    {
+        if (! str_contains($path, '.')) {
+            return $this->columnType($model, $path);
+        }
+
+        $related = $this->relatedModelFromRelationPath($model, Str::beforeLast($path, '.'));
+
+        return $related === null ? new StringType : $this->columnType($related, Str::afterLast($path, '.'));
     }
 
     private function columnType(Model $model, string $name): Type
