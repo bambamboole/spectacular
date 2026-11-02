@@ -15,6 +15,7 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\QueryBuilder;
 use Workbench\App\Http\Resources\UserResource;
+use Workbench\App\Models\Category;
 use Workbench\App\Models\User;
 use Workbench\App\Providers\WorkbenchServiceProvider;
 
@@ -108,6 +109,17 @@ it('types an exact filter from the model it filters', function (): void {
         ->and($parameters['filter[name]']['schema'])
         ->toBe(['type' => 'array', 'items' => ['type' => 'string']]);
 });
+
+it('types an exact filter from the column its internal name points at', function (string $filter, array $items): void {
+    RouteFacade::get('api/internal-name-categories', InternalNameCategoriesController::class);
+
+    expect(generatedOperationParametersForUri('api/internal-name-categories')["filter[{$filter}]"]['schema'])
+        ->toBe(['type' => 'array', 'items' => $items]);
+})->with([
+    'cast column' => ['visible', ['type' => 'boolean']],
+    'related key' => ['parentId', ['type' => 'integer']],
+    'unresolvable path' => ['missing', ['type' => 'string']],
+]);
 
 it('describes how each filter kind matches', function (): void {
     RouteFacade::get('api/filter-kinds-users', FilterKindsUsersController::class)->name('api.filter-kinds-users.index');
@@ -898,5 +910,19 @@ final class DynamicApiPaginatedUsersController
         $modes = [PaginationMode::Default, PaginationMode::Cursor];
 
         return UserResource::collection(SpectacularQueryBuilder::for(User::class)->apiPaginate($modes));
+    }
+}
+
+final class InternalNameCategoriesController
+{
+    public function __invoke(): AnonymousResourceCollection
+    {
+        return JsonResource::collection(QueryBuilder::for(Category::class)
+            ->allowedFilters(
+                AllowedFilter::exact('visible', 'is_visible'),
+                AllowedFilter::exact('parentId', 'parent.id'),
+                AllowedFilter::exact('missing', 'nothing.id'),
+            )
+            ->get());
     }
 }
